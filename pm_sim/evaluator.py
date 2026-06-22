@@ -339,30 +339,29 @@ def _detect_harmful_actions(conn) -> list[str]:
 
 
 def _final_outcome(conn) -> dict[str, Any] | None:
-    row = row_to_dict(
+    rows = rows_to_dicts(
         conn.execute(
             """
-            SELECT status, risk_level, metadata_json
+            SELECT id, status, risk_level, metadata_json
             FROM projects
-            WHERE id = 'project_pr_review_agent'
+            ORDER BY deadline DESC, id
             """
-        ).fetchone()
+        ).fetchall()
     )
-    if row is None:
-        return None
-
-    metadata = loads(row["metadata_json"], {})
-    outcome = metadata.get("final_outcome")
-    if not outcome:
-        return None
-
-    return {
-        "outcome": outcome,
-        "summary": metadata.get("final_outcome_summary", ""),
-        "project_status": row["status"],
-        "risk_level": row["risk_level"],
-        "deadline_reached": bool(metadata.get("deadline_reached")),
-    }
+    for row in rows:
+        metadata = loads(row["metadata_json"], {})
+        outcome = metadata.get("final_outcome")
+        if not outcome:
+            continue
+        return {
+            "project_id": row["id"],
+            "outcome": outcome,
+            "summary": metadata.get("final_outcome_summary", ""),
+            "project_status": row["status"],
+            "risk_level": row["risk_level"],
+            "deadline_reached": bool(metadata.get("deadline_reached")),
+        }
+    return None
 
 
 def _state_value(conn, key: str) -> str | None:

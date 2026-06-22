@@ -257,7 +257,21 @@ Scenario data should define most of the setup:
 - scheduled events
 - evaluation targets
 
-Python behavior rules can handle logic that data alone cannot express. The goal is for a second scenario to reuse the same engine, tools, event queue, and evaluator structure.
+Python behavior rules can handle logic that data alone cannot express. The v1 launch-readiness scenario still has scenario-specific Python checks for a few task gates, state-derived evidence rows, and Friday outcome classification. We should not pretend this is fully generic.
+
+The defensible split is:
+
+```text
+Reusable engine:
+  storage, tool actions, event delivery, timelines, effect application,
+  coworker rule matching, action logs, and evaluator component scoring
+
+Scenario-specific v1 logic:
+  some task-gate checks, some state-derived evidence, and the Friday
+  outcome classifier for the PR Review Agent launch
+```
+
+The next scaling step is not a giant prompt. It is moving more outcome rules and state checks into scenario data so a second scenario can reuse the same engine without custom Python branches for every project.
 
 ### Operator Workflow
 

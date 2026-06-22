@@ -242,6 +242,7 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertIn("without an approved reliable launch plan", outcome_doc["body"])
 
         evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        self.assertEqual(evaluation["final_outcome"]["project_id"], "project_pr_review_agent")
         self.assertEqual(evaluation["final_outcome"]["outcome"], "no_approved_friday_plan")
         self.assertEqual(evaluation["final_outcome"]["project_status"], "missed")
 

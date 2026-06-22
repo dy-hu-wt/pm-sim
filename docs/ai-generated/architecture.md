@@ -160,4 +160,4 @@ Direct coworker chat uses a structured rule interpreter. Rules can match on trig
 
 This is the main answer to the scaling concern: scenario files should describe the world, while engine code should define common simulation semantics.
 
-The current v1 still has some scenario-specific Python for Friday outcome classification and a few evaluator state checks. That is intentional for a single fully-authored scenario, but it is the next scaling boundary: additional scenarios should push more outcome rules into scenario data while keeping common action, event, effect, and storage semantics in the engine.
+The current v1 still has scenario-specific Python for some task gates, state-derived evidence rows, and Friday outcome classification. That is intentional for one fully-authored scenario, but it is the main scaling boundary. The common engine pieces are storage, tool actions, event delivery, timelines, effect application, coworker rule matching, action logs, and evaluator component scoring. A second scenario should push more outcome rules and state checks into scenario data instead of adding custom branches for every project.

@@ -183,22 +183,26 @@ def _effects_for_delivery(
         return effects_for_meeting(payload, _meeting_state(conn))
 
     if event_type == "friday_nimbus_deadline":
-        return _effects_for_friday_deadline(conn)
+        return _effects_for_friday_deadline(conn, payload)
 
     return effects_for_event(event_type, payload)
 
 
-def _effects_for_friday_deadline(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    outcome = _classify_friday_outcome(conn)
+def _effects_for_friday_deadline(
+    conn: sqlite3.Connection,
+    payload: dict[str, Any],
+) -> list[dict[str, Any]]:
+    project_id = payload.get("project_id", "project_pr_review_agent")
+    outcome = _classify_friday_outcome(conn, project_id)
 
     return [
         {
             "type": "update_project",
-            "project_id": "project_pr_review_agent",
+            "project_id": project_id,
             "status": outcome["status"],
             "risk_level": outcome["risk_level"],
             "deadline_reached": True,
-            "deadline_id": "deadline_nimbus_beta",
+            "deadline_id": payload.get("deadline_id", "deadline_nimbus_beta"),
             "final_outcome": outcome["final_outcome"],
             "final_outcome_summary": outcome["summary"],
         },
@@ -214,9 +218,9 @@ def _effects_for_friday_deadline(conn: sqlite3.Connection) -> list[dict[str, Any
     ]
 
 
-def _classify_friday_outcome(conn: sqlite3.Connection) -> dict[str, str]:
+def _classify_friday_outcome(conn: sqlite3.Connection, project_id: str) -> dict[str, str]:
     facts = _discovered_fact_ids(conn)
-    decision = _project_decision(conn)
+    decision = _project_decision(conn, project_id)
     draft_approved_at = _first_fact_or_evidence_time(
         conn,
         "fact_draft_mode_approved",
@@ -335,13 +339,14 @@ def _evidence_keys(conn: sqlite3.Connection) -> set[str]:
     return {row["evidence_key"] for row in rows}
 
 
-def _project_decision(conn: sqlite3.Connection) -> str | None:
+def _project_decision(conn: sqlite3.Connection, project_id: str) -> str | None:
     row = conn.execute(
         """
         SELECT metadata_json
         FROM projects
-        WHERE id = 'project_pr_review_agent'
-        """
+        WHERE id = ?
+        """,
+        (project_id,),
     ).fetchone()
     if row is None:
         return None
