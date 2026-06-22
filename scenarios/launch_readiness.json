@@ -1,25 +1,25 @@
 {
   "id": "launch_readiness",
-  "name": "Executive Health Report Launch Readiness",
-  "company": "Mushroom Metrics",
+  "name": "PR Review Agent Beta Launch Readiness",
+  "company": "Starboard DevTools",
   "start_time": "2026-06-22T09:00:00",
   "timezone": "America/New_York",
-  "summary": "Mushroom Metrics is trying to launch an Executive Health Report for Fireflower CRM's Friday renewal meeting.",
+  "summary": "Starboard DevTools is trying to launch a PR Review Agent beta for Nimbus Labs by Friday.",
   "projects": [
     {
-      "id": "project_exec_health_report",
-      "name": "Executive Health Report",
-      "customer": "Fireflower CRM",
+      "id": "project_pr_review_agent",
+      "name": "PR Review Agent Beta",
+      "customer": "Nimbus Labs",
       "deadline": "2026-06-26T15:00:00",
       "status": "at_risk",
       "risk_level": "high",
-      "stakeholder_pressure": "Daisy promised Fireflower CRM an executive-ready report for Friday.",
-      "description": "Launch an Executive Health Report for Fireflower CRM's Friday renewal meeting.",
+      "stakeholder_pressure": "Daisy promised Nimbus Labs a Friday beta of the PR Review Agent.",
+      "description": "Launch a PR Review Agent beta for Nimbus Labs by Friday.",
       "decision": "undecided",
       "success_criteria": [
-        "Report can be shown reliably in Fireflower CRM's Friday renewal meeting.",
-        "Customer success has clear talk track before Thursday morning.",
-        "The team has an explicit full-report versus fallback decision."
+        "The agent can be demoed reliably on a real pull request.",
+        "Nimbus Labs has clear beta messaging before Thursday morning.",
+        "The team has an explicit auto-commenting versus draft-mode decision."
       ]
     }
   ],
@@ -29,12 +29,12 @@
       "name": "Mario",
       "role": "Product Manager",
       "goals": [
-        "Show the strongest possible Executive Health Report story.",
-        "Avoid surprising Fireflower CRM or customer success late in the week."
+        "Show the strongest possible PR Review Agent beta.",
+        "Avoid surprising Nimbus Labs or customer-facing teams late in the week."
       ],
       "constraints": [
-        "Initially assumes the full report is still realistic.",
-        "Needs concrete risk before agreeing to cut scope."
+        "Initially assumes auto-commenting is still realistic.",
+        "Needs concrete risk before agreeing to cut launch scope."
       ],
       "availability": [
         {
@@ -75,12 +75,12 @@
       "name": "Luigi",
       "role": "Backend Engineer",
       "goals": [
-        "Stabilize CRM enrichment sync.",
-        "Prevent an unreliable Friday demo."
+        "Stabilize repository sync for the review agent.",
+        "Prevent the agent from reviewing stale code in the Friday beta."
       ],
       "constraints": [
-        "Owns the CRM integration and retry hardening.",
-        "Does not proactively escalate until Thursday unless asked about launch risk, blockers, CRM sync, or readiness."
+        "Owns the repo sync worker and webhook handling.",
+        "Does not proactively escalate until Thursday unless asked about launch risk, blockers, repo sync, stale code, or readiness."
       ],
       "availability": [
         {
@@ -112,14 +112,14 @@
       "response_delay_minutes": 120,
       "private_knowledge": {
         "fact_ids": [
-          "fact_crm_sync_flaky"
+          "fact_repo_sync_stale"
         ]
       },
       "behavior": {
         "rule": "luigi"
       },
       "private_fact_ids": [
-        "fact_crm_sync_flaky"
+        "fact_repo_sync_stale"
       ]
     },
     {
@@ -127,12 +127,12 @@
       "name": "Peach",
       "role": "Designer",
       "goals": [
-        "Finalize an executive-ready report layout.",
-        "Avoid designing around fields that may not exist on Friday."
+        "Finalize the beta onboarding and review-flow screens.",
+        "Avoid documenting auto-commenting behavior that may not ship on Friday."
       ],
       "constraints": [
-        "Blocked until full versus fallback scope is clarified.",
-        "Can finish a fallback layout quickly once CRM fields are explicitly out of Friday scope."
+        "Blocked until auto-commenting versus draft-mode scope is clarified.",
+        "Can finish draft-mode onboarding quickly once auto-posting is explicitly out of Friday scope."
       ],
       "availability": [
         {
@@ -179,12 +179,12 @@
       "name": "Daisy",
       "role": "Customer Success Lead",
       "goals": [
-        "Protect the Fireflower CRM renewal conversation.",
-        "Get a clear confidence update and talk track before speaking with the customer."
+        "Protect the Nimbus Labs beta relationship.",
+        "Get a clear confidence update and pilot talk track before speaking with the customer."
       ],
       "constraints": [
-        "Promised Fireflower an executive report for Friday.",
-        "Will support fallback if reliability risk and customer messaging are clear."
+        "Promised Nimbus Labs a useful coding-agent beta for Friday.",
+        "Will support draft mode if reliability risk and customer messaging are clear."
       ],
       "availability": [
         {
@@ -216,14 +216,14 @@
       "response_delay_minutes": 45,
       "private_knowledge": {
         "fact_ids": [
-          "fact_fireflower_values_reliability"
+          "fact_nimbus_values_reliability"
         ]
       },
       "behavior": {
         "rule": "daisy"
       },
       "private_fact_ids": [
-        "fact_fireflower_values_reliability"
+        "fact_nimbus_values_reliability"
       ]
     },
     {
@@ -231,12 +231,12 @@
       "name": "Toad",
       "role": "Engineering Manager",
       "goals": [
-        "Make a defensible launch decision.",
+        "Make a defensible beta launch decision.",
         "Keep engineers focused on the highest-risk work."
       ],
       "constraints": [
         "Will not approve de-scope without concrete customer impact and technical risk.",
-        "Can approve fallback report for Friday."
+        "Can approve draft-mode beta for Friday."
       ],
       "availability": [
         {
@@ -275,12 +275,12 @@
   ],
   "facts": [
     {
-      "id": "fact_crm_sync_flaky",
+      "id": "fact_repo_sync_stale",
       "visibility": "hidden",
       "owner_id": "luigi",
-      "summary": "The CRM enrichment sync for renewal date and account tier is flaky because the vendor endpoint times out.",
+      "summary": "The repo sync worker sometimes reviews an older commit because webhook events can arrive out of order.",
       "revealed_by": [
-        "Ask Luigi about launch risk, blockers, CRM sync, readiness, Fireflower, renewal fields, account tier, or fallback.",
+        "Ask Luigi about launch risk, blockers, repo sync, stale code, webhooks, auto-commenting, or readiness.",
         "Wait until Luigi's Thursday proactive escalation."
       ]
     },
@@ -288,46 +288,46 @@
       "id": "fact_design_blocked_by_scope",
       "visibility": "private",
       "owner_id": "peach",
-      "summary": "Peach cannot finish the report layout until the Friday scope is clarified."
+      "summary": "Peach cannot finish onboarding screens until the Friday launch mode is clarified."
     },
     {
-      "id": "fact_fireflower_values_reliability",
+      "id": "fact_nimbus_values_reliability",
       "visibility": "private",
       "owner_id": "daisy",
-      "summary": "For Fireflower CRM, a reliable focused report is better than a richer report that may fail during the renewal meeting."
+      "summary": "For Nimbus Labs, reliable draft suggestions are better than auto-posted comments that might review stale code."
     },
     {
-      "id": "fact_fallback_scope_confirmed",
+      "id": "fact_draft_mode_scope_confirmed",
       "visibility": "derived",
-      "summary": "The Friday report scope excludes CRM enrichment and uses reliable internal usage and support data."
+      "summary": "The Friday beta scope is draft-suggestions mode with human approval before comments are posted."
     },
     {
-      "id": "fact_fallback_approved",
+      "id": "fact_draft_mode_approved",
       "visibility": "derived",
-      "summary": "Toad approved shipping the fallback report for Friday."
+      "summary": "Toad approved shipping draft mode for Friday."
     }
   ],
   "tasks": [
     {
-      "id": "task_crm_enrichment",
-      "project_id": "project_exec_health_report",
-      "title": "Integrate CRM renewal date and account tier",
+      "id": "task_repo_sync",
+      "project_id": "project_pr_review_agent",
+      "title": "Stabilize repo sync for latest commit reviews",
       "owner_id": "luigi",
       "status": "in_progress",
       "priority": "high",
       "due_at": "2026-06-25T12:00:00",
       "metadata": {
         "blocked_by": [
-          "blocker_crm_sync_flaky"
+          "blocker_repo_sync_stale"
         ]
       },
       "visible": true,
-      "blocked_by": "blocker_crm_sync_flaky"
+      "blocked_by": "blocker_repo_sync_stale"
     },
     {
-      "id": "task_usage_support_pipeline",
-      "project_id": "project_exec_health_report",
-      "title": "Prepare usage and support metrics pipeline",
+      "id": "task_review_context_pipeline",
+      "project_id": "project_pr_review_agent",
+      "title": "Prepare diff context and test fixtures",
       "owner_id": "luigi",
       "status": "ready",
       "priority": "high",
@@ -337,9 +337,9 @@
       "blocked_by": ""
     },
     {
-      "id": "task_fallback_design",
-      "project_id": "project_exec_health_report",
-      "title": "Finalize fallback report layout",
+      "id": "task_draft_mode_docs",
+      "project_id": "project_pr_review_agent",
+      "title": "Finalize draft-mode onboarding",
       "owner_id": "peach",
       "status": "blocked",
       "priority": "medium",
@@ -354,8 +354,8 @@
     },
     {
       "id": "task_customer_talk_track",
-      "project_id": "project_exec_health_report",
-      "title": "Draft Fireflower customer success talk track",
+      "project_id": "project_pr_review_agent",
+      "title": "Draft Nimbus beta talk track",
       "owner_id": "daisy",
       "status": "not_started",
       "priority": "high",
@@ -370,8 +370,8 @@
     },
     {
       "id": "task_launch_decision",
-      "project_id": "project_exec_health_report",
-      "title": "Decide full report versus fallback report",
+      "project_id": "project_pr_review_agent",
+      "title": "Decide auto-commenting versus draft mode",
       "owner_id": "toad",
       "status": "not_started",
       "priority": "critical",
@@ -388,89 +388,89 @@
   "dependencies": [
     {
       "id": "dep_design_needs_scope",
-      "project_id": "project_exec_health_report",
+      "project_id": "project_pr_review_agent",
       "upstream_task_id": "task_launch_decision",
-      "downstream_task_id": "task_fallback_design",
-      "description": "Design cannot finish until Friday scope is decided."
+      "downstream_task_id": "task_draft_mode_docs",
+      "description": "Onboarding cannot finish until Friday launch mode is decided."
     },
     {
       "id": "dep_talk_track_needs_decision",
-      "project_id": "project_exec_health_report",
+      "project_id": "project_pr_review_agent",
       "upstream_task_id": "task_launch_decision",
       "downstream_task_id": "task_customer_talk_track",
-      "description": "Customer success talk track depends on the launch scope decision."
+      "description": "Customer beta talk track depends on the launch mode decision."
     },
     {
-      "id": "dep_full_report_needs_crm",
-      "project_id": "project_exec_health_report",
-      "upstream_task_id": "task_crm_enrichment",
+      "id": "dep_auto_commenting_needs_repo_sync",
+      "project_id": "project_pr_review_agent",
+      "upstream_task_id": "task_repo_sync",
       "downstream_task_id": "task_launch_decision",
-      "description": "CRM enrichment status informs whether the full report is safe."
+      "description": "Repo sync reliability determines whether auto-commenting is safe."
     }
   ],
   "blockers": [
     {
-      "id": "blocker_crm_sync_flaky",
-      "project_id": "project_exec_health_report",
-      "title": "CRM enrichment sync is unreliable",
+      "id": "blocker_repo_sync_stale",
+      "project_id": "project_pr_review_agent",
+      "title": "Repo sync can review stale commits",
       "status": "open",
       "severity": "high",
       "owner_id": "luigi",
       "hidden": true,
-      "description": "Full report may show blank or stale renewal date and account tier in the Friday meeting.",
+      "description": "Auto-commenting may post review comments against an older commit instead of the latest PR diff.",
       "metadata": {
-        "fact_id": "fact_crm_sync_flaky"
+        "fact_id": "fact_repo_sync_stale"
       }
     },
     {
       "id": "blocker_scope_unclear",
-      "project_id": "project_exec_health_report",
-      "title": "Friday report scope is unclear",
+      "project_id": "project_pr_review_agent",
+      "title": "Friday launch mode is unclear",
       "status": "open",
       "severity": "medium",
       "owner_id": "peach",
       "hidden": false,
-      "description": "Design and customer messaging cannot finish until full versus fallback scope is decided.",
+      "description": "Onboarding and customer messaging cannot finish until auto-commenting versus draft mode is decided.",
       "metadata": {
         "fact_id": "fact_design_blocked_by_scope"
       }
     },
     {
       "id": "blocker_launch_scope_decision",
-      "project_id": "project_exec_health_report",
-      "title": "No full report versus fallback decision",
+      "project_id": "project_pr_review_agent",
+      "title": "No auto-commenting versus draft-mode decision",
       "status": "open",
       "severity": "high",
       "owner_id": "toad",
       "hidden": false,
-      "description": "The team may drift into a risky full-report launch without explicit approval."
+      "description": "The team may drift into a risky auto-commenting beta without explicit approval."
     }
   ],
   "docs": [
     {
       "id": "doc_project_brief",
-      "title": "Executive Health Report Project Brief",
+      "title": "PR Review Agent Beta Brief",
       "kind": "brief",
       "visible": true,
-      "body": "Executive Health Report goal: give customer success leaders an executive-ready report before renewal meetings. Friday pilot: Fireflower CRM. Full report fields: usage trends, seat adoption, support ticket volume, renewal risk, CRM account tier, CRM renewal date, and customer health summary. Fallback report fields: usage trends, seat adoption, support ticket volume, renewal risk, and customer health summary."
+      "body": "PR Review Agent goal: help engineering teams review pull requests faster. Friday pilot: Nimbus Labs. Full beta mode posts review comments automatically on PRs. Draft-mode beta prepares suggestions for human approval before posting. Draft mode is less flashy, but safer if repo sync is not reliable."
     },
     {
       "id": "doc_monday_standup",
       "title": "Monday Standup Notes",
       "kind": "meeting_notes",
       "visible": true,
-      "body": "Mario wants the full report if possible. Peach needs scope confirmation before final design. Daisy needs confidence language before she updates Fireflower. Luigi said he is still hardening CRM enrichment retries."
+      "body": "Mario wants auto-commenting if possible. Peach needs launch-mode confirmation before final onboarding. Daisy needs confidence language before she updates Nimbus. Luigi said he is still hardening repo sync ordering."
     },
     {
-      "id": "doc_crm_retry_notes",
-      "title": "CRM Retry Notes",
+      "id": "doc_repo_sync_notes",
+      "title": "Repo Sync Notes",
       "kind": "engineering_notes",
       "visible": false,
       "owner_id": "luigi",
       "metadata": {
         "owner_id": "luigi"
       },
-      "body": "Vendor CRM enrichment endpoint is intermittently timing out. Retries reduce failures but do not make renewal date and account tier reliable enough for a Friday executive demo."
+      "body": "Webhook events can arrive out of order. The sync worker sometimes evaluates an older commit SHA, so auto-posted review comments may target stale code. Draft mode avoids customer-visible bad comments while the worker is hardened."
     }
   ],
   "messages": [
@@ -481,7 +481,7 @@
       "sender_id": "mario",
       "recipient_id": "agent",
       "subject": null,
-      "body": "Can you drive launch readiness for the Executive Health Report this week? Fireflower's renewal meeting is Friday, and I would love to keep the full report in scope if risk allows."
+      "body": "Can you drive launch readiness for the PR Review Agent beta this week? Nimbus Labs expects the Friday pilot, and I would love to keep auto-commenting in scope if risk allows."
     },
     {
       "id": "msg_initial_daisy",
@@ -489,19 +489,19 @@
       "channel": "email",
       "sender_id": "daisy",
       "recipient_id": "agent",
-      "subject": "Fireflower Friday prep",
-      "body": "Fireflower is expecting an executive-ready health report for Friday's renewal meeting. Please tell me by Thursday morning what we can confidently show."
+      "subject": "Nimbus Friday beta prep",
+      "body": "Nimbus Labs is expecting a useful coding-agent beta on Friday. Please tell me by Thursday morning what we can confidently show."
     }
   ],
   "events": [
     {
-      "id": "event_mario_full_report_push",
-      "event_type": "mario_full_report_push",
+      "id": "event_mario_auto_comment_push",
+      "event_type": "mario_auto_comment_push",
       "scheduled_at": "2026-06-23T10:00:00",
       "status": "pending",
       "priority": 100,
       "payload": {
-        "project_id": "project_exec_health_report"
+        "project_id": "project_pr_review_agent"
       }
     },
     {
@@ -511,8 +511,8 @@
       "status": "pending",
       "priority": 100,
       "payload": {
-        "project_id": "project_exec_health_report",
-        "task_id": "task_fallback_design"
+        "project_id": "project_pr_review_agent",
+        "task_id": "task_draft_mode_docs"
       }
     },
     {
@@ -522,28 +522,28 @@
       "status": "pending",
       "priority": 100,
       "payload": {
-        "project_id": "project_exec_health_report"
+        "project_id": "project_pr_review_agent"
       }
     },
     {
-      "id": "event_luigi_proactive_crm_risk",
-      "event_type": "luigi_proactive_crm_risk",
+      "id": "event_luigi_proactive_repo_risk",
+      "event_type": "luigi_proactive_repo_risk",
       "scheduled_at": "2026-06-25T10:00:00",
       "status": "pending",
       "priority": 100,
       "payload": {
-        "project_id": "project_exec_health_report",
-        "blocker_id": "blocker_crm_sync_flaky"
+        "project_id": "project_pr_review_agent",
+        "blocker_id": "blocker_repo_sync_stale"
       }
     },
     {
-      "id": "event_friday_fireflower_deadline",
-      "event_type": "friday_fireflower_deadline",
+      "id": "event_friday_nimbus_deadline",
+      "event_type": "friday_nimbus_deadline",
       "scheduled_at": "2026-06-26T15:00:00",
       "status": "pending",
       "priority": 100,
       "payload": {
-        "project_id": "project_exec_health_report"
+        "project_id": "project_pr_review_agent"
       }
     }
   ],
@@ -566,27 +566,27 @@
       "points": 20,
       "evidence_keys": [
         "peach_unblocked",
-        "fallback_approved"
+        "draft_mode_approved"
       ]
     },
     "risk_handling": {
       "points": 15,
       "evidence_keys": [
-        "fallback_approved"
+        "draft_mode_approved"
       ],
       "preferred_before": "2026-06-25T15:00:00"
     },
     "avoid_harmful_actions": {
       "points": 15,
       "harmful_patterns": [
-        "mark CRM enrichment complete without resolving blocker",
+        "mark repo sync complete without resolving stale-code blocker",
         "ignore Daisy until Friday",
-        "approve full report after CRM risk is known without Toad approval"
+        "approve auto-commenting after stale-code risk is known without Toad approval"
       ]
     }
   },
   "baseline": {
-    "description": "No-op baseline waits for scheduled events. Luigi surfaces the CRM risk on Thursday, which is late for Daisy's customer message and Peach's layout work.",
-    "expected_outcome": "Report remains at risk, fallback may be chosen late, and stakeholder confidence is lower than an agent-driven path."
+    "description": "No-op baseline waits for scheduled events. Luigi surfaces the stale-code risk on Thursday, which is late for Daisy's customer message and Peach's onboarding work.",
+    "expected_outcome": "Beta remains at risk, draft mode may be chosen late, and stakeholder confidence is lower than an agent-driven path."
   }
 }

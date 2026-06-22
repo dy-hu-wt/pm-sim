@@ -155,10 +155,19 @@ def _apply_update_blocker(
 ) -> dict[str, Any]:
     blocker_id = _required(effect, "blocker_id")
     status = _required(effect, "status")
+    existing = conn.execute(
+        "SELECT status FROM blockers WHERE id = ?",
+        (blocker_id,),
+    ).fetchone()
+    if existing is None:
+        raise ValueError(f"Cannot update unknown blocker: {blocker_id}")
+    if existing["status"] == "resolved" and status != "resolved":
+        return {"blocker_id": blocker_id, "status": existing["status"], "skipped": True}
+
     discovered_at = now if status in {"surfaced", "open", "resolved"} else None
     resolved_at = now if status == "resolved" else None
 
-    cursor = conn.execute(
+    conn.execute(
         """
         UPDATE blockers
         SET status = ?,
@@ -168,8 +177,6 @@ def _apply_update_blocker(
         """,
         (status, discovered_at, resolved_at, resolved_at, blocker_id),
     )
-    if cursor.rowcount == 0:
-        raise ValueError(f"Cannot update unknown blocker: {blocker_id}")
     return {"blocker_id": blocker_id, "status": status}
 
 

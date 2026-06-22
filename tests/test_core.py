@@ -46,8 +46,8 @@ class CoreSimulationTests(unittest.TestCase):
         blocker_ids = {blocker["id"] for blocker in state["known_blockers"]}
         fact_ids = {fact["id"] for fact in state["discovered_facts"]}
 
-        self.assertNotIn("blocker_crm_sync_flaky", blocker_ids)
-        self.assertNotIn("fact_crm_sync_flaky", fact_ids)
+        self.assertNotIn("blocker_repo_sync_stale", blocker_ids)
+        self.assertNotIn("fact_repo_sync_stale", fact_ids)
 
     def test_advance_time_by_duration_does_not_deliver_future_events(self) -> None:
         result = advance_time(self.db_path, "2h")
@@ -64,7 +64,7 @@ class CoreSimulationTests(unittest.TestCase):
 
         self.assertEqual(result["to"], "2026-06-23T10:00:00")
         self.assertEqual(len(result["delivered_events"]), 1)
-        self.assertEqual(result["delivered_events"][0]["id"], "event_mario_full_report_push")
+        self.assertEqual(result["delivered_events"][0]["id"], "event_mario_auto_comment_push")
         self.assertTrue(result["delivered_events"][0]["result"]["handled"])
         self.assertEqual(state["current_time"], "2026-06-23T10:00:00")
 
@@ -76,9 +76,9 @@ class CoreSimulationTests(unittest.TestCase):
         fact_ids = {fact["id"] for fact in state["discovered_facts"]}
         recent_bodies = [message["body"] for message in state["recent_messages"]]
 
-        self.assertIn("blocker_crm_sync_flaky", blocker_ids)
-        self.assertIn("fact_crm_sync_flaky", fact_ids)
-        self.assertTrue(any("CRM enrichment sync" in body for body in recent_bodies))
+        self.assertIn("blocker_repo_sync_stale", blocker_ids)
+        self.assertIn("fact_repo_sync_stale", fact_ids)
+        self.assertTrue(any("repo sync" in body for body in recent_bodies))
 
     def test_can_deliver_all_seeded_events_through_friday_deadline(self) -> None:
         result = advance_time(self.db_path, "to:2026-06-26T15:00:00")
@@ -90,7 +90,7 @@ class CoreSimulationTests(unittest.TestCase):
                 """
                 SELECT status, risk_level, metadata_json
                 FROM projects
-                WHERE id = 'project_exec_health_report'
+                WHERE id = 'project_pr_review_agent'
                 """
             ).fetchone()
             outcome_doc = conn.execute(
@@ -103,7 +103,7 @@ class CoreSimulationTests(unittest.TestCase):
         finally:
             conn.close()
 
-        self.assertIn("friday_fireflower_deadline", event_types)
+        self.assertIn("friday_nimbus_deadline", event_types)
         self.assertTrue(all(event["result"]["handled"] for event in result["delivered_events"]))
         self.assertEqual(project["status"], "missed")
         self.assertEqual(project["risk_level"], "high")
@@ -111,10 +111,10 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(outcome_doc["kind"], "outcome_report")
         self.assertIn("without an approved reliable launch plan", outcome_doc["body"])
 
-    def test_friday_deadline_records_successful_fallback_outcome(self) -> None:
+    def test_friday_deadline_records_successful_draft_mode_outcome(self) -> None:
         schedule_meeting(
             self.db_path,
-            "Fallback risk review for Fireflower launch",
+            "Draft-mode risk review for Nimbus launch",
             "2026-06-22T10:00:00",
             "2026-06-22T10:30:00",
             ["luigi", "daisy", "mario", "toad", "peach"],
@@ -128,7 +128,7 @@ class CoreSimulationTests(unittest.TestCase):
                 """
                 SELECT status, risk_level, metadata_json
                 FROM projects
-                WHERE id = 'project_exec_health_report'
+                WHERE id = 'project_pr_review_agent'
                 """
             ).fetchone()
             outcome_doc = conn.execute(
@@ -144,16 +144,34 @@ class CoreSimulationTests(unittest.TestCase):
         metadata = loads(project["metadata_json"])
         self.assertEqual(project["status"], "shipped")
         self.assertEqual(project["risk_level"], "low")
-        self.assertEqual(metadata["final_outcome"], "fallback_report_shipped")
-        self.assertIn("shipped the reliable fallback report", outcome_doc["body"])
+        self.assertEqual(metadata["final_outcome"], "draft_mode_beta_shipped")
+        self.assertIn("shipped the reliable draft-mode beta", outcome_doc["body"])
+
+    def test_events_delivered_during_large_time_jump_keep_scheduled_times(self) -> None:
+        schedule_meeting(
+            self.db_path,
+            "Draft-mode risk review for Nimbus launch",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["luigi", "daisy", "mario", "toad", "peach"],
+        )
+
+        result = advance_time(self.db_path, "to:2026-06-26T15:00:00")
+        meeting_event = next(
+            event for event in result["delivered_events"] if event["event_type"] == "meeting_occurs"
+        )
+        evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+
+        self.assertEqual(meeting_event["delivered_at"], "2026-06-22T10:30:00")
+        self.assertEqual(evaluation["score"], evaluation["max_score"])
 
 
 class CoworkerRuleTests(unittest.TestCase):
-    def test_luigi_reveals_crm_risk_when_asked_about_blockers(self) -> None:
-        replies = replies_for_chat("luigi", "Any blockers or CRM sync risk for launch?")
+    def test_luigi_reveals_repo_sync_risk_when_asked_about_blockers(self) -> None:
+        replies = replies_for_chat("luigi", "Any blockers or repo sync stale-code risk for launch?")
 
         self.assertEqual(len(replies), 1)
-        self.assertIn("CRM enrichment sync", replies[0].body)
+        self.assertIn("repo sync", replies[0].body)
         effect_types = {effect["type"] for effect in replies[0].effects}
         self.assertIn("discover_fact", effect_types)
         self.assertIn("update_blocker", effect_types)
@@ -161,26 +179,26 @@ class CoworkerRuleTests(unittest.TestCase):
     def test_luigi_repeat_risk_reply_does_not_duplicate_discovery_effects(self) -> None:
         replies = replies_for_chat(
             "luigi",
-            "Any CRM sync blockers for launch?",
-            {"discovered_facts": ["fact_crm_sync_flaky"]},
+            "Any repo sync blockers for launch?",
+            {"discovered_facts": ["fact_repo_sync_stale"]},
         )
 
         self.assertEqual(len(replies), 1)
-        self.assertIn("Same CRM enrichment risk", replies[0].body)
+        self.assertIn("Same repo sync risk", replies[0].body)
         self.assertEqual(replies[0].effects, ())
 
     def test_background_event_has_deterministic_effects(self) -> None:
         effects = effects_for_event(
-            "luigi_proactive_crm_risk",
+            "luigi_proactive_repo_risk",
             {
-                "project_id": "project_exec_health_report",
-                "blocker_id": "blocker_crm_sync_flaky",
+                "project_id": "project_pr_review_agent",
+                "blocker_id": "blocker_repo_sync_stale",
             },
         )
 
         self.assertGreaterEqual(len(effects), 3)
         self.assertEqual(effects[0]["type"], "create_message")
-        self.assertIn("CRM enrichment sync", effects[0]["body"])
+        self.assertIn("repo sync", effects[0]["body"])
 
 
 class EffectApplicationTests(unittest.TestCase):
@@ -202,31 +220,31 @@ class EffectApplicationTests(unittest.TestCase):
                         "type": "create_message",
                         "sender_id": "luigi",
                         "recipient_id": "agent",
-                        "body": "CRM sync is risky.",
+                        "body": "Repo sync is risky.",
                     },
                     {
                         "type": "discover_fact",
-                        "fact_id": "fact_crm_sync_flaky",
+                        "fact_id": "fact_repo_sync_stale",
                     },
                     {
                         "type": "update_blocker",
-                        "blocker_id": "blocker_crm_sync_flaky",
+                        "blocker_id": "blocker_repo_sync_stale",
                         "status": "surfaced",
                     },
                     {
                         "type": "update_task",
-                        "task_id": "task_fallback_design",
+                        "task_id": "task_draft_mode_docs",
                         "status": "in_progress",
                     },
                     {
                         "type": "update_project",
-                        "project_id": "project_exec_health_report",
-                        "decision": "fallback_report_approved",
+                        "project_id": "project_pr_review_agent",
+                        "decision": "draft_mode_approved",
                     },
                     {
                         "type": "add_evaluation_evidence",
                         "key": "blocker_discovered",
-                        "note": "Luigi disclosed CRM risk.",
+                        "note": "Luigi disclosed stale repo sync risk.",
                     },
                 ],
                 now="2026-06-22T11:00:00",
@@ -236,16 +254,16 @@ class EffectApplicationTests(unittest.TestCase):
 
             self.assertEqual(len(applied), 6)
             fact = conn.execute(
-                "SELECT discovered_at FROM facts WHERE id = 'fact_crm_sync_flaky'"
+                "SELECT discovered_at FROM facts WHERE id = 'fact_repo_sync_stale'"
             ).fetchone()
             blocker = conn.execute(
-                "SELECT status, discovered_at FROM blockers WHERE id = 'blocker_crm_sync_flaky'"
+                "SELECT status, discovered_at FROM blockers WHERE id = 'blocker_repo_sync_stale'"
             ).fetchone()
             task = conn.execute(
-                "SELECT status FROM tasks WHERE id = 'task_fallback_design'"
+                "SELECT status FROM tasks WHERE id = 'task_draft_mode_docs'"
             ).fetchone()
             project = conn.execute(
-                "SELECT metadata_json FROM projects WHERE id = 'project_exec_health_report'"
+                "SELECT metadata_json FROM projects WHERE id = 'project_pr_review_agent'"
             ).fetchone()
             evidence = conn.execute(
                 "SELECT evidence_key FROM evaluation_evidence WHERE evidence_key = 'blocker_discovered'"
@@ -255,7 +273,7 @@ class EffectApplicationTests(unittest.TestCase):
             self.assertEqual(blocker["status"], "surfaced")
             self.assertEqual(blocker["discovered_at"], "2026-06-22T11:00:00")
             self.assertEqual(task["status"], "in_progress")
-            self.assertEqual(loads(project["metadata_json"])["decision"], "fallback_report_approved")
+            self.assertEqual(loads(project["metadata_json"])["decision"], "draft_mode_approved")
             self.assertEqual(evidence["evidence_key"], "blocker_discovered")
         finally:
             conn.close()
@@ -269,7 +287,7 @@ class EffectApplicationTests(unittest.TestCase):
                     {
                         "type": "add_evaluation_evidence",
                         "key": "blocker_discovered",
-                        "note": "Luigi disclosed CRM risk.",
+                        "note": "Luigi disclosed stale repo sync risk.",
                     }
                 ],
                 now="2026-06-22T11:00:00",
@@ -281,7 +299,7 @@ class EffectApplicationTests(unittest.TestCase):
                     {
                         "type": "add_evaluation_evidence",
                         "key": "blocker_discovered",
-                        "note": "Luigi disclosed CRM risk.",
+                        "note": "Luigi disclosed stale repo sync risk.",
                     }
                 ],
                 now="2026-06-22T13:00:00",
@@ -294,7 +312,7 @@ class EffectApplicationTests(unittest.TestCase):
                 SELECT COUNT(*) AS count
                 FROM evaluation_evidence
                 WHERE evidence_key = 'blocker_discovered'
-                  AND note = 'Luigi disclosed CRM risk.'
+                  AND note = 'Luigi disclosed stale repo sync risk.'
                 """
             ).fetchone()["count"]
 
@@ -305,8 +323,52 @@ class EffectApplicationTests(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_resolved_blocker_is_not_downgraded_by_later_stale_event(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            first = apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_blocker",
+                        "blocker_id": "blocker_scope_unclear",
+                        "status": "resolved",
+                    }
+                ],
+                now="2026-06-22T10:00:00",
+                source="test:resolve",
+            )
+            second = apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_blocker",
+                        "blocker_id": "blocker_scope_unclear",
+                        "status": "surfaced",
+                    }
+                ],
+                now="2026-06-24T11:00:00",
+                source="test:stale_escalation",
+            )
+            conn.commit()
+
+            blocker = conn.execute(
+                """
+                SELECT status, resolved_at
+                FROM blockers
+                WHERE id = 'blocker_scope_unclear'
+                """
+            ).fetchone()
+
+            self.assertEqual(first[0]["status"], "resolved")
+            self.assertTrue(second[0]["skipped"])
+            self.assertEqual(blocker["status"], "resolved")
+            self.assertEqual(blocker["resolved_at"], "2026-06-22T10:00:00")
+        finally:
+            conn.close()
+
     def test_coworker_reply_event_creates_message_and_applies_attached_effects(self) -> None:
-        send_chat(self.db_path, "luigi", "Any CRM sync blockers for launch?")
+        send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
 
         result = advance_time(self.db_path, "2h")
         state = observe(self.db_path)
@@ -314,12 +376,12 @@ class EffectApplicationTests(unittest.TestCase):
         self.assertEqual(result["delivered_events"][0]["event_type"], "coworker_reply")
         self.assertTrue(result["delivered_events"][0]["result"]["handled"])
         self.assertEqual(state["recent_messages"][0]["sender_id"], "luigi")
-        self.assertIn("fact_crm_sync_flaky", {fact["id"] for fact in state["discovered_facts"]})
+        self.assertIn("fact_repo_sync_stale", {fact["id"] for fact in state["discovered_facts"]})
 
     def test_meeting_event_creates_transcript_and_applies_coordination_effects(self) -> None:
         meeting = schedule_meeting(
             self.db_path,
-            "Fallback risk review for Fireflower launch",
+            "Draft-mode risk review for Nimbus launch",
             "2026-06-22T10:00:00",
             "2026-06-22T10:30:00",
             ["luigi", "daisy", "mario", "toad"],
@@ -362,13 +424,13 @@ class EffectApplicationTests(unittest.TestCase):
             self.assertEqual(calendar_event["transcript_doc_id"], "doc_transcript_cal_1")
             self.assertEqual(transcript["kind"], "meeting_transcript")
             self.assertEqual(transcript["visible"], 1)
-            self.assertIn("CRM enrichment", transcript["body"])
-            self.assertIn("blocker_crm_sync_flaky", blocker_ids)
-            self.assertIn("fact_crm_sync_flaky", fact_ids)
-            self.assertIn("fact_fallback_approved", fact_ids)
+            self.assertIn("repo sync", transcript["body"])
+            self.assertIn("blocker_repo_sync_stale", blocker_ids)
+            self.assertIn("fact_repo_sync_stale", fact_ids)
+            self.assertIn("fact_draft_mode_approved", fact_ids)
             self.assertIn("blocker_discovered", evidence_keys)
             self.assertIn("stakeholder_alignment", evidence_keys)
-            self.assertIn("fallback_approved", evidence_keys)
+            self.assertIn("draft_mode_approved", evidence_keys)
         finally:
             conn.close()
 
@@ -386,30 +448,30 @@ class ToolActionTests(unittest.TestCase):
         tasks = list_tasks(self.db_path)
 
         task_ids = {task["id"] for task in tasks}
-        self.assertIn("task_crm_enrichment", task_ids)
+        self.assertIn("task_repo_sync", task_ids)
         self.assertIn("task_launch_decision", task_ids)
 
     def test_read_doc_returns_visible_doc_body(self) -> None:
         result = read_doc(self.db_path, "doc_project_brief")
 
         self.assertTrue(result["ok"])
-        self.assertIn("customer success leaders", result["doc"]["body"])
+        self.assertIn("review pull requests faster", result["doc"]["body"])
 
     def test_read_doc_blocks_invisible_doc(self) -> None:
-        result = read_doc(self.db_path, "doc_crm_retry_notes")
+        result = read_doc(self.db_path, "doc_repo_sync_notes")
 
         self.assertFalse(result["ok"])
         self.assertIn("not visible", result["error"])
 
     def test_send_chat_schedules_coworker_reply(self) -> None:
-        result = send_chat(self.db_path, "luigi", "Any CRM sync blockers for launch?")
+        result = send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
         events = event_log(self.db_path, limit=20)
 
         self.assertTrue(result["ok"])
         self.assertEqual(len(result["scheduled_reply_ids"]), 1)
         reply_events = [event for event in events if event["event_type"] == "coworker_reply"]
         self.assertEqual(len(reply_events), 1)
-        self.assertIn("CRM enrichment sync", reply_events[0]["payload_json"])
+        self.assertIn("repo sync", reply_events[0]["payload_json"])
 
     def test_send_email_records_message_without_scheduling_reply(self) -> None:
         result = send_email(
@@ -444,10 +506,10 @@ class ToolActionTests(unittest.TestCase):
         result = send_email(
             self.db_path,
             "daisy",
-            "Fireflower Friday fallback status",
+            "Nimbus Friday draft-mode status",
             (
-                "CRM sync has vendor timeout risk. I recommend a reliable fallback "
-                "for Friday using usage and support data."
+                "Repo sync has stale-commit risk. I recommend reliable draft mode "
+                "for Friday with human approval."
             ),
         )
         conn = connect(self.db_path)
@@ -465,12 +527,12 @@ class ToolActionTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["applied_effects"][0]["type"], "add_evaluation_evidence")
         self.assertEqual(evidence["evidence_key"], "stakeholder_alignment")
-        self.assertIn("Fireflower risk and fallback", evidence["note"])
+        self.assertIn("Nimbus repo-sync risk and draft-mode", evidence["note"])
 
     def test_schedule_meeting_creates_future_meeting_event(self) -> None:
         result = schedule_meeting(
             self.db_path,
-            "Fallback risk review",
+            "Draft-mode risk review",
             "2026-06-22T10:00:00",
             "2026-06-22T10:30:00",
             ["luigi", "daisy", "mario", "toad"],
@@ -510,24 +572,24 @@ class EvaluatorTests(unittest.TestCase):
     def test_reset_state_scores_below_agent_improved_path(self) -> None:
         baseline = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
 
-        send_chat(self.db_path, "luigi", "Any CRM sync blockers for launch?")
+        send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
         advance_time(self.db_path, "2h")
         send_chat(
             self.db_path,
             "daisy",
-            "CRM sync is risky. Can we message a reliable fallback for Fireflower?",
+            "Repo sync has stale-code risk. Can we message reliable draft mode for Nimbus?",
         )
         advance_time(self.db_path, "45m")
         send_chat(
             self.db_path,
             "peach",
-            "Please finalize the fallback using usage and support data without CRM fields.",
+            "Please finalize draft-mode onboarding with human approval and no auto-commenting.",
         )
         advance_time(self.db_path, "90m")
         send_chat(
             self.db_path,
             "toad",
-            "CRM vendor sync is timing out. Approve fallback report for Friday?",
+            "Repo sync can review stale commits. Approve draft mode for Friday?",
         )
         advance_time(self.db_path, "90m")
 
@@ -555,7 +617,7 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(blocker_component["status"], "partial")
 
     def test_harmful_task_completion_is_penalized(self) -> None:
-        update_task(self.db_path, "task_crm_enrichment", status="complete", priority=None)
+        update_task(self.db_path, "task_repo_sync", status="complete", priority=None)
 
         result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
         harmful_component = next(
@@ -571,10 +633,10 @@ class EvaluatorTests(unittest.TestCase):
         send_email(
             self.db_path,
             "daisy",
-            "Fireflower Friday fallback status",
+            "Nimbus Friday draft-mode status",
             (
-                "CRM sync has vendor timeout risk. I recommend a reliable fallback "
-                "for Friday using usage and support data."
+                "Repo sync has stale-commit risk. I recommend reliable draft mode "
+                "for Friday with human approval."
             ),
         )
 
@@ -588,10 +650,10 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(stakeholder_component["earned"], 20)
         self.assertEqual(stakeholder_component["evidence"][0]["source"], "action:msg_agent_email_3")
 
-    def test_fake_fallback_design_progress_does_not_improve_task_score(self) -> None:
+    def test_fake_draft_mode_progress_does_not_improve_task_score(self) -> None:
         baseline = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
 
-        update_task(self.db_path, "task_fallback_design", status="complete", priority=None)
+        update_task(self.db_path, "task_draft_mode_docs", status="complete", priority=None)
         result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
         task_component = next(
             component
@@ -603,8 +665,8 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(task_component["earned"], 0)
         self.assertIn("peach_unblocked", task_component["missing_evidence"])
 
-    def test_fallback_design_progress_counts_only_after_scope_fact_and_blocker_resolution(self) -> None:
-        update_task(self.db_path, "task_fallback_design", status="in_progress", priority=None)
+    def test_draft_mode_progress_counts_only_after_scope_fact_and_blocker_resolution(self) -> None:
+        update_task(self.db_path, "task_draft_mode_docs", status="in_progress", priority=None)
 
         conn = connect(self.db_path)
         try:
@@ -613,7 +675,7 @@ class EvaluatorTests(unittest.TestCase):
                 [
                     {
                         "type": "discover_fact",
-                        "fact_id": "fact_fallback_scope_confirmed",
+                        "fact_id": "fact_draft_mode_scope_confirmed",
                     }
                 ],
                 now="2026-06-22T10:00:00",

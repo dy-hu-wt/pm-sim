@@ -1,10 +1,3 @@
-"""Deterministic coworker behavior rules for the launch readiness scenario.
-
-The engine owns persistence, time, event delivery, and state mutation. This
-module only maps observed inputs to deterministic effect dictionaries that the
-engine can validate and apply.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,8 +9,6 @@ Effect = dict[str, Any]
 
 @dataclass(frozen=True)
 class CoworkerReply:
-    """A scheduled reply and the state effects it should produce when delivered."""
-
     person_id: str
     delay_minutes: int
     body: str
@@ -41,13 +32,22 @@ RISK_TERMS = frozenset(
         "launch",
         "ready",
         "readiness",
-        "crm",
+        "repo",
+        "repository",
         "sync",
-        "fireflower",
-        "renewal",
-        "tier",
-        "vendor",
+        "webhook",
+        "webhooks",
+        "commit",
+        "stale",
+        "diff",
+        "pr",
+        "review",
+        "agent",
+        "auto-comment",
+        "auto-commenting",
+        "nimbus",
         "fallback",
+        "draft",
     }
 )
 
@@ -55,13 +55,17 @@ SCOPE_TERMS = frozenset(
     {
         "scope",
         "fallback",
+        "draft",
+        "draft-mode",
+        "mode",
         "fields",
         "requirements",
         "design",
-        "export",
-        "report",
+        "onboarding",
+        "docs",
         "full",
         "demo",
+        "auto-commenting",
     }
 )
 
@@ -69,13 +73,6 @@ SCOPE_TERMS = frozenset(
 def replies_for_chat(
     person_id: str, body: str, state: dict[str, Any] | None = None
 ) -> list[CoworkerReply]:
-    """Return deterministic replies caused by an agent chat message.
-
-    `state` is optional so the rules can be tested before the full engine
-    exists. When present, it may include facts such as discovered facts,
-    blocker status, task status, or project decisions.
-    """
-
     person_id = person_id.lower()
     normalized = _normalize(body)
     state = state or {}
@@ -94,22 +91,21 @@ def replies_for_chat(
 
 
 def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
-    """Return deterministic effects for scheduled background events."""
-
-    if event_type == "luigi_proactive_crm_risk":
+    # Event rules return effect dictionaries only; effects.py owns mutation.
+    if event_type == "luigi_proactive_repo_risk":
         return [
             _message(
                 "chat",
                 "luigi",
                 "agent",
-                "I do not think the CRM enrichment sync is safe for Friday. "
-                "The vendor endpoint is still timing out, so the full report "
-                "can fail on renewal date and account tier. We should choose "
-                "the fallback report unless Toad explicitly accepts the risk.",
+                "I do not think auto-commenting is safe for Friday. The repo "
+                "sync worker can process webhook events out of order, so the "
+                "agent may review a stale commit. We should ship draft mode "
+                "unless Toad explicitly accepts the risk.",
             ),
-            _discover_fact("fact_crm_sync_flaky", "luigi_proactive_crm_risk"),
-            _update_blocker("blocker_crm_sync_flaky", "surfaced"),
-            _add_evidence("blocker_discovered", "Luigi proactively disclosed CRM sync risk."),
+            _discover_fact("fact_repo_sync_stale", "luigi_proactive_repo_risk"),
+            _update_blocker("blocker_repo_sync_stale", "surfaced"),
+            _add_evidence("blocker_discovered", "Luigi proactively disclosed stale repo sync risk."),
         ]
 
     if event_type == "daisy_confidence_check":
@@ -118,21 +114,21 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
                 "chat",
                 "daisy",
                 "agent",
-                "Fireflower asked whether Friday's executive report is still "
-                "on track. I need a confidence update before I talk to them.",
+                "Nimbus asked whether Friday's coding-agent beta is still on "
+                "track. I need a confidence update before I talk to them.",
             ),
             _update_pressure("stakeholder_pressure", 1),
         ]
 
-    if event_type == "mario_full_report_push":
+    if event_type == "mario_auto_comment_push":
         return [
             _message(
                 "chat",
                 "mario",
                 "agent",
-                "I still want the full Executive Health Report for Friday if "
-                "we can make it work. Please call out any launch risk clearly "
-                "before we cut scope.",
+                "I still want auto-commenting in the Friday beta if we can "
+                "make it work. Please call out any launch risk clearly before "
+                "we cut scope.",
             ),
             _update_pressure("scope_pressure", 1),
         ]
@@ -143,8 +139,8 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
                 "chat",
                 "peach",
                 "agent",
-                "I am blocked on the final layout until someone confirms "
-                "whether CRM fields are in scope for Friday.",
+                "I am blocked on onboarding until someone confirms whether "
+                "auto-commenting or draft mode is in scope for Friday.",
             ),
             _update_blocker("blocker_scope_unclear", "surfaced"),
         ]
@@ -153,8 +149,7 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
 
 
 def effects_for_meeting(payload: dict[str, Any]) -> list[Effect]:
-    """Return transcript and deterministic coordination effects for a meeting."""
-
+    # Meetings always produce a transcript, then add decisions when the right people attend.
     attendees = {attendee.lower() for attendee in payload.get("attendees", [])}
     title = payload.get("title", "Meeting")
     normalized_topic = _normalize(title)
@@ -183,46 +178,48 @@ def effects_for_meeting(payload: dict[str, Any]) -> list[Effect]:
     ]
 
     risk_topic = _mentions_any(normalized_topic, RISK_TERMS)
-    fallback_topic = _mentions_any(normalized_topic, {"fallback", "de-scope", "descope", "scope"})
-    launch_topic = _mentions_any(normalized_topic, {"launch", "readiness", "friday", "fireflower"})
+    draft_topic = _mentions_any(
+        normalized_topic, {"fallback", "draft", "draft-mode", "de-scope", "descope", "scope"}
+    )
+    launch_topic = _mentions_any(normalized_topic, {"launch", "readiness", "friday", "nimbus", "beta"})
 
-    if "luigi" in attendees and (risk_topic or fallback_topic or launch_topic):
+    if "luigi" in attendees and (risk_topic or draft_topic or launch_topic):
         effects.extend(
             [
-                _discover_fact("fact_crm_sync_flaky", "meeting_occurs"),
-                _update_blocker("blocker_crm_sync_flaky", "surfaced"),
-                _add_evidence("blocker_discovered", "Meeting surfaced Luigi's CRM sync risk."),
+                _discover_fact("fact_repo_sync_stale", "meeting_occurs"),
+                _update_blocker("blocker_repo_sync_stale", "surfaced"),
+                _add_evidence("blocker_discovered", "Meeting surfaced Luigi's stale repo sync risk."),
             ]
         )
 
-    if {"mario", "daisy"} & attendees and (risk_topic or fallback_topic):
+    if {"mario", "daisy"} & attendees and (risk_topic or draft_topic):
         effects.append(
             _add_evidence(
                 "stakeholder_alignment",
-                "Meeting aligned stakeholders around CRM risk and fallback messaging.",
+                "Meeting aligned stakeholders around repo sync risk and draft-mode messaging.",
             )
         )
 
-    if {"luigi", "toad"}.issubset(attendees) and (risk_topic or fallback_topic):
+    if {"luigi", "toad"}.issubset(attendees) and (risk_topic or draft_topic):
         effects.extend(
             [
-                _discover_fact("fact_fallback_approved", "meeting_occurs"),
-                _update_project_decision("fallback_report_approved"),
+                _discover_fact("fact_draft_mode_approved", "meeting_occurs"),
+                _update_project_decision("draft_mode_approved"),
                 _update_blocker("blocker_launch_scope_decision", "resolved"),
                 _add_evidence(
-                    "fallback_approved",
-                    "Toad approved fallback in a meeting with technical risk context.",
+                    "draft_mode_approved",
+                    "Toad approved draft mode in a meeting with technical risk context.",
                 ),
             ]
         )
 
-    if "peach" in attendees and fallback_topic:
+    if "peach" in attendees and draft_topic:
         effects.extend(
             [
-                _discover_fact("fact_fallback_scope_confirmed", "meeting_occurs"),
-                _update_task("task_fallback_design", "in_progress"),
+                _discover_fact("fact_draft_mode_scope_confirmed", "meeting_occurs"),
+                _update_task("task_draft_mode_docs", "in_progress"),
                 _update_blocker("blocker_scope_unclear", "resolved"),
-                _add_evidence("peach_unblocked", "Meeting clarified fallback scope for Peach."),
+                _add_evidence("peach_unblocked", "Meeting clarified draft-mode scope for Peach."),
             ]
         )
 
@@ -230,16 +227,17 @@ def effects_for_meeting(payload: dict[str, Any]) -> list[Effect]:
 
 
 def _luigi_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
+    # Backend owner: knows the hidden stale repo-sync risk.
     if _mentions_any(normalized, RISK_TERMS):
-        if _state_has_fact(state, "fact_crm_sync_flaky"):
+        if _state_has_fact(state, "fact_repo_sync_stale"):
             return CoworkerReply(
                 person_id="luigi",
                 delay_minutes=RESPONSE_DELAYS_MINUTES["luigi"],
                 body=(
-                    "Same CRM enrichment risk as before: usage and support data "
-                    "are solid, but the vendor CRM endpoint is still too flaky "
-                    "for renewal date and account tier. I still recommend the "
-                    "fallback report unless Toad accepts the demo risk."
+                    "Same repo sync risk as before: the review context pipeline "
+                    "is solid, but webhook ordering can still make the agent "
+                    "review a stale commit. I still recommend draft mode unless "
+                    "Toad accepts the auto-commenting risk."
                 ),
             )
 
@@ -247,17 +245,16 @@ def _luigi_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
             person_id="luigi",
             delay_minutes=RESPONSE_DELAYS_MINUTES["luigi"],
             body=(
-                "The risky part is the CRM enrichment sync. Usage and support "
-                "data are solid, but the vendor CRM endpoint is timing out "
-                "often enough that renewal date and account tier may be blank "
-                "or stale on Friday. I can keep retry hardening going, but I "
-                "would recommend a fallback report unless Toad accepts the "
-                "demo risk."
+                "The risky part is repo sync. The review context pipeline is "
+                "solid, but webhook events can arrive out of order, so the "
+                "agent may review a stale commit on Friday. I can keep "
+                "hardening the worker, but I recommend draft mode unless Toad "
+                "accepts the auto-commenting risk."
             ),
             effects=(
-                _discover_fact("fact_crm_sync_flaky", "luigi_chat_reply"),
-                _update_blocker("blocker_crm_sync_flaky", "surfaced"),
-                _add_evidence("blocker_discovered", "Luigi disclosed CRM sync risk."),
+                _discover_fact("fact_repo_sync_stale", "luigi_chat_reply"),
+                _update_blocker("blocker_repo_sync_stale", "surfaced"),
+                _add_evidence("blocker_discovered", "Luigi disclosed stale repo sync risk."),
             ),
         )
 
@@ -265,28 +262,29 @@ def _luigi_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
         person_id="luigi",
         delay_minutes=RESPONSE_DELAYS_MINUTES["luigi"],
         body=(
-            "I am working on the CRM enrichment integration. If you need launch "
-            "confidence, ask me specifically about CRM sync risk."
+            "I am working on repo sync hardening. If you need launch "
+            "confidence, ask me specifically about stale-code or auto-commenting risk."
         ),
     )
 
 
 def _mario_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
-    risk_known = _state_has_fact(state, "fact_crm_sync_flaky") or _mentions_any(
-        normalized, {"risk", "blocker", "fallback", "crm", "sync"}
+    # Product owner: prefers auto-commenting but accepts draft mode when risk is concrete.
+    risk_known = _state_has_fact(state, "fact_repo_sync_stale") or _mentions_any(
+        normalized, {"risk", "blocker", "fallback", "draft", "repo", "sync", "stale", "commit"}
     )
     if risk_known:
         return CoworkerReply(
             person_id="mario",
             delay_minutes=RESPONSE_DELAYS_MINUTES["mario"],
             body=(
-                "The full report is still the strongest product story, but I "
-                "do not want a Friday demo failure. If Luigi's CRM risk is real, "
-                "align Daisy and Toad on the fallback and keep the full report "
-                "as a follow-up."
+                "Auto-commenting is still the strongest product story, but I "
+                "do not want a Friday demo failure. If Luigi's stale-code risk "
+                "is real, align Daisy and Toad on draft mode and keep "
+                "auto-commenting as a follow-up."
             ),
             effects=(
-                _add_evidence("stakeholder_alignment", "Mario accepted fallback if CRM risk is confirmed."),
+                _add_evidence("stakeholder_alignment", "Mario accepted draft mode if repo sync risk is confirmed."),
             ),
         )
 
@@ -294,31 +292,32 @@ def _mario_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
         person_id="mario",
         delay_minutes=RESPONSE_DELAYS_MINUTES["mario"],
         body=(
-            "Please push for the full Executive Health Report. Fireflower needs "
-            "to see the CRM tier and renewal context if we can possibly ship it."
+            "Please push for the auto-commenting beta. Nimbus needs to see the "
+            "agent comment on pull requests if we can possibly ship it."
         ),
         effects=(_update_pressure("scope_pressure", 1),),
     )
 
 
 def _peach_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
-    scope_clear = _state_has_fact(state, "fact_fallback_scope_confirmed") or _mentions_any(
-        normalized, {"fallback", "usage", "support", "internal only", "without crm"}
+    # Design/onboarding owner: blocked until launch mode is clear.
+    scope_clear = _state_has_fact(state, "fact_draft_mode_scope_confirmed") or _mentions_any(
+        normalized, {"fallback", "draft", "draft mode", "human approval", "without auto", "no auto-commenting"}
     )
     if scope_clear:
         return CoworkerReply(
             person_id="peach",
             delay_minutes=RESPONSE_DELAYS_MINUTES["peach"],
             body=(
-                "That unblocks the design. I will finalize the fallback layout "
-                "with usage trends, seat adoption, support volume, renewal risk "
-                "summary copy, and a clear note that CRM tier is omitted for Friday."
+                "That unblocks the onboarding work. I will finalize the "
+                "draft-mode flow with human approval before comments are posted "
+                "and a clear note that auto-commenting is follow-up."
             ),
             effects=(
-                _discover_fact("fact_fallback_scope_confirmed", "peach_chat_reply"),
-                _update_task("task_fallback_design", "in_progress"),
+                _discover_fact("fact_draft_mode_scope_confirmed", "peach_chat_reply"),
+                _update_task("task_draft_mode_docs", "in_progress"),
                 _update_blocker("blocker_scope_unclear", "resolved"),
-                _add_evidence("peach_unblocked", "Fallback scope clarified for Peach."),
+                _add_evidence("peach_unblocked", "Draft-mode scope clarified for Peach."),
             ),
         )
 
@@ -326,27 +325,31 @@ def _peach_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
         person_id="peach",
         delay_minutes=RESPONSE_DELAYS_MINUTES["peach"],
         body=(
-            "I am blocked on final design because I do not know whether CRM "
-            "tier and renewal date are in Friday's scope. I can finish quickly "
-            "once full versus fallback is decided."
+            "I am blocked on onboarding because I do not know whether "
+            "auto-commenting or draft mode is in Friday's scope. I can finish "
+            "quickly once launch mode is decided."
         ),
         effects=(_update_blocker("blocker_scope_unclear", "surfaced"),),
     )
 
 
 def _daisy_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
-    if _mentions_any(normalized, {"risk", "fallback", "crm", "sync", "confidence", "blocked"}):
+    # Customer success owner: needs reliable Nimbus messaging before Friday.
+    if _mentions_any(
+        normalized,
+        {"risk", "fallback", "draft", "repo", "sync", "stale", "confidence", "blocked", "auto-commenting"},
+    ):
         return CoworkerReply(
             person_id="daisy",
             delay_minutes=RESPONSE_DELAYS_MINUTES["daisy"],
             body=(
-                "For Fireflower, reliability matters more than showing every "
-                "field. I can message the fallback as a focused executive readout "
-                "if you give me clear language by Thursday morning."
+                "For Nimbus, reliability matters more than auto-posting comments. "
+                "I can message draft mode as a safer beta if you give me clear "
+                "language by Thursday morning."
             ),
             effects=(
-                _add_evidence("stakeholder_alignment", "Daisy supported reliable fallback with clear messaging."),
-                _discover_fact("fact_fireflower_values_reliability", "daisy_chat_reply"),
+                _add_evidence("stakeholder_alignment", "Daisy supported reliable draft mode with clear messaging."),
+                _discover_fact("fact_nimbus_values_reliability", "daisy_chat_reply"),
             ),
         )
 
@@ -354,31 +357,31 @@ def _daisy_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
         person_id="daisy",
         delay_minutes=RESPONSE_DELAYS_MINUTES["daisy"],
         body=(
-            "Fireflower's renewal meeting is Friday. I need to know what we can "
+            "Nimbus expects the beta on Friday. I need to know what we can "
             "confidently show them and what language I should use with their team."
         ),
     )
 
 
 def _toad_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
-    has_risk_context = _state_has_fact(state, "fact_crm_sync_flaky") or _mentions_any(
-        normalized, {"crm", "sync", "risk", "fallback", "vendor", "timeout"}
+    # Engineering manager: can approve draft mode once technical risk is explicit.
+    has_risk_context = _state_has_fact(state, "fact_repo_sync_stale") or _mentions_any(
+        normalized, {"repo", "sync", "stale", "commit", "risk", "fallback", "draft", "webhook", "auto-commenting"}
     )
     if has_risk_context:
         return CoworkerReply(
             person_id="toad",
             delay_minutes=RESPONSE_DELAYS_MINUTES["toad"],
             body=(
-                "Approved to de-scope CRM enrichment for Friday. Ship the "
-                "fallback report with reliable internal data, keep Luigi on CRM "
-                "hardening, and document the full-report follow-up after the "
-                "renewal meeting."
+                "Approved to de-scope auto-commenting for Friday. Ship draft "
+                "mode with human approval, keep Luigi on repo sync hardening, "
+                "and document auto-commenting as the follow-up."
             ),
             effects=(
-                _discover_fact("fact_fallback_approved", "toad_chat_reply"),
-                _update_project_decision("fallback_report_approved"),
+                _discover_fact("fact_draft_mode_approved", "toad_chat_reply"),
+                _update_project_decision("draft_mode_approved"),
                 _update_blocker("blocker_launch_scope_decision", "resolved"),
-                _add_evidence("fallback_approved", "Toad approved Friday fallback after CRM risk was raised."),
+                _add_evidence("draft_mode_approved", "Toad approved Friday draft mode after stale-code risk was raised."),
             ),
         )
 
@@ -428,17 +431,13 @@ def _update_task(task_id: str, status: str) -> Effect:
 
 
 def _update_project_decision(decision: str) -> Effect:
-    return {
-        "type": "update_project",
-        "project_id": "project_exec_health_report",
-        "decision": decision,
-    }
+    return {"type": "update_project", "project_id": "project_pr_review_agent", "decision": decision}
 
 
 def _update_pressure(metric: str, delta: int) -> Effect:
     return {
         "type": "update_project",
-        "project_id": "project_exec_health_report",
+        "project_id": "project_pr_review_agent",
         f"{metric}_delta": delta,
     }
 
@@ -454,17 +453,17 @@ def _meeting_transcript_body(title: str, attendees: set[str], normalized_topic: 
         "Summary:",
     ]
     if "luigi" in attendees and _mentions_any(normalized_topic, RISK_TERMS):
-        lines.append(
-            "- Luigi stated that CRM enrichment for renewal date and account tier remains risky."
-        )
+        lines.append("- Luigi stated that repo sync can still make the agent review stale commits.")
     if "daisy" in attendees:
-        lines.append("- Daisy asked for reliable Friday messaging for Fireflower CRM.")
+        lines.append("- Daisy asked for reliable Friday beta messaging for Nimbus Labs.")
     if "mario" in attendees:
-        lines.append("- Mario agreed the full report is valuable but should not create demo failure risk.")
-    if "toad" in attendees and _mentions_any(normalized_topic, {"fallback", "risk", "crm", "sync"}):
-        lines.append("- Toad approved fallback scope if CRM enrichment is unsafe for Friday.")
-    if "peach" in attendees and "fallback" in normalized_topic:
-        lines.append("- Peach can proceed once fallback fields are confirmed.")
+        lines.append("- Mario agreed auto-commenting is valuable but should not create demo failure risk.")
+    if "toad" in attendees and _mentions_any(
+        normalized_topic, {"fallback", "draft", "risk", "repo", "sync", "stale"}
+    ):
+        lines.append("- Toad approved draft mode if auto-commenting is unsafe for Friday.")
+    if "peach" in attendees and _mentions_any(normalized_topic, {"fallback", "draft", "draft-mode"}):
+        lines.append("- Peach can proceed once draft-mode scope is confirmed.")
     if len(lines) == 3:
         lines.append("- No launch-critical decisions were made.")
     return "\n".join(lines)

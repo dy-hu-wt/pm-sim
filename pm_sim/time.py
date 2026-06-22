@@ -107,7 +107,8 @@ def _deliver_event(
     payload = loads(event["payload_json"], {})
     source = f"event:{event['id']}"
     effects = _effects_for_delivery(conn, event["event_type"], payload)
-    applied_effects = apply_effects(conn, effects, now=delivered_at, source=source)
+    event_time = event["scheduled_at"]
+    applied_effects = apply_effects(conn, effects, now=event_time, source=source)
     result = {
         "handled": True,
         "payload": payload,
@@ -119,13 +120,13 @@ def _deliver_event(
         SET status = 'delivered', delivered_at = ?, result_json = ?
         WHERE id = ?
         """,
-        (delivered_at, dumps(result), event["id"]),
+        (event_time, dumps(result), event["id"]),
     )
     return {
         "id": event["id"],
         "event_type": event["event_type"],
         "scheduled_at": event["scheduled_at"],
-        "delivered_at": delivered_at,
+        "delivered_at": event_time,
         "result": result,
     }
 
@@ -151,7 +152,7 @@ def _effects_for_delivery(
     if event_type == "meeting_occurs":
         return effects_for_meeting(payload)
 
-    if event_type == "friday_fireflower_deadline":
+    if event_type == "friday_nimbus_deadline":
         return _effects_for_friday_deadline(conn)
 
     return effects_for_event(event_type, payload)
@@ -159,29 +160,29 @@ def _effects_for_delivery(
 
 def _effects_for_friday_deadline(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     facts = _discovered_fact_ids(conn)
-    fallback_approved = "fact_fallback_approved" in facts
-    scope_confirmed = "fact_fallback_scope_confirmed" in facts
-    daisy_aligned = "fact_fireflower_values_reliability" in facts or _has_evidence(
+    draft_approved = "fact_draft_mode_approved" in facts
+    scope_confirmed = "fact_draft_mode_scope_confirmed" in facts
+    daisy_aligned = "fact_nimbus_values_reliability" in facts or _has_evidence(
         conn, "stakeholder_alignment"
     )
 
-    if fallback_approved and scope_confirmed and daisy_aligned:
+    if draft_approved and scope_confirmed and daisy_aligned:
         outcome = {
             "status": "shipped",
             "risk_level": "low",
-            "final_outcome": "fallback_report_shipped",
+            "final_outcome": "draft_mode_beta_shipped",
             "summary": (
-                "The team shipped the reliable fallback report for Fireflower. "
-                "CRM enrichment remains follow-up work."
+                "The team shipped the reliable draft-mode beta for Nimbus Labs. "
+                "Auto-commenting remains follow-up work."
             ),
         }
-    elif fallback_approved:
+    elif draft_approved:
         outcome = {
             "status": "partial",
             "risk_level": "medium",
-            "final_outcome": "fallback_approved_with_execution_gaps",
+            "final_outcome": "draft_mode_approved_with_execution_gaps",
             "summary": (
-                "Fallback was approved, but scope or stakeholder alignment was "
+                "Draft mode was approved, but scope or stakeholder alignment was "
                 "not fully closed before the Friday deadline."
             ),
         }
@@ -192,18 +193,18 @@ def _effects_for_friday_deadline(conn: sqlite3.Connection) -> list[dict[str, Any
             "final_outcome": "no_approved_friday_plan",
             "summary": (
                 "Friday arrived without an approved reliable launch plan. "
-                "The full report remains risky because CRM enrichment is unresolved."
+                "Auto-commenting remains risky because repo sync can review stale code."
             ),
         }
 
     return [
         {
             "type": "update_project",
-            "project_id": "project_exec_health_report",
+            "project_id": "project_pr_review_agent",
             "status": outcome["status"],
             "risk_level": outcome["risk_level"],
             "deadline_reached": True,
-            "deadline_id": "deadline_fireflower_renewal",
+            "deadline_id": "deadline_nimbus_beta",
             "final_outcome": outcome["final_outcome"],
             "final_outcome_summary": outcome["summary"],
         },

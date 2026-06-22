@@ -275,6 +275,8 @@ def _format_effect(effect: dict[str, Any]) -> str:
     if effect_type == "discover_fact":
         return f"discovered fact {effect.get('fact_id')}"
     if effect_type == "update_blocker":
+        if effect.get("skipped"):
+            return f"kept blocker {effect.get('blocker_id')} -> {effect.get('status')}"
         return f"updated blocker {effect.get('blocker_id')} -> {effect.get('status')}"
     if effect_type == "update_task":
         return f"updated task {effect.get('task_id')}"

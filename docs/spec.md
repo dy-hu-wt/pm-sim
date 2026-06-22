@@ -270,30 +270,30 @@ A UI is optional. If added, it should stay lightweight and should not hide the s
 
 Working scenario: launch readiness week.
 
-Company: Mushroom Metrics, a small B2B SaaS company that helps customer success teams monitor account health.
+Company: Starboard DevTools, a small B2B SaaS company that sells developer workflow tools.
 
 Product context:
 
-Customers use Mushroom Metrics to track product adoption, support risk, renewal risk, and expansion opportunities.
+Customers use Starboard to review pull requests faster, catch common issues earlier, and reduce review backlogs.
 
-Project: launch an Executive Health Report feature for a pilot customer by Friday.
+Project: launch a PR Review Agent beta for a pilot customer by Friday.
 
-The report is meant to help customer success leaders prepare for executive renewal meetings. It combines product usage trends, seat adoption, support ticket volume, renewal risk, CRM account tier, and a customer health summary.
+The agent is meant to read pull request diffs and prepare useful review suggestions. The most impressive version auto-posts comments directly on PRs.
 
-The pilot customer, Fireflower CRM, has a renewal meeting on Friday. Daisy from customer success promised they would have the report ready for that meeting.
+The pilot customer, Nimbus Labs, expects a Friday beta demo. Daisy promised they would see something useful and reliable.
 
 Core risk:
 
-The full report depends on a CRM enrichment sync for renewal date and account tier. That sync is flaky. Internal product usage and support data are reliable.
+Auto-commenting depends on repo sync always reviewing the latest commit. That sync path is flaky because webhook events can arrive out of order. Draft suggestions with human approval are reliable.
 
 The PM has to help the team choose between:
 
 ```text
-Full report:
-  more valuable for the renewal conversation, but higher demo failure risk
+Auto-commenting beta:
+  more impressive for the pilot, but higher customer-visible failure risk
 
-Fallback report:
-  uses reliable internal usage/support data only, less complete but safer for Friday
+Draft-mode beta:
+  suggestions require human approval before posting, less flashy but safer for Friday
 ```
 
 The PM starts on Monday. There is stakeholder pressure, a hidden backend blocker, unclear task ownership, and a Friday decision point.
