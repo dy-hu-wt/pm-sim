@@ -217,6 +217,17 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         tasks,
         valid_actors,
     )
+    _validate_action_rules(
+        data.get("action_rules", []),
+        people,
+        docs,
+        facts,
+        projects,
+        blockers,
+        tasks,
+        valid_actors,
+    )
+    _validate_scripted_policy(data.get("scripted_policy", []), people, docs, tasks)
 
 
 def _ids(data: dict[str, Any], section: str) -> set[str]:
@@ -391,6 +402,167 @@ def _validate_meeting_rules(
                 tasks=tasks,
                 valid_actors=valid_actors,
             )
+
+
+def _validate_action_rules(
+    rules: list[dict[str, Any]],
+    people: set[str],
+    docs: set[str],
+    facts: set[str],
+    projects: set[str],
+    blockers: set[str],
+    tasks: set[str],
+    valid_actors: set[str],
+) -> None:
+    seen = set()
+    for rule in rules:
+        rule_id = rule.get("id")
+        if not isinstance(rule_id, str) or not rule_id:
+            raise ScenarioError("Action rule must have a string id.")
+        if rule_id in seen:
+            raise ScenarioError(f"Action rules have duplicate id: {rule_id}")
+        seen.add(rule_id)
+
+        action_type = rule.get("action_type")
+        if action_type not in {"send_email", "update_doc"}:
+            raise ScenarioError(f"Action rule {rule_id} has unsupported action_type: {action_type}")
+
+        person_id = rule.get("person_id")
+        if person_id is not None and person_id not in people:
+            raise ScenarioError(f"Action rule {rule_id} references unknown person_id: {person_id}")
+        recipient_id = rule.get("recipient_id")
+        if recipient_id is not None and recipient_id not in valid_actors:
+            raise ScenarioError(f"Action rule {rule_id} references unknown recipient_id: {recipient_id}")
+        doc_id = rule.get("doc_id")
+        if doc_id is not None and doc_id not in docs:
+            raise ScenarioError(f"Action rule {rule_id} references unknown doc_id: {doc_id}")
+
+        for key in ("terms_any", "terms_all"):
+            _validate_string_list(rule.get(key, []), f"Action rule {rule_id} {key}")
+        for group in rule.get("term_groups_all", []):
+            _validate_string_list(group, f"Action rule {rule_id} term group")
+
+        _validate_conditions(
+            rule.get("when", []),
+            label=f"Action rule {rule_id}",
+            facts=facts,
+            valid_actors=valid_actors,
+        )
+
+        effects = rule.get("effects", [])
+        if not isinstance(effects, list):
+            raise ScenarioError(f"Action rule {rule_id} effects must be a list.")
+        _validate_effects(
+            effects,
+            label=f"Action rule {rule_id}",
+            docs=docs,
+            facts=facts,
+            projects=projects,
+            blockers=blockers,
+            tasks=tasks,
+            valid_actors=valid_actors,
+        )
+
+
+def _validate_scripted_policy(
+    steps: list[dict[str, Any]],
+    people: set[str],
+    docs: set[str],
+    tasks: set[str],
+) -> None:
+    if not isinstance(steps, list):
+        raise ScenarioError("scripted_policy must be a list.")
+    for index, step in enumerate(steps, start=1):
+        if not isinstance(step, dict):
+            raise ScenarioError(f"scripted_policy step {index} must be an object.")
+        name = step.get("name")
+        if not isinstance(name, str) or not name:
+            raise ScenarioError(f"scripted_policy step {index} must have a string name.")
+        tool = step.get("tool")
+        args = step.get("args", {})
+        if not isinstance(args, dict):
+            raise ScenarioError(f"scripted_policy step {name} args must be an object.")
+        if tool in {"read_doc", "update_doc"} and args.get("doc_id") not in docs:
+            raise ScenarioError(
+                f"scripted_policy step {name} references unknown doc_id: {args.get('doc_id')}"
+            )
+        if tool in {"send_chat", "send_email"} and args.get("person_id") not in people:
+            raise ScenarioError(
+                f"scripted_policy step {name} references unknown person_id: {args.get('person_id')}"
+            )
+        if tool == "update_task" and args.get("task_id") not in tasks:
+            raise ScenarioError(
+                f"scripted_policy step {name} references unknown task_id: {args.get('task_id')}"
+            )
+        if tool == "schedule_meeting":
+            for attendee in args.get("attendees", []):
+                if attendee not in people:
+                    raise ScenarioError(
+                        f"scripted_policy step {name} references unknown attendee: {attendee}"
+                    )
+        if tool not in {
+            "advance_time",
+            "read_doc",
+            "schedule_meeting",
+            "send_chat",
+            "send_email",
+            "update_doc",
+            "update_task",
+        }:
+            raise ScenarioError(f"scripted_policy step {name} has unsupported tool: {tool}")
+
+
+def _validate_conditions(
+    conditions: list[dict[str, Any]],
+    *,
+    label: str,
+    facts: set[str],
+    valid_actors: set[str],
+) -> None:
+    if not isinstance(conditions, list):
+        raise ScenarioError(f"{label} when must be a list.")
+    for condition in conditions:
+        _validate_condition(condition, label=label, facts=facts, valid_actors=valid_actors)
+
+
+def _validate_condition(
+    condition: dict[str, Any],
+    *,
+    label: str,
+    facts: set[str],
+    valid_actors: set[str],
+) -> None:
+    if not isinstance(condition, dict):
+        raise ScenarioError(f"{label} condition must be an object.")
+    for key in ("all", "any"):
+        if key in condition:
+            _validate_conditions(
+                condition[key],
+                label=label,
+                facts=facts,
+                valid_actors=valid_actors,
+            )
+    if "not" in condition:
+        _validate_condition(
+            condition["not"],
+            label=label,
+            facts=facts,
+            valid_actors=valid_actors,
+        )
+    if "fact_discovered" in condition and condition["fact_discovered"] not in facts:
+        raise ScenarioError(
+            f"{label} references unknown fact_discovered fact: {condition['fact_discovered']}"
+        )
+    if "message_exists" in condition:
+        spec = condition["message_exists"]
+        if not isinstance(spec, dict):
+            raise ScenarioError(f"{label} message_exists condition must be an object.")
+        for key in ("sender_id", "recipient_id"):
+            actor_id = spec.get(key)
+            if actor_id is not None and actor_id not in valid_actors:
+                raise ScenarioError(f"{label} references unknown message {key}: {actor_id}")
+        for key in ("terms_any", "terms_all"):
+            _validate_string_list(spec.get(key, []), f"{label} message_exists {key}")
 
 
 def _validate_effects(

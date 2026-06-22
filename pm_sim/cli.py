@@ -255,6 +255,7 @@ def _color_agent_message(message: str) -> str:
     message = _highlight_people(message)
     for label, color in {
         "READ": _blue,
+        "UPDATE_DOC": _blue,
         "CHAT": _magenta,
         "EMAIL": _cyan,
         "MEETING": _yellow,

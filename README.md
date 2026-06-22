@@ -2,21 +2,21 @@
 
 `pm-sim` is a local project-manager simulation environment. The current backend models a simulated SaaS launch week with persistent SQLite state, scheduled events, coworker rules, internal tool surfaces, and an inspectable action/event log.
 
-The first scenario is Fireflower launching a PR Review Agent beta for Nimbus Labs. The project has stakeholder pressure, task dependencies, hidden repo-sync risk, and an auto-commenting versus draft-mode tradeoff.
+The first scenario is Fireflower launching a PR Review Agent beta for Nimbus Labs while also fielding a smaller Koopa Bank audit-log request. The main launch has stakeholder pressure, task dependencies, hidden repo-sync risk, and an auto-commenting versus draft-mode tradeoff.
 
 ## Scenario
 
 The included scenario is `launch_readiness`.
 
-Fireflower is a B2B SaaS company preparing a PR Review Agent beta for Nimbus Labs. The full beta would auto-post review comments on pull requests, but that depends on repo sync always using the latest commit. A safer draft mode prepares suggestions for human approval before comments are posted. During the week, Nimbus asks whether comments will auto-post, and Daisy needs rollout language before she updates them.
+Fireflower is a B2B SaaS company preparing a PR Review Agent beta for Nimbus Labs. The full beta would auto-post review comments on pull requests, but that depends on repo sync always using the latest commit. A safer draft mode prepares suggestions for human approval before comments are posted. During the week, Nimbus asks whether comments will auto-post, Daisy needs rollout language before she updates them, and Koopa Bank asks for a scoped admin audit-log export answer before a Thursday security review.
 
-The agent's job is to discover the stale-code risk, align Mario, Luigi, Peach, Daisy, and Toad, clarify scope, and improve the Friday launch outcome.
+The agent's job is to discover the stale-code risk, align Mario, Luigi, Peach, Daisy, and Toad, clarify scope, protect the main launch, and handle the smaller Koopa interruption without overpromising.
 
 The scenario is authored as three JSON files:
 
 ```text
 scenarios/launch_readiness/scenario.json  # manifest: id, start time, includes
-scenarios/launch_readiness/world.json     # people, coworker state, project, facts, tasks, docs, events
+scenarios/launch_readiness/world.json     # people, coworker state, projects, facts, tasks, docs, events
 scenarios/launch_readiness/rules.json     # coworker/event behavior, gates, scoring, outcomes
 ```
 
@@ -66,7 +66,7 @@ pm-sim evaluate --explain
 pm-sim read-doc doc_friday_outcome
 ```
 
-Expected baseline result: `15 / 110`. Luigi eventually surfaces the repo-sync risk, but it happens too late to align Daisy, unblock Peach, approve draft mode, or answer the security question. The Friday outcome report should say the beta arrived without an approved reliable launch plan.
+Expected baseline result: `15 / 120`. Luigi eventually surfaces the repo-sync risk, but it happens too late to align Daisy, unblock Peach, approve draft mode, answer the security question, or scope the Koopa audit-log request. The Friday outcome report should say the beta arrived without an approved reliable launch plan.
 
 ## Quick Happy Path
 
@@ -95,6 +95,12 @@ pm-sim update-doc doc_launch_decision_record "Friday launch decision: Toad appro
 pm-sim send-email daisy "Nimbus Friday draft-mode update" "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has stale-commit risk, so comments should require human approval before posting."
 
 pm-sim advance-time to:2026-06-24T14:00:00
+pm-sim send-chat luigi "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?"
+pm-sim advance-time 2h
+pm-sim send-chat toad "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?"
+pm-sim advance-time 90m
+pm-sim send-email daisy "Koopa audit log export scope for Thursday" "Koopa can get a one-time CSV export of admin audit logs for Thursday's security review. Full self-serve export should stay follow-up after Nimbus launch work."
+
 pm-sim send-chat luigi "Nimbus asked if we store source code from private repos. Is there a security doc?"
 pm-sim advance-time 2h
 pm-sim read-doc doc_private_repo_security_baseline
@@ -106,9 +112,9 @@ pm-sim advance-time to:2026-06-26T15:00:00
 pm-sim read-doc doc_friday_outcome
 ```
 
-Expected evaluation result before the Friday deadline: `110 / 110`. The important evidence is recorded through delivered coworker reply events, the decision record, the Daisy launch email, and the security interruption: `blocker_discovered`, `stakeholder_alignment`, `customer_message_ready`, `peach_unblocked`, `draft_mode_approved`, `decision_record_written`, `security_doc_found`, and `security_question_answered`. The security answer only scores after Daisy's security question is visible. Advancing to Friday then records the final project outcome.
+Expected evaluation result before the Friday deadline: `120 / 120`. The important evidence is recorded through delivered coworker reply events, the decision record, the Daisy launch email, the Koopa scope update, and the security interruption: `blocker_discovered`, `stakeholder_alignment`, `customer_message_ready`, `peach_unblocked`, `draft_mode_approved`, `decision_record_written`, `koopa_scoped`, `koopa_update_sent`, `security_doc_found`, and `security_question_answered`. The security answer only scores after Daisy's security question is visible. Advancing to Friday then records the final project outcome.
 
-The path demonstrates good PM behavior by turning a hidden technical risk into a clear launch tradeoff, aligning the customer-facing owner, unblocking implementation work, and getting an explicit decision before the deadline.
+The path demonstrates good PM behavior by turning a hidden technical risk into a clear launch tradeoff, aligning the customer-facing owner, unblocking implementation work, handling a smaller competing request without stealing the launch team, and getting explicit decisions before deadlines.
 
 The same path can be run by the deterministic scripted agent:
 
@@ -116,7 +122,7 @@ The same path can be run by the deterministic scripted agent:
 pm-sim run-agent --policy scripted --reset
 ```
 
-The scripted policy uses the normal tool functions. It does not mutate database state directly.
+The scripted policy steps are authored in `scenarios/launch_readiness/rules.json` under `scripted_policy`; the runner only dispatches those steps through normal tool functions. It does not mutate database state directly.
 
 ## Meeting-Based Path
 
@@ -136,6 +142,12 @@ pm-sim update-doc doc_launch_decision_record "Friday launch decision: Toad appro
 pm-sim send-email daisy "Nimbus Friday draft-mode update" "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has stale-commit risk, so comments should require human approval before posting."
 
 pm-sim advance-time to:2026-06-24T14:00:00
+pm-sim send-chat luigi "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?"
+pm-sim advance-time 2h
+pm-sim send-chat toad "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?"
+pm-sim advance-time 90m
+pm-sim send-email daisy "Koopa audit log export scope for Thursday" "Koopa can get a one-time CSV export of admin audit logs for Thursday's security review. Full self-serve export should stay follow-up after Nimbus launch work."
+
 pm-sim send-chat luigi "Nimbus asked if we store source code from private repos. Is there a security doc?"
 pm-sim advance-time 2h
 pm-sim read-doc doc_private_repo_security_baseline
@@ -245,7 +257,7 @@ Task updates are checked against the surrounding world state to resist reward ha
 
 After the Friday deadline event is delivered, `evaluate` also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
-The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, and `rules.json`. Most scenario semantics now live in data: task gates, coworker memory, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, and Friday outcome rules are evaluated by reusable engine code. The remaining v1 boundary is meeting behavior, which still contains some scenario-specific Python for the authored PR Review Agent scenario. That is acceptable for one complete scenario; the next scaling step is to make meeting effects use the same declarative rule style before adding a second scenario.
+The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, and `rules.json`. Most scenario semantics now live in data: task gates, coworker memory, action-derived evidence rules, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger terms, transcript lines, and effects.
 
 The backend is covered by:
 

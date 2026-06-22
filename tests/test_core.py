@@ -182,8 +182,11 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(state["scenario_id"], "launch_readiness")
         self.assertEqual(state["current_time"], "2026-06-22T09:00:00")
         self.assertEqual(len(state["people"]), 5)
-        self.assertEqual(len(state["projects"]), 1)
+        self.assertEqual(len(state["projects"]), 2)
         self.assertGreaterEqual(len(state["tasks"]), 5)
+        project_ids = {project["id"] for project in state["projects"]}
+        self.assertIn("project_pr_review_agent", project_ids)
+        self.assertIn("project_audit_log_export", project_ids)
         coworker_state = {
             (row["person_id"], row["key"]): loads(row["value_json"])
             for row in state["coworker_state"]
@@ -191,6 +194,7 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertFalse(coworker_state[("luigi", "risk_surfaced")])
         self.assertFalse(coworker_state[("peach", "scope_unblocked")])
         self.assertFalse(coworker_state[("toad", "approval_recorded")])
+        self.assertFalse(coworker_state[("daisy", "koopa_update_received")])
 
     def test_reset_seeds_open_launch_conflict(self) -> None:
         conflict = self._project_metadata()["launch_conflict"]
@@ -326,16 +330,38 @@ class CoreSimulationTests(unittest.TestCase):
                 WHERE id = 'doc_friday_outcome'
                 """
             ).fetchone()
+            koopa_project = conn.execute(
+                """
+                SELECT status, risk_level, metadata_json
+                FROM projects
+                WHERE id = 'project_audit_log_export'
+                """
+            ).fetchone()
+            koopa_outcome_doc = conn.execute(
+                """
+                SELECT kind, body
+                FROM docs
+                WHERE id = 'doc_koopa_audit_export_outcome'
+                """
+            ).fetchone()
         finally:
             conn.close()
 
-        self.assertIn("friday_nimbus_deadline", event_types)
+        self.assertIn("project_deadline", event_types)
         self.assertTrue(all(event["result"]["handled"] for event in result["delivered_events"]))
         self.assertEqual(project["status"], "missed")
         self.assertEqual(project["risk_level"], "high")
         self.assertEqual(loads(project["metadata_json"])["final_outcome"], "no_approved_friday_plan")
         self.assertEqual(outcome_doc["kind"], "outcome_report")
         self.assertIn("without an approved reliable launch plan", outcome_doc["body"])
+        self.assertEqual(koopa_project["status"], "at_risk")
+        self.assertEqual(koopa_project["risk_level"], "medium")
+        self.assertEqual(
+            loads(koopa_project["metadata_json"])["final_outcome"],
+            "koopa_audit_scope_unresolved",
+        )
+        self.assertEqual(koopa_outcome_doc["kind"], "outcome_report")
+        self.assertIn("without a clear scoped answer", koopa_outcome_doc["body"])
 
         evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
         self.assertEqual(evaluation["final_outcome"]["project_id"], "project_pr_review_agent")
@@ -379,6 +405,60 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(project["risk_level"], "low")
         self.assertEqual(metadata["final_outcome"], "draft_mode_beta_shipped")
         self.assertIn("shipped the reliable draft-mode beta", outcome_doc["body"])
+
+    def test_koopa_audit_export_can_be_scoped_and_closed_before_deadline(self) -> None:
+        advance_time(self.db_path, "to:2026-06-24T14:00:00")
+        send_chat(
+            self.db_path,
+            "luigi",
+            "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?",
+        )
+        advance_time(self.db_path, "2h")
+        send_chat(
+            self.db_path,
+            "toad",
+            "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?",
+        )
+        advance_time(self.db_path, "90m")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Koopa audit log export scope for Thursday",
+            (
+                "Koopa can get a one-time CSV export of admin audit logs for Thursday's "
+                "security review. Full self-serve export should stay follow-up after Nimbus launch work."
+            ),
+        )
+        advance_time(self.db_path, "to:2026-06-25T16:00:00")
+
+        conn = connect(self.db_path)
+        try:
+            project = conn.execute(
+                """
+                SELECT status, risk_level, metadata_json
+                FROM projects
+                WHERE id = 'project_audit_log_export'
+                """
+            ).fetchone()
+            blocker = conn.execute(
+                "SELECT status FROM blockers WHERE id = 'blocker_audit_export_scope_unclear'"
+            ).fetchone()
+            outcome_doc = conn.execute(
+                """
+                SELECT body
+                FROM docs
+                WHERE id = 'doc_koopa_audit_export_outcome'
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+
+        metadata = loads(project["metadata_json"])
+        self.assertEqual(project["status"], "active")
+        self.assertEqual(project["risk_level"], "low")
+        self.assertEqual(metadata["final_outcome"], "koopa_audit_update_ready")
+        self.assertEqual(blocker["status"], "resolved")
+        self.assertIn("one-time CSV", outcome_doc["body"])
 
     def test_friday_deadline_records_late_draft_mode_outcome(self) -> None:
         schedule_meeting(
@@ -501,7 +581,45 @@ class CoreSimulationTests(unittest.TestCase):
             ),
         )
         self._send_customer_ready_email()
-        self._answer_security_question()
+        advance_time(self.db_path, "to:2026-06-24T14:00:00")
+        send_chat(
+            self.db_path,
+            "luigi",
+            "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?",
+        )
+        advance_time(self.db_path, "2h")
+        send_chat(
+            self.db_path,
+            "toad",
+            "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?",
+        )
+        advance_time(self.db_path, "90m")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Koopa audit log export scope for Thursday",
+            (
+                "Koopa can get a one-time CSV export of admin audit logs for Thursday's "
+                "security review. Full self-serve export should stay follow-up after Nimbus launch work."
+            ),
+        )
+        send_chat(
+            self.db_path,
+            "luigi",
+            "Nimbus asked if we store source code from private repos. Is there a security doc?",
+        )
+        advance_time(self.db_path, "2h")
+        read_doc(self.db_path, "doc_private_repo_security_baseline")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus private repo security answer",
+            (
+                "Nimbus can tell their reviewer that private repo source code is processed "
+                "transiently. Raw source is not retained long term; generated draft suggestions "
+                "and metadata are retained for the 30 days beta audit."
+            ),
+        )
         advance_time(self.db_path, "to:2026-06-26T15:00:00")
         meeting_event = next(
             event for event in result["delivered_events"] if event["event_type"] == "meeting_occurs"
@@ -1752,6 +1870,27 @@ class EvaluatorTests(unittest.TestCase):
         send_chat(
             self.db_path,
             "luigi",
+            "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?",
+        )
+        advance_time(self.db_path, "2h")
+        send_chat(
+            self.db_path,
+            "toad",
+            "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?",
+        )
+        advance_time(self.db_path, "90m")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Koopa audit log export scope for Thursday",
+            (
+                "Koopa can get a one-time CSV export of admin audit logs for Thursday's "
+                "security review. Full self-serve export should stay follow-up after Nimbus launch work."
+            ),
+        )
+        send_chat(
+            self.db_path,
+            "luigi",
             "Nimbus asked if we store source code from private repos. Is there a security doc?",
         )
         advance_time(self.db_path, "2h")
@@ -1895,7 +2034,7 @@ class EvaluatorTests(unittest.TestCase):
             if component["key"] == "avoid_harmful_actions"
         )
 
-        self.assertEqual(result["score"], 105)
+        self.assertEqual(result["score"], 115)
         self.assertEqual(harmful_component["earned"], 10)
         self.assertEqual(harmful_component["coordination_penalty"], 5)
         self.assertIn("excessive direct outreach", harmful_component["note"])
@@ -2027,12 +2166,13 @@ class EvaluatorTests(unittest.TestCase):
         output = self._run_cli("evaluate", "--explain")
 
         self.assertIn("Evaluation Explanation", output)
-        self.assertIn("Score: 110 / 110", output)
+        self.assertIn("Score: 120 / 120", output)
         self.assertIn("+30 blocker_discovery (passed, max 30)", output)
         self.assertIn("+20 stakeholder_communication (passed, max 20)", output)
         self.assertIn("+20 task_state_improvement (passed, max 20)", output)
         self.assertIn("+15 risk_handling (passed, max 15)", output)
         self.assertIn("+10 security_interruption (passed, max 10)", output)
+        self.assertIn("+10 portfolio_tradeoff (passed, max 10)", output)
         self.assertIn("Evidence:", output)
         self.assertIn("Stale repo sync risk is discovered in world state.", output)
         self.assertIn("Agent gave Daisy a Nimbus-ready Friday update", output)
@@ -2042,11 +2182,12 @@ class EvaluatorTests(unittest.TestCase):
     def test_evaluate_explain_prints_missing_evidence(self) -> None:
         output = self._run_cli("evaluate", "--explain")
 
-        self.assertIn("Score: 15 / 110", output)
+        self.assertIn("Score: 15 / 120", output)
         self.assertIn("+0 stakeholder_communication (missing, max 20)", output)
         self.assertIn("Missing: stakeholder_alignment, customer_message_ready", output)
         self.assertIn("Missing: peach_unblocked, draft_mode_approved", output)
         self.assertIn("Missing: security_doc_found, security_question_answered", output)
+        self.assertIn("Missing: koopa_scoped, koopa_update_sent", output)
 
     def test_documented_noop_baseline_path_is_runnable(self) -> None:
         self._run_cli("reset")
@@ -2055,7 +2196,7 @@ class EvaluatorTests(unittest.TestCase):
         evaluation = self._run_cli("evaluate", "--explain")
         outcome = self._run_cli("read-doc", "doc_friday_outcome")
 
-        self.assertIn("Score: 15 / 110", evaluation)
+        self.assertIn("Score: 15 / 120", evaluation)
         self.assertIn("Late evidence: blocker_discovered.", evaluation)
         self.assertIn("Missing: stakeholder_alignment, customer_message_ready", evaluation)
         self.assertIn("Friday Outcome", outcome)
@@ -2101,6 +2242,27 @@ class EvaluatorTests(unittest.TestCase):
         self._run_cli(
             "send-chat",
             "luigi",
+            "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?",
+        )
+        self._run_cli("advance-time", "2h")
+        self._run_cli(
+            "send-chat",
+            "toad",
+            "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?",
+        )
+        self._run_cli("advance-time", "90m")
+        self._run_cli(
+            "send-email",
+            "daisy",
+            "Koopa audit log export scope for Thursday",
+            (
+                "Koopa can get a one-time CSV export of admin audit logs for Thursday's "
+                "security review. Full self-serve export should stay follow-up after Nimbus launch work."
+            ),
+        )
+        self._run_cli(
+            "send-chat",
+            "luigi",
             "Nimbus asked if we store source code from private repos. Is there a security doc?",
         )
         self._run_cli("advance-time", "2h")
@@ -2122,7 +2284,7 @@ class EvaluatorTests(unittest.TestCase):
 
         self.assertIn("Transcript: Draft-mode risk review for Nimbus launch", transcript)
         self.assertIn("Toad approved draft mode", transcript)
-        self.assertIn("Score: 110 / 110", before_deadline)
+        self.assertIn("Score: 120 / 120", before_deadline)
         self.assertIn("Outcome:  draft_mode_beta_shipped", after_deadline)
         self.assertIn("shipped the reliable draft-mode beta", after_deadline)
 
@@ -2147,7 +2309,7 @@ class ScriptedAgentTests(unittest.TestCase):
 
         self.assertTrue(result["ok"])
         self.assertEqual(result["policy"], "scripted")
-        self.assertEqual(result["evaluation"]["score"], 110)
+        self.assertEqual(result["evaluation"]["score"], 120)
         self.assertEqual(result["evaluation"]["score"], result["evaluation"]["max_score"])
         self.assertTrue(result["finalization"]["advanced"])
         self.assertEqual(result["finalization"]["to"], "2026-06-26T15:00:00")
@@ -2166,9 +2328,9 @@ class ScriptedAgentTests(unittest.TestCase):
         action_types = [entry["action_type"] for entry in log]
 
         self.assertIn("reset", action_types)
-        self.assertEqual(action_types.count("send_chat"), 5)
-        self.assertEqual(action_types.count("send_email"), 2)
-        self.assertEqual(action_types.count("advance_time"), 6)
+        self.assertEqual(action_types.count("send_chat"), 7)
+        self.assertEqual(action_types.count("send_email"), 3)
+        self.assertEqual(action_types.count("advance_time"), 8)
         self.assertEqual(action_types.count("finalize_to_deadline"), 1)
 
     def test_cli_run_agent_prints_summary(self) -> None:
@@ -2176,9 +2338,9 @@ class ScriptedAgentTests(unittest.TestCase):
 
         self.assertIn("Agent Run", output)
         self.assertIn("Policy: scripted", output)
-        self.assertIn("Score:  110 / 110", output)
+        self.assertIn("Score:  120 / 120", output)
         self.assertIn("Deadline: advanced to Fri 2026-06-26 15:00", output)
-        self.assertIn("events: luigi_proactive_repo_risk, friday_nimbus_deadline", output)
+        self.assertIn("events: luigi_proactive_repo_risk, project_deadline", output)
         self.assertIn("outcome: draft_mode_beta_shipped", output)
         self.assertIn("send_security_answer", output)
 

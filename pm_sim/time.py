@@ -178,23 +178,26 @@ def _effects_for_delivery(
     if event_type == "meeting_occurs":
         return effects_for_meeting(payload, _meeting_state(conn))
 
-    if event_type == "friday_nimbus_deadline":
-        return _effects_for_friday_deadline(conn, payload)
+    if event_type == "project_deadline":
+        return _effects_for_project_deadline(conn, payload)
 
     return effects_for_event(conn, event_type, payload)
 
 
-def _effects_for_friday_deadline(
+def _effects_for_project_deadline(
     conn: sqlite3.Connection,
     payload: dict[str, Any],
 ) -> list[dict[str, Any]]:
     project_id = payload.get("project_id")
     if not isinstance(project_id, str) or not project_id:
-        raise RuntimeError("Friday deadline event requires payload.project_id.")
+        raise RuntimeError("Project deadline event requires payload.project_id.")
     deadline_id = payload.get("deadline_id")
     if not isinstance(deadline_id, str) or not deadline_id:
-        raise RuntimeError("Friday deadline event requires payload.deadline_id.")
-    outcome = _classify_friday_outcome(conn, project_id)
+        raise RuntimeError("Project deadline event requires payload.deadline_id.")
+    outcome_doc_id = payload.get("outcome_doc_id")
+    if not isinstance(outcome_doc_id, str) or not outcome_doc_id:
+        outcome_doc_id = f"doc_{deadline_id}_outcome"
+    outcome = _classify_project_outcome(conn, project_id)
 
     return [
         {
@@ -209,8 +212,8 @@ def _effects_for_friday_deadline(
         },
         {
             "type": "create_doc",
-            "id": "doc_friday_outcome",
-            "title": "Friday Outcome",
+            "id": outcome_doc_id,
+            "title": payload.get("outcome_doc_title", "Project Outcome"),
             "kind": "outcome_report",
             "visible": True,
             "body": outcome["summary"],
@@ -219,7 +222,7 @@ def _effects_for_friday_deadline(
     ]
 
 
-def _classify_friday_outcome(conn: sqlite3.Connection, project_id: str) -> dict[str, str]:
+def _classify_project_outcome(conn: sqlite3.Connection, project_id: str) -> dict[str, str]:
     rules = loads(get_state_value(conn, "outcome_rules_json") or "[]", [])
     for rule in rules:
         if not all_conditions_match(conn, rule.get("when", []), project_id=project_id):

@@ -29,6 +29,8 @@ def condition_matches(
         )
     if "not" in condition:
         return not condition_matches(conn, condition["not"], project_id=project_id)
+    if "project_id" in condition:
+        return project_id == condition["project_id"]
     if "fact_discovered" in condition:
         return fact_discovered_at(conn, condition["fact_discovered"]) is not None
     if "evidence_exists" in condition:
@@ -41,6 +43,8 @@ def condition_matches(
         return _project_decision_matches(conn, condition["project_decision"], project_id)
     if "coworker_state" in condition:
         return _coworker_state_matches(conn, condition["coworker_state"])
+    if "message_exists" in condition:
+        return _message_exists(conn, condition["message_exists"])
     if "first_time_at_or_after" in condition:
         spec = condition["first_time_at_or_after"]
         first_time = first_fact_or_evidence_time(
@@ -241,6 +245,38 @@ def _coworker_state_matches(conn: sqlite3.Connection, spec: dict[str, Any]) -> b
     raise ValueError(f"Unsupported coworker_state condition: {spec}")
 
 
+def _message_exists(conn: sqlite3.Connection, spec: dict[str, Any]) -> bool:
+    clauses = []
+    values = []
+    for key in ("channel", "sender_id", "recipient_id"):
+        if key in spec:
+            clauses.append(f"{key} = ?")
+            values.append(spec[key])
+    if "before" in spec:
+        clauses.append("sent_at < ?")
+        values.append(spec["before"])
+    if "at_or_after" in spec:
+        clauses.append("sent_at >= ?")
+        values.append(spec["at_or_after"])
+
+    query = "SELECT subject, body FROM messages"
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+    query += " ORDER BY sent_at, id"
+    rows = conn.execute(query, values).fetchall()
+
+    terms_any = {_normalize(term) for term in spec.get("terms_any", [])}
+    terms_all = {_normalize(term) for term in spec.get("terms_all", [])}
+    for row in rows:
+        text = _normalize(f"{row['subject'] or ''} {row['body'] or ''}")
+        if terms_any and not any(term in text for term in terms_any):
+            continue
+        if terms_all and not all(term in text for term in terms_all):
+            continue
+        return True
+    return False
+
+
 def _outreach_before(conn: sqlite3.Connection, spec: dict[str, Any]) -> bool:
     person_id = spec["person_id"]
     before = spec["before"]
@@ -276,3 +312,7 @@ def _outreach_before(conn: sqlite3.Connection, spec: dict[str, Any]) -> bool:
 def _state_value(conn: sqlite3.Connection, key: str) -> str | None:
     row = conn.execute("SELECT value FROM sim_state WHERE key = ?", (key,)).fetchone()
     return None if row is None else row["value"]
+
+
+def _normalize(value: str) -> str:
+    return " ".join(value.lower().split())

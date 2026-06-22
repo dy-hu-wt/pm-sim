@@ -26,6 +26,22 @@
         "Nimbus Labs has clear beta messaging before Thursday morning.",
         "The team has an explicit auto-commenting versus draft-mode decision."
       ]
+    },
+    {
+      "id": "project_audit_log_export",
+      "name": "Admin Audit Log Export",
+      "customer": "Koopa Bank",
+      "deadline": "2026-06-25T16:00:00",
+      "status": "active",
+      "risk_level": "medium",
+      "stakeholder_pressure": "Koopa Bank has a Thursday security review and needs clarity on audit log export scope.",
+      "description": "Clarify and communicate whether Fireflower can support an admin audit log CSV export for Koopa Bank's security review.",
+      "decision": "undecided",
+      "success_criteria": [
+        "Koopa Bank receives a scoped answer before Thursday's security review.",
+        "The team avoids promising a full self-serve export if only a one-time CSV is feasible.",
+        "The PR Review Agent launch remains the main engineering focus."
+      ]
     }
   ],
   "people": [
@@ -334,6 +350,24 @@
       "person_id": "toad",
       "key": "approval_recorded",
       "value": false
+    },
+    {
+      "id": "coworker_state_daisy_koopa_update_received",
+      "person_id": "daisy",
+      "key": "koopa_update_received",
+      "value": false
+    },
+    {
+      "id": "coworker_state_luigi_audit_export_feasibility_shared",
+      "person_id": "luigi",
+      "key": "audit_export_feasibility_shared",
+      "value": false
+    },
+    {
+      "id": "coworker_state_toad_audit_scope_aligned",
+      "person_id": "toad",
+      "key": "audit_scope_aligned",
+      "value": false
     }
   ],
   "facts": [
@@ -378,6 +412,23 @@
       "id": "fact_draft_mode_approved",
       "visibility": "derived",
       "summary": "Toad approved shipping draft mode for Friday."
+    },
+    {
+      "id": "fact_koopa_needs_audit_csv",
+      "visibility": "private",
+      "owner_id": "daisy",
+      "summary": "Koopa Bank needs a CSV export of admin audit logs for a Thursday security review, but they mostly need a clear scoped answer."
+    },
+    {
+      "id": "fact_audit_log_one_time_export_feasible",
+      "visibility": "hidden",
+      "owner_id": "luigi",
+      "summary": "A one-time CSV export is feasible this week, but a full self-serve audit export needs follow-up work after the PR Review Agent beta."
+    },
+    {
+      "id": "fact_audit_export_scope_confirmed",
+      "visibility": "derived",
+      "summary": "The Koopa Bank audit log export scope is one-time CSV for the security review, with full self-serve export deferred."
     }
   ],
   "tasks": [
@@ -472,6 +523,62 @@
       },
       "visible": true,
       "blocked_by": "blocker_launch_scope_decision"
+    },
+    {
+      "id": "task_audit_export_scope",
+      "project_id": "project_audit_log_export",
+      "title": "Clarify audit log export scope for Koopa Bank",
+      "owner_id": "toad",
+      "status": "not_started",
+      "priority": "high",
+      "due_at": "2026-06-25T12:00:00",
+      "metadata": {
+        "blocked_by": [
+          "blocker_audit_export_scope_unclear"
+        ]
+      },
+      "visible": true,
+      "blocked_by": "blocker_audit_export_scope_unclear"
+    },
+    {
+      "id": "task_audit_export_feasibility",
+      "project_id": "project_audit_log_export",
+      "title": "Confirm one-time CSV export feasibility",
+      "owner_id": "luigi",
+      "status": "not_started",
+      "priority": "medium",
+      "due_at": "2026-06-25T12:00:00",
+      "metadata": {},
+      "visible": true,
+      "blocked_by": ""
+    },
+    {
+      "id": "task_koopa_status_update",
+      "project_id": "project_audit_log_export",
+      "title": "Send Koopa Bank status update through Daisy",
+      "owner_id": "daisy",
+      "status": "not_started",
+      "priority": "medium",
+      "due_at": "2026-06-25T15:00:00",
+      "metadata": {
+        "blocked_by": [
+          "blocker_audit_export_scope_unclear"
+        ]
+      },
+      "visible": true,
+      "blocked_by": "blocker_audit_export_scope_unclear"
+    },
+    {
+      "id": "task_self_serve_audit_export_followup",
+      "project_id": "project_audit_log_export",
+      "title": "Plan self-serve audit export follow-up",
+      "owner_id": "mario",
+      "status": "not_started",
+      "priority": "low",
+      "due_at": "2026-06-26T12:00:00",
+      "metadata": {},
+      "visible": true,
+      "blocked_by": ""
     }
   ],
   "dependencies": [
@@ -502,6 +609,13 @@
       "upstream_task_id": "task_repo_sync",
       "downstream_task_id": "task_launch_decision",
       "description": "Repo sync reliability determines whether auto-commenting is safe."
+    },
+    {
+      "id": "dep_koopa_update_needs_scope",
+      "project_id": "project_audit_log_export",
+      "upstream_task_id": "task_audit_export_scope",
+      "downstream_task_id": "task_koopa_status_update",
+      "description": "Daisy's Koopa update needs a confirmed one-time CSV versus full export scope."
     }
   ],
   "blockers": [
@@ -540,6 +654,16 @@
       "owner_id": "toad",
       "hidden": false,
       "description": "The team may drift into a risky auto-commenting beta without explicit approval."
+    },
+    {
+      "id": "blocker_audit_export_scope_unclear",
+      "project_id": "project_audit_log_export",
+      "title": "Koopa audit export scope is unclear",
+      "status": "open",
+      "severity": "medium",
+      "owner_id": "toad",
+      "hidden": false,
+      "description": "Koopa Bank needs an answer for Thursday, but the team has not confirmed whether this is a one-time CSV export or a full self-serve feature."
     }
   ],
   "docs": [
@@ -592,6 +716,13 @@
         "owner_id": "luigi"
       },
       "body": "For the Nimbus beta, the PR Review Agent processes private-repo source snippets transiently to generate review suggestions. Raw source code is not stored long term. Generated draft suggestions, PR metadata, commit SHAs, and audit metadata may be retained for 30 days during the beta. Customer-facing wording should say: source is processed transiently, raw source is not retained long term, and generated suggestions plus metadata are retained for the beta audit window."
+    },
+    {
+      "id": "doc_koopa_audit_export_note",
+      "title": "Koopa Audit Export Note",
+      "kind": "customer_note",
+      "visible": true,
+      "body": "Koopa Bank asked whether admin audit logs can be exported before their Thursday security review. The open question is scope: a one-time CSV for the review may be feasible, while a full self-serve export likely needs follow-up planning."
     }
   ],
   "messages": [
@@ -647,6 +778,16 @@
       }
     },
     {
+      "id": "event_koopa_audit_export_request",
+      "event_type": "koopa_audit_export_request",
+      "scheduled_at": "2026-06-24T10:00:00",
+      "status": "pending",
+      "priority": 100,
+      "payload": {
+        "project_id": "project_audit_log_export"
+      }
+    },
+    {
       "id": "event_nimbus_launch_mode_question",
       "event_type": "nimbus_launch_mode_question",
       "scheduled_at": "2026-06-24T15:30:00",
@@ -678,14 +819,29 @@
       }
     },
     {
+      "id": "event_koopa_audit_export_deadline",
+      "event_type": "project_deadline",
+      "scheduled_at": "2026-06-25T16:00:00",
+      "status": "pending",
+      "priority": 100,
+      "payload": {
+        "project_id": "project_audit_log_export",
+        "deadline_id": "deadline_koopa_audit_export",
+        "outcome_doc_id": "doc_koopa_audit_export_outcome",
+        "outcome_doc_title": "Koopa Audit Export Outcome"
+      }
+    },
+    {
       "id": "event_friday_nimbus_deadline",
-      "event_type": "friday_nimbus_deadline",
+      "event_type": "project_deadline",
       "scheduled_at": "2026-06-26T15:00:00",
       "status": "pending",
       "priority": 100,
       "payload": {
         "project_id": "project_pr_review_agent",
-        "deadline_id": "deadline_nimbus_beta"
+        "deadline_id": "deadline_nimbus_beta",
+        "outcome_doc_id": "doc_friday_outcome",
+        "outcome_doc_title": "Friday Outcome"
       }
     }
   ]

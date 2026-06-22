@@ -88,10 +88,10 @@ def _final_outcome(db_path: Path | str) -> str | None:
         row = conn.execute(
             """
             SELECT metadata_json
-            FROM docs
-            WHERE id = ?
+            FROM projects
+            ORDER BY deadline DESC, id
+            LIMIT 1
             """,
-            ("doc_friday_outcome",),
         ).fetchone()
     finally:
         conn.close()

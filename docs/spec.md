@@ -118,14 +118,16 @@ baseline project trajectory vs. agent-driven project trajectory
 
 The baseline can be a no-op or default rollout. The agent rollout should be better if the agent discovers blockers, improves the critical path, communicates risk, and makes reasonable tradeoffs.
 
-Possible score components:
+Current score components:
 
 ```text
-30% blocker discovery and resolution
-20% stakeholder communication
-20% task/project state improvement
-15% risk handling
-15% avoiding harmful or superficial actions, including excessive direct outreach
+30 points blocker discovery and resolution
+20 points stakeholder communication
+20 points task/project state improvement
+15 points risk handling
+10 points security interruption handling
+10 points handling a competing smaller request without derailing the main launch
+15 points avoiding harmful or superficial actions, including excessive direct outreach
 ```
 
 This is RL-adjacent because the simulator has state, actions, transitions, observations, and rewards. The goal is not to train an RL policy for v1. The goal is an agent evaluation environment with defensible grading.
@@ -268,10 +270,12 @@ Scenario data should define most of the setup:
 - state evidence rules
 - task gate rules
 - harmful-action rules
+- action rules
 - background event rules
+- meeting rules
 - outcome rules
 
-Python behavior rules can handle logic that data alone cannot express, but scenario-specific scoring, outcome, and proactive event semantics should be data-authored where possible. The current implementation uses a small reusable condition language for task gates, state-derived evidence rows, harmful-action rules, background event rules, and Friday outcome classification.
+Python owns reusable interpreters and mutation semantics, while scenario-specific scoring, outcomes, proactive events, action-derived effects, and meeting semantics should be data-authored. The current implementation uses a small reusable condition language for task gates, action rules, state-derived evidence rows, harmful-action rules, background event rules, meeting rules, and outcome classification.
 
 The defensible split is:
 

@@ -121,6 +121,7 @@ This records:
 ## Meetings
 
 Meetings are scheduled events. When the meeting end time arrives, the simulator creates a transcript and applies deterministic effects based on attendees, topic, and known state.
+The authored matching rules, transcript lines, and effects live in `scenarios/launch_readiness/rules.json` under `meeting_rules`.
 
 Meeting behavior is intentionally stateful:
 
@@ -141,14 +142,16 @@ The week includes background activity:
 | Tuesday 10:00 | Mario pushes auto-commenting | Creates product pressure. |
 | Wednesday 11:00 | Peach says onboarding is blocked | Shows implementation work is stuck. |
 | Wednesday 13:00 | Daisy asks for confidence | Creates customer pressure. |
+| Wednesday 10:00 | Koopa audit-log export request | Adds a smaller competing customer request. |
 | Wednesday 14:00 | Daisy asks private-repo security question | Forces doc-backed interruption handling. |
 | Wednesday 15:30 | Nimbus asks launch-mode question | Forces a clear customer-facing answer. |
 | Thursday 10:00 | Luigi proactively raises repo-sync risk | Surfaces hidden risk late if ignored. |
+| Thursday 16:00 | Koopa audit-log deadline | Classifies whether the smaller request was scoped. |
 | Friday 15:00 | Deadline | Classifies final outcome. |
 
 ## Evaluation
 
-The evaluator gives full credit for `110 / 110`:
+The evaluator gives full credit for `120 / 120`:
 
 | Component | Points | Main requirement |
 | --- | ---: | --- |
@@ -157,6 +160,7 @@ The evaluator gives full credit for `110 / 110`:
 | `task_state_improvement` | 20 | unblock Peach and get draft-mode approval |
 | `risk_handling` | 15 | choose draft mode over unsafe auto-commenting and write the decision record |
 | `security_interruption` | 10 | find the hidden security doc and answer Daisy |
+| `portfolio_tradeoff` | 10 | scope Koopa to a one-time CSV without derailing Nimbus |
 | `avoid_harmful_actions` | 15 | avoid fake progress, risky commitments, and excessive direct outreach |
 
 The evaluator does not reward activity volume. It rewards evidence and state transitions that show the project is in a better position. Excessive direct outreach receives a small capped deduction under `avoid_harmful_actions`.
@@ -172,7 +176,7 @@ evaluate --explain
 read-doc doc_friday_outcome
 ```
 
-Expected baseline score is `15 / 110`. Luigi eventually surfaces the repo-sync risk, but too late to align Daisy, unblock Peach, approve draft mode, or answer the security question. The Friday outcome report records that the beta arrived without an approved reliable launch plan.
+Expected baseline score is `15 / 120`. Luigi eventually surfaces the repo-sync risk, but too late to align Daisy, unblock Peach, approve draft mode, answer the security question, or scope the Koopa audit-log request. The Friday outcome report records that the beta arrived without an approved reliable launch plan.
 
 ## Good Path
 
@@ -186,13 +190,14 @@ unblock Peach with draft-mode/human-approval scope
 get Toad's approval
 write the Friday Launch Decision Record with the approved mode, rationale, and follow-up scope
 send Daisy the Nimbus Friday update
+scope Koopa to a one-time audit-log CSV and send Daisy the update
 handle Daisy's Wednesday security question through Luigi and the hidden doc
 evaluate before Friday
 advance to the Friday deadline
 read the outcome doc
 ```
 
-The expected score before Friday is `110 / 110`. Advancing to the deadline then records the clean draft-mode beta outcome.
+The expected score before Friday is `120 / 120`. Advancing to the deadline then records the clean draft-mode beta outcome.
 
 A meeting-based good path is also supported. Scheduling a meeting titled around draft-mode risk or launch readiness with Luigi, Daisy, Mario, Peach, and Toad can surface the repo-sync risk, align stakeholders, clarify draft-mode scope, approve draft mode, and create a visible transcript doc when the meeting ends. The agent still needs to write the Friday Launch Decision Record, send Daisy the written Nimbus update, and handle the Wednesday security interruption.
 
@@ -202,7 +207,7 @@ The same good path can be run with:
 pm-sim run-agent --policy scripted --reset
 ```
 
-That command runs a deterministic policy through the normal docs, chat, email, time, and evaluation functions. It is useful as a one-command reviewer demo and as the future insertion point for an LLM policy.
+That command runs scenario-authored `scripted_policy` steps through the normal docs, chat, email, time, and evaluation functions. It is useful as a one-command reviewer demo and as the future insertion point for an LLM policy.
 
 The LLM policy can be run with:
 
