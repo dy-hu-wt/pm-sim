@@ -527,6 +527,78 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(harmful_component["earned"], 0)
         self.assertTrue(harmful_component["detected_harms"])
 
+    def test_fake_fallback_design_progress_does_not_improve_task_score(self) -> None:
+        baseline = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+
+        update_task(self.db_path, "task_fallback_design", status="complete", priority=None)
+        result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        task_component = next(
+            component
+            for component in result["components"]
+            if component["key"] == "task_state_improvement"
+        )
+
+        self.assertEqual(result["score"], baseline["score"])
+        self.assertEqual(task_component["earned"], 0)
+        self.assertIn("peach_unblocked", task_component["missing_evidence"])
+
+    def test_fallback_design_progress_counts_only_after_scope_fact_and_blocker_resolution(self) -> None:
+        update_task(self.db_path, "task_fallback_design", status="in_progress", priority=None)
+
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "discover_fact",
+                        "fact_id": "fact_fallback_scope_confirmed",
+                    }
+                ],
+                now="2026-06-22T10:00:00",
+                source="test:scope_known",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        fact_only = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        fact_only_component = next(
+            component
+            for component in fact_only["components"]
+            if component["key"] == "task_state_improvement"
+        )
+        self.assertEqual(fact_only_component["earned"], 0)
+
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_blocker",
+                        "blocker_id": "blocker_scope_unclear",
+                        "status": "resolved",
+                    }
+                ],
+                now="2026-06-22T10:15:00",
+                source="test:scope_resolved",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        valid = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        valid_component = next(
+            component
+            for component in valid["components"]
+            if component["key"] == "task_state_improvement"
+        )
+
+        self.assertEqual(valid_component["earned"], 10)
+        self.assertEqual(valid_component["status"], "partial")
+        self.assertEqual(valid_component["evidence"][0]["key"], "peach_unblocked")
+
 
 if __name__ == "__main__":
     unittest.main()

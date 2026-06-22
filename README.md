@@ -120,7 +120,9 @@ python3 -m pm_sim.cli evaluate
 python3 -m pm_sim.cli --json evaluate
 ```
 
-The score comes from the rubric in `scenarios/launch_readiness.json`. It rewards recorded evidence for early blocker discovery, stakeholder alignment, task improvement, and risk handling. It also checks for harmful state, such as marking CRM enrichment complete while the CRM blocker is still open.
+The score comes from the rubric in `scenarios/launch_readiness.json`. It rewards outcomes and state improvements, not raw tool usage or activity volume. Evidence must show that the agent improved the project: discovering blockers, aligning stakeholders, unblocking real work, approving a defensible fallback, and avoiding harmful state.
+
+Task updates are checked against the surrounding world state to resist reward hacking. For example, marking CRM enrichment complete while the CRM blocker is unresolved is penalized, and fallback design progress only counts when fallback scope is confirmed and the scope blocker is resolved.
 
 The backend is covered by:
 

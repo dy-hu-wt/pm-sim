@@ -118,11 +118,26 @@ def _load_state_evidence(conn) -> list[dict[str, Any]]:
             """
         ).fetchone()
     )
-    if fallback_scope and fallback_task and fallback_task["status"] in {"in_progress", "complete"}:
+    scope_blocker = row_to_dict(
+        conn.execute(
+            """
+            SELECT status
+            FROM blockers
+            WHERE id = 'blocker_scope_unclear'
+            """
+        ).fetchone()
+    )
+    if (
+        fallback_scope
+        and fallback_task
+        and fallback_task["status"] in {"in_progress", "complete"}
+        and scope_blocker
+        and scope_blocker["status"] in COMPLETED_STATUSES
+    ):
         evidence.append(
             _state_evidence(
                 "peach_unblocked",
-                "Fallback design is unblocked in world state.",
+                "Fallback design is unblocked by confirmed scope and resolved blocker.",
                 fallback_scope["discovered_at"],
             )
         )
