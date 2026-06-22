@@ -36,9 +36,9 @@ python3 -m pm_sim.cli reset --scenario scenarios/launch_readiness.json
 
 This creates `data/current.db`, which is ignored by git.
 
-## Reviewer Walkthrough
+## Quick Happy Path
 
-This golden path exercises the main flow: inspect context, discover Luigi's hidden CRM risk, align Daisy on fallback messaging, unblock Peach, get Toad's fallback approval, and evaluate the final state.
+This is the shortest successful path through the scenario. It demonstrates discovery, stakeholder alignment, fallback approval, evaluation, and the Friday deadline outcome; it is not meant to exhaust the whole simulated week.
 
 ```bash
 python3 -m pm_sim.cli reset
@@ -58,9 +58,12 @@ python3 -m pm_sim.cli send-chat toad "CRM vendor sync is timing out. Approve fal
 python3 -m pm_sim.cli advance-time 90m
 
 python3 -m pm_sim.cli evaluate
+
+python3 -m pm_sim.cli advance-time to:2026-06-26T15:00:00
+python3 -m pm_sim.cli read-doc doc_friday_outcome
 ```
 
-Expected result: `100 / 100`. The important evidence is recorded through delivered coworker reply events: `blocker_discovered`, `stakeholder_alignment`, `peach_unblocked`, and `fallback_approved`.
+Expected evaluation result before the Friday deadline: `100 / 100`. The important evidence is recorded through delivered coworker reply events: `blocker_discovered`, `stakeholder_alignment`, `peach_unblocked`, and `fallback_approved`. Advancing to Friday then records the final project outcome.
 
 ## Commands
 
