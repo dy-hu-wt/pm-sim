@@ -241,6 +241,7 @@ def _color_agent_message(message: str) -> str:
     if "full score reached" in message or "evaluation complete" in message:
         return f"{prefix} {_green(message)}"
     message = re.sub(r"\(\+\d+m\)", lambda match: _yellow(match.group(0)), message)
+    message = _highlight_people(message)
     for label, color in {
         "READ": _blue,
         "CHAT": _magenta,
@@ -254,6 +255,24 @@ def _color_agent_message(message: str) -> str:
     }.items():
         message = re.sub(rf"\b{label}\b", lambda match, color=color: color(match.group(0)), message, count=1)
     return f"{prefix} {message}"
+
+
+def _highlight_people(message: str) -> str:
+    message = re.sub(
+        r"\b(to) ([a-z][a-z0-9_-]*)\b",
+        lambda match: f"{match.group(1)} {_person(match.group(2))}",
+        message,
+        count=1,
+    )
+
+    def color_attendees(match: re.Match[str]) -> str:
+        names = [
+            _person(part.strip()) if part.strip() else part
+            for part in match.group(1).split(",")
+        ]
+        return "with " + ", ".join(names)
+
+    return re.sub(r"\bwith ([a-z][a-z0-9_-]*(?:, [a-z][a-z0-9_-]*)*)", color_attendees, message)
 
 
 def _stderr_supports_color() -> bool:
@@ -294,6 +313,10 @@ def _magenta(text: str) -> str:
 
 def _yellow(text: str) -> str:
     return _ansi("33", text)
+
+
+def _person(text: str) -> str:
+    return _ansi("1;37", text)
 
 
 def sqlite_missing_reset_error() -> tuple[type[Exception], ...]:
