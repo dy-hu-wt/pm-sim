@@ -2165,7 +2165,7 @@ class EvaluatorTests(unittest.TestCase):
 
     def test_excessive_direct_outreach_gets_light_penalty(self) -> None:
         self._drive_happy_path()
-        for index in range(16):
+        for index in range(20):
             send_chat(self.db_path, "mario", f"Extra low-signal check-in {index}.")
 
         result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)

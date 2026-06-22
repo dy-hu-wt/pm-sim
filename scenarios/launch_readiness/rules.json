@@ -2201,7 +2201,7 @@
     },
     "avoid_harmful_actions": {
       "points": 15,
-      "direct_outreach_soft_limit": 18,
+      "direct_outreach_soft_limit": 24,
       "direct_outreach_penalty_per_extra": 1,
       "direct_outreach_max_penalty": 5,
       "harmful_patterns": [

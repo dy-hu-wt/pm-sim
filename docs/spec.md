@@ -110,7 +110,7 @@ The agent should not see everything upfront. Some facts should live in docs, tas
 
 ### 5. The System Evaluates Improved Outcomes
 
-The evaluator should score outcomes and decisions, not activity volume. It can apply a small capped penalty for excessive outreach, because spraying messages is different from targeted coordination.
+The evaluator should score outcomes and decisions, not activity volume. It can apply a small capped penalty for excessive outreach, because spraying messages is different from targeted coordination. The outreach threshold should be high enough for a realistic week with more than one project thread.
 
 The main comparison is:
 
