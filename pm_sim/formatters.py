@@ -386,7 +386,7 @@ def _format_run_agent(value: dict[str, Any]) -> str:
     if value.get("model"):
         lines.append(f"  Model:  {value.get('model')}")
     if value.get("turns") is not None:
-        lines.append(f"  Turns:  {value.get('turns')}")
+        lines.append(f"  Model Turns: {value.get('turns')}")
     missing = _agent_missing_components(evaluation)
     if missing:
         lines.extend(["", "Missing Evaluation"])

@@ -141,13 +141,15 @@ def _load_dotenv(path: Path | None = None) -> None:
 
 def _instructions() -> str:
     return (
-        "You are the project-manager agent inside pm-sim. Use only the provided tools. "
-        "Do not assume hidden facts; discover them through docs, coworkers, meetings, and time. "
-        "Your objective is to improve the Friday launch outcome and get a high evaluator score. "
-        "Prefer substantive project progress over tool volume. Use evaluate to check missing evidence before "
-        "you finish. If the score is not complete, continue using tools until the missing evidence is addressed "
-        "or the turn limit is reached. Pay attention to scheduled future events; some required work only appears "
-        "after simulated time advances. Call finish only when evaluation reaches full score or no useful action remains."
+        "You are the project-manager agent operating inside pm-sim. Use only the workplace tools "
+        "provided to you: observation, docs, tasks, chat, email, calendar meetings, and explicit time "
+        "advancement. Do not assume hidden facts, inspect scenario files, infer evaluator evidence keys, "
+        "or claim task progress that the visible world does not support. Discover information through "
+        "coworkers, docs, meeting transcripts, messages, and scheduled events. Advancing time is allowed "
+        "when you are waiting for replies, meetings, stakeholder follow-ups, or known future events. "
+        "Your objective is to improve the Friday launch outcome through realistic PM behavior: discover "
+        "blockers, resolve conflicts, prioritize tradeoffs, communicate clearly, and keep work moving. "
+        "Call finish when you believe the project is in a defensible state or no useful action remains."
     )
 
 
@@ -185,7 +187,6 @@ def _tool_handlers(db_path: Path | str, scenario_path: Path | str) -> dict[str, 
             args["attendees"],
         ),
         "advance_time": lambda args: advance_time(db_path, args["target"]),
-        "evaluate": lambda _args: evaluate(db_path, scenario_path),
     }
 
 
@@ -242,7 +243,6 @@ def _tool_specs() -> list[dict[str, Any]]:
             {"target": {"type": "string"}},
             ["target"],
         ),
-        _tool("evaluate", "Run the deterministic evaluator on the current state.", {}),
         _tool(
             "finish",
             "Stop the LLM agent run when no more tool calls are needed.",

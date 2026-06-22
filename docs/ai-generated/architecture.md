@@ -128,7 +128,7 @@ pm-sim evaluate --explain
 
 `run-agent --policy scripted --reset` runs the golden path through the same public tool functions used by the CLI. It is a deterministic policy, not an LLM and not a training loop.
 
-`run-agent --policy llm --reset --max-turns 40` uses the OpenAI API to choose simulator tool calls. The local runner exposes docs, chat, email, tasks, meetings, time, and evaluation as callable tools. The model selects actions; the simulator still owns state transitions and grading. The CLI prints progress logs during LLM runs because model calls can otherwise look idle until the final result is returned. If the run ends below full score, the summary prints missing evaluator evidence so the operator can see what the model failed to resolve.
+`run-agent --policy llm --reset --max-turns 40` uses the OpenAI API to choose simulator tool calls. The local runner exposes observation, docs, chat, email, tasks, meetings, and time as callable tools. The evaluator is not exposed as an agent tool during the episode; final scoring is operator-side after the agent stops. A model turn is one model decision round, not one tool call, and a single model turn may request multiple tools. The CLI prints progress logs during LLM runs because model calls can otherwise look idle until the final result is returned. If the run ends below full score, the operator summary prints missing evaluator evidence so the operator can see what the model failed to resolve.
 
 ## Scaling Path
 

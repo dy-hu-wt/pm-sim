@@ -1712,9 +1712,8 @@ class LlmAgentTests(unittest.TestCase):
             [
                 [
                     _function_call("call_1", "read_doc", {"doc_id": "doc_project_brief"}),
-                    _function_call("call_2", "evaluate", {}),
                 ],
-                [_function_call("call_3", "finish", {"reason": "done"})],
+                [_function_call("call_2", "finish", {"reason": "done"})],
             ]
         )
 
@@ -1732,9 +1731,26 @@ class LlmAgentTests(unittest.TestCase):
         self.assertEqual(result["policy"], "llm")
         self.assertEqual(result["model"], "test-model")
         self.assertTrue(result["finished"])
-        self.assertEqual([step["name"] for step in result["steps"]], ["reset", "read_doc", "evaluate", "finish"])
+        self.assertEqual([step["name"] for step in result["steps"]], ["reset", "read_doc", "finish"])
         self.assertIn("reset", action_types)
         self.assertNotIn("send_chat", action_types)
+
+    def test_llm_agent_does_not_expose_evaluator_as_agent_tool(self) -> None:
+        client = _FakeResponsesClient([[_function_call("call_1", "finish", {"reason": "done"})]])
+
+        run_llm_agent(
+            self.db_path,
+            DEFAULT_SCENARIO_PATH,
+            reset_first=True,
+            model="test-model",
+            client=client,
+            max_turns=1,
+        )
+
+        tool_names = {tool["name"] for tool in client.calls[0]["tools"]}
+
+        self.assertNotIn("evaluate", tool_names)
+        self.assertIn("advance_time", tool_names)
 
     def test_llm_agent_appends_function_outputs_to_model_input(self) -> None:
         client = _FakeResponsesClient(
