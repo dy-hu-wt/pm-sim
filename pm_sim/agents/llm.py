@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Union
 
@@ -57,7 +58,7 @@ def run_llm_agent(
     finished = False
     final_message = ""
     for turn in range(1, max_turns + 1):
-        _progress(progress, f"turn {turn}/{max_turns}: waiting for model")
+        _progress(progress, f"{_sim_time_label(db_path)} turn {turn}/{max_turns}: waiting for model")
         response = client.responses.create(
             model=model,
             instructions=_instructions(),
@@ -69,7 +70,7 @@ def run_llm_agent(
         input_items.extend(output)
         final_message = getattr(response, "output_text", "") or final_message
         tool_calls = [item for item in output if getattr(item, "type", None) == "function_call"]
-        _progress(progress, f"turn {turn}/{max_turns}: model returned {len(tool_calls)} tool call(s)")
+        _progress(progress, f"{_sim_time_label(db_path)} turn {turn}/{max_turns}: model returned {len(tool_calls)} tool call(s)")
 
         if not tool_calls:
             break
@@ -77,7 +78,7 @@ def run_llm_agent(
         for call in tool_calls:
             name = getattr(call, "name", "")
             args = _parse_arguments(getattr(call, "arguments", "{}"))
-            _progress(progress, f"running tool: {name}")
+            _progress(progress, f"{_sim_time_label(db_path)} running {name}{_args_summary(name, args)}")
             if name == "finish":
                 finished = True
                 result: dict[str, Any] = {"ok": True, "reason": args.get("reason", "")}
@@ -89,6 +90,9 @@ def run_llm_agent(
                     result = handler(args)
 
             steps.append(_step(name, result))
+            result_summary = _result_summary(name, result)
+            if result_summary:
+                _progress(progress, f"{_sim_time_label(db_path)} {result_summary}")
             input_items.append(
                 {
                     "type": "function_call_output",
@@ -291,3 +295,79 @@ def _step(name: str, result: ToolResult) -> dict[str, Any]:
 def _progress(progress: ProgressFn | None, message: str) -> None:
     if progress is not None:
         progress(message)
+
+
+def _sim_time_label(db_path: Path | str) -> str:
+    try:
+        current_time = observe(db_path).get("current_time")
+    except Exception:
+        current_time = None
+    return f"[{_pretty_time(current_time)}]"
+
+
+def _pretty_time(value: str | None) -> str:
+    if not value:
+        return "sim time unknown"
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    return parsed.strftime("%a %Y-%m-%d %H:%M")
+
+
+def _args_summary(name: str, args: dict[str, Any]) -> str:
+    if name == "send_chat":
+        return f" -> {args.get('person_id')}: {_short(args.get('body', ''), 80)}"
+    if name == "send_email":
+        return f" -> {args.get('person_id')} [{_short(args.get('subject', ''), 60)}]"
+    if name == "read_doc":
+        return f" {args.get('doc_id')}"
+    if name == "advance_time":
+        return f" {args.get('target')}"
+    if name == "update_task":
+        updates = ", ".join(
+            f"{key}={value}" for key, value in args.items() if key in {"status", "priority"}
+        )
+        return f" {args.get('task_id')} {updates}".rstrip()
+    if name == "schedule_meeting":
+        attendees = ", ".join(args.get("attendees", []))
+        return f" [{_short(args.get('title', ''), 60)}] {args.get('start_at')}->{args.get('end_at')} with {attendees}"
+    if name == "finish":
+        return f": {_short(args.get('reason', ''), 80)}"
+    return ""
+
+
+def _result_summary(name: str, result: ToolResult) -> str:
+    if not isinstance(result, dict):
+        return f"{name} returned {len(result)} row(s)"
+    if not result.get("ok", True):
+        return f"{name} failed: {result.get('error')}"
+    if name == "observe":
+        return f"observe returned current time {_pretty_time(result.get('current_time'))}"
+    if name == "advance_time":
+        delivered = result.get("delivered_events", [])
+        if delivered:
+            event_types = ", ".join(event.get("event_type", "event") for event in delivered)
+            return f"advanced to {_pretty_time(result.get('to'))}; delivered {event_types}"
+        return f"advanced to {_pretty_time(result.get('to'))}; delivered no events"
+    if name == "send_chat":
+        replies = result.get("scheduled_reply_ids", [])
+        return f"chat scheduled {len(replies)} reply event(s)"
+    if name == "send_email":
+        effects = result.get("applied_effects", [])
+        return f"email applied {len(effects)} effect(s)"
+    if name == "read_doc":
+        doc = result.get("doc", {})
+        return f"read doc: {doc.get('title', 'unknown doc')}"
+    if name == "schedule_meeting":
+        return f"meeting scheduled: {result.get('meeting_id')}"
+    if name == "update_task":
+        return f"task updated: {result.get('task_id')}"
+    return ""
+
+
+def _short(value: str, limit: int) -> str:
+    text = " ".join(str(value).split())
+    if len(text) <= limit:
+        return text
+    return f"{text[: limit - 3]}..."

@@ -168,7 +168,7 @@ pm-sim run-agent --policy llm --reset --max-turns 40
 
 The flag is `--policy`, not `--polciy`. The LLM policy uses the OpenAI API to choose workplace tool calls, then the simulator executes those calls locally. The model does not get the evaluator as a tool during the episode; grading runs after the agent stops.
 
-An LLM turn means one model decision round: the runner sends the current conversation/tool results to the model, waits for tool calls, runs those tools, and feeds the tool outputs back. A single model turn may contain more than one tool call. LLM runs print progress lines like `[agent] turn 1/40: waiting for model` while the model is thinking or the simulator is running a tool. Add `--quiet` to suppress those logs.
+An LLM turn means one model decision round: the runner sends the current conversation/tool results to the model, waits for tool calls, runs those tools, and feeds the tool outputs back. A single model turn may contain more than one tool call. LLM runs print progress lines with simulated time and tool details, such as `[agent] [Wed 2026-06-24 14:00] running send_chat -> luigi ...`. Add `--quiet` to suppress those logs.
 
 If an LLM run stops below full score, the operator summary prints the missing evaluator evidence. For example, `security_doc_found` and `security_question_answered` mean the model did not advance to Daisy's Wednesday security question, ask Luigi about the security doc, read it, and answer Daisy.
 

@@ -1816,7 +1816,9 @@ class LlmAgentTests(unittest.TestCase):
 
         self.assertIn("resetting scenario", messages)
         self.assertTrue(any("waiting for model" in message for message in messages))
-        self.assertTrue(any("running tool: observe" in message for message in messages))
+        self.assertTrue(any("Mon 2026-06-22 09:00" in message for message in messages))
+        self.assertTrue(any("running observe" in message for message in messages))
+        self.assertTrue(any("observe returned" in message for message in messages))
 
 
 class _FakeResponsesClient:
