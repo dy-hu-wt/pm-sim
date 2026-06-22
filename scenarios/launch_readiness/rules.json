@@ -2379,7 +2379,7 @@
       "name": "wait_for_luigi_reply",
       "tool": "advance_time",
       "args": {
-        "target": "2h"
+        "target": "until_next_event"
       }
     },
     {
@@ -2409,7 +2409,7 @@
       "name": "wait_for_peach_reply",
       "tool": "advance_time",
       "args": {
-        "target": "90m"
+        "target": "until_next_event"
       }
     },
     {
@@ -2424,7 +2424,7 @@
       "name": "wait_for_toad_reply",
       "tool": "advance_time",
       "args": {
-        "target": "90m"
+        "target": "until_next_event"
       }
     },
     {
@@ -2449,45 +2449,6 @@
       "tool": "advance_time",
       "args": {
         "target": "to:2026-06-24T14:00:00"
-      }
-    },
-    {
-      "name": "ask_luigi_about_koopa_audit_export",
-      "tool": "send_chat",
-      "args": {
-        "person_id": "luigi",
-        "body": "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?"
-      }
-    },
-    {
-      "name": "wait_for_koopa_feasibility_reply",
-      "tool": "advance_time",
-      "args": {
-        "target": "2h"
-      }
-    },
-    {
-      "name": "ask_toad_to_scope_koopa_audit_export",
-      "tool": "send_chat",
-      "args": {
-        "person_id": "toad",
-        "body": "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?"
-      }
-    },
-    {
-      "name": "wait_for_koopa_scope_reply",
-      "tool": "advance_time",
-      "args": {
-        "target": "90m"
-      }
-    },
-    {
-      "name": "send_koopa_scope_update",
-      "tool": "send_email",
-      "args": {
-        "person_id": "daisy",
-        "subject": "Koopa audit log export scope for Thursday",
-        "body": "Koopa can get a one-time CSV export of admin audit logs for Thursday's security review. Full self-serve export should stay follow-up after Nimbus launch work."
       }
     },
     {
@@ -2522,10 +2483,49 @@
       }
     },
     {
+      "name": "ask_luigi_about_koopa_audit_export",
+      "tool": "send_chat",
+      "args": {
+        "person_id": "luigi",
+        "body": "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?"
+      }
+    },
+    {
+      "name": "wait_for_koopa_feasibility_reply",
+      "tool": "advance_time",
+      "args": {
+        "target": "to:2026-06-25T10:30:00"
+      }
+    },
+    {
+      "name": "ask_toad_to_scope_koopa_audit_export",
+      "tool": "send_chat",
+      "args": {
+        "person_id": "toad",
+        "body": "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?"
+      }
+    },
+    {
+      "name": "wait_for_koopa_scope_reply",
+      "tool": "advance_time",
+      "args": {
+        "target": "until_next_event"
+      }
+    },
+    {
+      "name": "send_koopa_scope_update",
+      "tool": "send_email",
+      "args": {
+        "person_id": "daisy",
+        "subject": "Koopa audit log export scope for Thursday",
+        "body": "Koopa can get a one-time CSV export of admin audit logs for Thursday's security review. Full self-serve export should stay follow-up after Nimbus launch work."
+      }
+    },
+    {
       "name": "wait_for_final_readiness_check",
       "tool": "advance_time",
       "args": {
-        "target": "to:2026-06-25T12:00:00"
+        "target": "to:2026-06-25T12:10:00"
       }
     },
     {

@@ -87,7 +87,7 @@ pm-sim read-doc doc_project_brief
 pm-sim read-doc doc_beta_rollout_template
 
 pm-sim send-chat luigi "Any repo sync blockers or launch risks for Nimbus?"
-pm-sim advance-time 2h
+pm-sim advance-time until_next_event
 
 pm-sim send-chat daisy "Repo sync has stale-code risk. Can we message reliable draft mode for Nimbus?"
 pm-sim advance-time 45m
@@ -103,18 +103,18 @@ pm-sim update-doc doc_launch_decision_record "Friday launch decision: Toad appro
 pm-sim send-email daisy "Nimbus Friday draft-mode update" "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has stale-commit risk, so comments should require human approval before posting."
 
 pm-sim advance-time to:2026-06-24T14:00:00
-pm-sim send-chat luigi "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?"
-pm-sim advance-time 2h
-pm-sim send-chat toad "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?"
-pm-sim advance-time 90m
-pm-sim send-email daisy "Koopa audit log export scope for Thursday" "Koopa can get a one-time CSV export of admin audit logs for Thursday's security review. Full self-serve export should stay follow-up after Nimbus launch work."
-
 pm-sim send-chat luigi "Nimbus asked if we store source code from private repos. Is there a security doc?"
 pm-sim advance-time 2h
 pm-sim read-doc doc_private_repo_security_baseline
 pm-sim send-email daisy "Nimbus private repo security answer" "Nimbus can tell their reviewer that private repo source code is processed transiently. Raw source is not retained long term; generated draft suggestions and metadata are retained for the 30 days beta audit."
 
-pm-sim advance-time to:2026-06-25T12:00:00
+pm-sim send-chat luigi "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?"
+pm-sim advance-time to:2026-06-25T10:30:00
+pm-sim send-chat toad "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?"
+pm-sim advance-time until_next_event
+pm-sim send-email daisy "Koopa audit log export scope for Thursday" "Koopa can get a one-time CSV export of admin audit logs for Thursday's security review. Full self-serve export should stay follow-up after Nimbus launch work."
+
+pm-sim advance-time to:2026-06-25T12:10:00
 pm-sim send-email daisy "Thursday final readiness for Nimbus Friday beta" "Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode with human approval before posting, private repo security wording is covered, and Koopa stays scoped to a one-time audit CSV so it does not derail the Friday beta."
 
 pm-sim evaluate
@@ -153,18 +153,18 @@ pm-sim update-doc doc_launch_decision_record "Friday launch decision: Toad appro
 pm-sim send-email daisy "Nimbus Friday draft-mode update" "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has stale-commit risk, so comments should require human approval before posting."
 
 pm-sim advance-time to:2026-06-24T14:00:00
-pm-sim send-chat luigi "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?"
-pm-sim advance-time 2h
-pm-sim send-chat toad "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?"
-pm-sim advance-time 90m
-pm-sim send-email daisy "Koopa audit log export scope for Thursday" "Koopa can get a one-time CSV export of admin audit logs for Thursday's security review. Full self-serve export should stay follow-up after Nimbus launch work."
-
 pm-sim send-chat luigi "Nimbus asked if we store source code from private repos. Is there a security doc?"
 pm-sim advance-time 2h
 pm-sim read-doc doc_private_repo_security_baseline
 pm-sim send-email daisy "Nimbus private repo security answer" "Nimbus can tell their reviewer that private repo source code is processed transiently. Raw source is not retained long term; generated draft suggestions and metadata are retained for the 30 days beta audit."
 
-pm-sim advance-time to:2026-06-25T12:00:00
+pm-sim send-chat luigi "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?"
+pm-sim advance-time to:2026-06-25T10:30:00
+pm-sim send-chat toad "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?"
+pm-sim advance-time until_next_event
+pm-sim send-email daisy "Koopa audit log export scope for Thursday" "Koopa can get a one-time CSV export of admin audit logs for Thursday's security review. Full self-serve export should stay follow-up after Nimbus launch work."
+
+pm-sim advance-time to:2026-06-25T12:10:00
 pm-sim send-email daisy "Thursday final readiness for Nimbus Friday beta" "Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode with human approval before posting, private repo security wording is covered, and Koopa stays scoped to a one-time audit CSV so it does not derail the Friday beta."
 
 pm-sim evaluate --explain
@@ -227,7 +227,7 @@ pm-sim advance-time 2h
 pm-sim advance-time until_next_event
 ```
 
-Workplace actions also consume deterministic simulated effort: chat costs 5 minutes, email costs 10 minutes, reading a doc costs 15 minutes, updating a doc costs 20 minutes, scheduling a meeting costs 5 minutes, and task updates cost 1 minute. Meetings themselves resolve at their scheduled end time. Model latency never advances the clock.
+Workplace actions also consume deterministic simulated effort: chat costs 5 minutes, email costs 10 minutes, reading a doc costs 15 minutes, updating a doc costs 20 minutes, scheduling a meeting costs 5 minutes, and task updates cost 1 minute. Coworker reply delays count only inside that coworker's authored availability windows, so a late-day question can roll into the next work window. Meetings themselves resolve at their scheduled end time. Model latency never advances the clock.
 
 Debug lower-level internals when needed:
 

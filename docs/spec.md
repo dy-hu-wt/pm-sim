@@ -83,6 +83,8 @@ For the first version, coworker behavior should be deterministic at the state-tr
 
 An LLM could later help turn a known fact into more natural wording, but it should not decide the fact.
 
+Coworker response delays count only inside the person's authored availability windows. Agent action costs stay fixed, but a late-day chat to a coworker can schedule the reply in the next available work window.
+
 Coworker state is explicit actor memory, stored separately from global project state. It records durable commitments such as Luigi having surfaced the risk, Mario accepting draft mode, Peach becoming unblocked, Daisy receiving customer/security updates, and Toad recording approval. Facts, blockers, and project metadata still drive grading; coworker state makes NPC memory inspectable and reusable for future rules.
 
 Example:
@@ -313,7 +315,7 @@ pm-sim observe
 pm-sim read-doc doc_project_brief
 pm-sim update-doc doc_launch_decision_record "Friday launch decision: ..."
 pm-sim send-chat luigi "Any repo sync blockers for launch?"
-pm-sim advance-time 2h
+pm-sim advance-time until_next_event
 pm-sim log
 pm-sim evaluate
 pm-sim run-agent --policy scripted --reset

@@ -260,7 +260,7 @@ class CoreSimulationTests(unittest.TestCase):
 
     def test_agent_path_moves_launch_conflict_to_resolved_draft_mode(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
-        advance_time(self.db_path, "2h")
+        advance_time(self.db_path, "until_next_event")
         send_chat(
             self.db_path,
             "daisy",
@@ -430,15 +430,32 @@ class CoreSimulationTests(unittest.TestCase):
         send_chat(
             self.db_path,
             "luigi",
-            "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?",
+            "Nimbus asked if we store source code from private repos. Is there a security doc?",
         )
         advance_time(self.db_path, "2h")
+        read_doc(self.db_path, "doc_private_repo_security_baseline")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus private repo security answer",
+            (
+                "Nimbus can tell their reviewer that private repo source code is processed "
+                "transiently. Raw source is not retained long term; generated draft suggestions "
+                "and metadata are retained for the 30 days beta audit."
+            ),
+        )
+        send_chat(
+            self.db_path,
+            "luigi",
+            "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?",
+        )
+        advance_time(self.db_path, "to:2026-06-25T10:30:00")
         send_chat(
             self.db_path,
             "toad",
             "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?",
         )
-        advance_time(self.db_path, "90m")
+        advance_time(self.db_path, "until_next_event")
         send_email(
             self.db_path,
             "daisy",
@@ -604,27 +621,6 @@ class CoreSimulationTests(unittest.TestCase):
         send_chat(
             self.db_path,
             "luigi",
-            "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?",
-        )
-        advance_time(self.db_path, "2h")
-        send_chat(
-            self.db_path,
-            "toad",
-            "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?",
-        )
-        advance_time(self.db_path, "90m")
-        send_email(
-            self.db_path,
-            "daisy",
-            "Koopa audit log export scope for Thursday",
-            (
-                "Koopa can get a one-time CSV export of admin audit logs for Thursday's "
-                "security review. Full self-serve export should stay follow-up after Nimbus launch work."
-            ),
-        )
-        send_chat(
-            self.db_path,
-            "luigi",
             "Nimbus asked if we store source code from private repos. Is there a security doc?",
         )
         advance_time(self.db_path, "2h")
@@ -639,7 +635,28 @@ class CoreSimulationTests(unittest.TestCase):
                 "and metadata are retained for the 30 days beta audit."
             ),
         )
-        advance_time(self.db_path, "to:2026-06-25T12:00:00")
+        send_chat(
+            self.db_path,
+            "luigi",
+            "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?",
+        )
+        advance_time(self.db_path, "to:2026-06-25T10:30:00")
+        send_chat(
+            self.db_path,
+            "toad",
+            "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?",
+        )
+        advance_time(self.db_path, "until_next_event")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Koopa audit log export scope for Thursday",
+            (
+                "Koopa can get a one-time CSV export of admin audit logs for Thursday's "
+                "security review. Full self-serve export should stay follow-up after Nimbus launch work."
+            ),
+        )
+        advance_time(self.db_path, "to:2026-06-25T12:10:00")
         send_email(
             self.db_path,
             "daisy",
@@ -724,7 +741,7 @@ class CoreSimulationTests(unittest.TestCase):
 
     def test_timeline_shows_actions_events_messages_and_evidence_in_order(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
-        advance_time(self.db_path, "2h")
+        advance_time(self.db_path, "until_next_event")
 
         entries = timeline(self.db_path, limit=0)
         kinds = {entry["kind"] for entry in entries}
@@ -754,7 +771,7 @@ class CoreSimulationTests(unittest.TestCase):
 
     def test_timeline_filters_by_kind(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
-        advance_time(self.db_path, "2h")
+        advance_time(self.db_path, "until_next_event")
 
         actions = timeline(self.db_path, kind="action")
         events = timeline(self.db_path, kind="event")
@@ -942,7 +959,7 @@ class CoworkerRuleTests(unittest.TestCase):
             db_path = Path(tmpdir) / "test.db"
             reset(db_path, DEFAULT_SCENARIO_PATH)
             send_chat(db_path, "luigi", "Any repo sync blockers for launch?")
-            advance_time(db_path, "2h")
+            advance_time(db_path, "until_next_event")
 
             conn = connect(db_path)
             try:
@@ -1178,7 +1195,7 @@ class EffectApplicationTests(unittest.TestCase):
     def test_coworker_reply_event_creates_message_and_applies_attached_effects(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
 
-        result = advance_time(self.db_path, "2h")
+        result = advance_time(self.db_path, "until_next_event")
         state = observe(self.db_path)
 
         self.assertEqual(result["delivered_events"][0]["event_type"], "coworker_reply")
@@ -1532,7 +1549,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
             "luigi",
             "Nimbus asked if we store source code from private repos. Is there a security doc?",
         )
-        advance_time(self.db_path, "2h")
+        advance_time(self.db_path, "until_next_event")
         revealed = read_doc(self.db_path, "doc_private_repo_security_baseline")
         conn = connect(self.db_path)
         try:
@@ -1563,7 +1580,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
             "luigi",
             "Nimbus asked if we store source code from private repos. Is there a security doc?",
         )
-        advance_time(self.db_path, "2h")
+        advance_time(self.db_path, "until_next_event")
         revealed = read_doc(self.db_path, "doc_private_repo_security_baseline")
         conn = connect(self.db_path)
         try:
@@ -1600,8 +1617,46 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertEqual(len(result["scheduled_reply_ids"]), 1)
         reply_events = [event for event in events if event["event_type"] == "coworker_reply"]
         self.assertEqual(len(reply_events), 1)
-        self.assertEqual(reply_events[0]["scheduled_at"], "2026-06-22T11:00:00")
+        self.assertEqual(reply_events[0]["scheduled_at"], "2026-06-22T12:00:00")
         self.assertIn("repo sync", reply_events[0]["payload_json"])
+
+    def test_chat_reply_delay_respects_coworker_availability(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            conn.execute(
+                "UPDATE sim_state SET value = ? WHERE key = 'current_time'",
+                ("2026-06-22T17:30:00",),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
+        reply_events = [
+            event for event in event_log(self.db_path, limit=20)
+            if event["event_type"] == "coworker_reply"
+        ]
+
+        self.assertEqual(reply_events[0]["scheduled_at"], "2026-06-23T11:30:00")
+
+    def test_chat_reply_before_working_hours_starts_at_next_available_window(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            conn.execute(
+                "UPDATE sim_state SET value = ? WHERE key = 'current_time'",
+                ("2026-06-24T07:30:00",),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        send_chat(self.db_path, "daisy", "Can you send a confidence check for Nimbus?")
+        reply_events = [
+            event for event in event_log(self.db_path, limit=20)
+            if event["event_type"] == "coworker_reply"
+        ]
+
+        self.assertEqual(reply_events[0]["scheduled_at"], "2026-06-24T09:15:00")
 
     def test_send_email_records_message_without_scheduling_reply(self) -> None:
         result = send_email(
@@ -1873,7 +1928,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
 
     def _drive_to_draft_approval(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
-        advance_time(self.db_path, "2h")
+        advance_time(self.db_path, "until_next_event")
         send_chat(
             self.db_path,
             "daisy",
@@ -1937,7 +1992,7 @@ class EvaluatorTests(unittest.TestCase):
 
     def _drive_happy_path(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
-        advance_time(self.db_path, "2h")
+        advance_time(self.db_path, "until_next_event")
         send_chat(
             self.db_path,
             "daisy",
@@ -1979,27 +2034,6 @@ class EvaluatorTests(unittest.TestCase):
         send_chat(
             self.db_path,
             "luigi",
-            "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?",
-        )
-        advance_time(self.db_path, "2h")
-        send_chat(
-            self.db_path,
-            "toad",
-            "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?",
-        )
-        advance_time(self.db_path, "90m")
-        send_email(
-            self.db_path,
-            "daisy",
-            "Koopa audit log export scope for Thursday",
-            (
-                "Koopa can get a one-time CSV export of admin audit logs for Thursday's "
-                "security review. Full self-serve export should stay follow-up after Nimbus launch work."
-            ),
-        )
-        send_chat(
-            self.db_path,
-            "luigi",
             "Nimbus asked if we store source code from private repos. Is there a security doc?",
         )
         advance_time(self.db_path, "2h")
@@ -2014,8 +2048,29 @@ class EvaluatorTests(unittest.TestCase):
                 "and metadata are retained for the 30 days beta audit."
             ),
         )
+        send_chat(
+            self.db_path,
+            "luigi",
+            "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?",
+        )
+        advance_time(self.db_path, "to:2026-06-25T10:30:00")
+        send_chat(
+            self.db_path,
+            "toad",
+            "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?",
+        )
+        advance_time(self.db_path, "until_next_event")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Koopa audit log export scope for Thursday",
+            (
+                "Koopa can get a one-time CSV export of admin audit logs for Thursday's "
+                "security review. Full self-serve export should stay follow-up after Nimbus launch work."
+            ),
+        )
 
-        advance_time(self.db_path, "to:2026-06-25T12:00:00")
+        advance_time(self.db_path, "to:2026-06-25T12:10:00")
         send_email(
             self.db_path,
             "daisy",
@@ -2413,27 +2468,6 @@ class EvaluatorTests(unittest.TestCase):
         self._run_cli(
             "send-chat",
             "luigi",
-            "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?",
-        )
-        self._run_cli("advance-time", "2h")
-        self._run_cli(
-            "send-chat",
-            "toad",
-            "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?",
-        )
-        self._run_cli("advance-time", "90m")
-        self._run_cli(
-            "send-email",
-            "daisy",
-            "Koopa audit log export scope for Thursday",
-            (
-                "Koopa can get a one-time CSV export of admin audit logs for Thursday's "
-                "security review. Full self-serve export should stay follow-up after Nimbus launch work."
-            ),
-        )
-        self._run_cli(
-            "send-chat",
-            "luigi",
             "Nimbus asked if we store source code from private repos. Is there a security doc?",
         )
         self._run_cli("advance-time", "2h")
@@ -2448,7 +2482,28 @@ class EvaluatorTests(unittest.TestCase):
                 "and metadata are retained for the 30 days beta audit."
             ),
         )
-        self._run_cli("advance-time", "to:2026-06-25T12:00:00")
+        self._run_cli(
+            "send-chat",
+            "luigi",
+            "Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?",
+        )
+        self._run_cli("advance-time", "to:2026-06-25T10:30:00")
+        self._run_cli(
+            "send-chat",
+            "toad",
+            "Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?",
+        )
+        self._run_cli("advance-time", "until_next_event")
+        self._run_cli(
+            "send-email",
+            "daisy",
+            "Koopa audit log export scope for Thursday",
+            (
+                "Koopa can get a one-time CSV export of admin audit logs for Thursday's "
+                "security review. Full self-serve export should stay follow-up after Nimbus launch work."
+            ),
+        )
+        self._run_cli("advance-time", "to:2026-06-25T12:10:00")
         self._run_cli(
             "send-email",
             "daisy",

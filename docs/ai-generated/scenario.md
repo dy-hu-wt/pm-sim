@@ -201,8 +201,8 @@ unblock Peach with draft-mode/human-approval scope
 get Toad's approval
 write the Friday Launch Decision Record with the approved mode, rationale, and follow-up scope
 send Daisy the Nimbus Friday update
-scope Koopa to a one-time audit-log CSV and send Daisy the update
 handle Daisy's Wednesday security question through Luigi and the hidden doc
+scope Koopa to a one-time audit-log CSV and send Daisy the update
 evaluate before Friday
 advance to the Friday deadline
 read the outcome doc

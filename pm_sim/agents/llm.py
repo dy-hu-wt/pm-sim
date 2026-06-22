@@ -171,6 +171,8 @@ def _instructions() -> str:
         "or claim task progress that the visible world does not support. Discover information through "
         "coworkers, docs, meeting transcripts, messages, and scheduled events. Advancing time is allowed "
         "when you are waiting for replies, meetings, stakeholder follow-ups, or known future events. "
+        "Coworker replies arrive only during the recipient's working hours, so late-day messages may "
+        "roll into the next available work window. "
         "Coworker attention is limited. Do not broadcast routine updates, send courtesy confirmations, "
         "or ask the same person to confirm a decision that is already visible in a message, transcript, "
         "or task. Message the smallest useful set of people. Prefer one concise email or one focused "

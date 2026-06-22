@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -170,6 +170,7 @@ def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
 
 
 # Chat tool: records an agent message and schedules deterministic coworker replies. Cost: 5m.
+# Reply delays consume only the recipient coworker's authored working hours.
 def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
     body = body.strip()
     if not body:
@@ -492,7 +493,13 @@ def _schedule_coworker_reply(
     current_time: str,
 ) -> str:
     event_id = _next_id(conn, "events", "event_coworker_reply")
-    scheduled_at = _format_time(_parse_time(current_time) + timedelta(minutes=reply.delay_minutes))
+    scheduled_at = _format_time(
+        _add_available_minutes(
+            _parse_time(current_time),
+            reply.delay_minutes,
+            _person_availability(conn, reply.person_id),
+        )
+    )
     conn.execute(
         """
         INSERT INTO events
@@ -621,6 +628,77 @@ def _behavior_state(conn: sqlite3.Connection) -> dict[str, Any]:
 
 def _get_person(conn: sqlite3.Connection, person_id: str) -> dict[str, Any] | None:
     return row_to_dict(conn.execute("SELECT * FROM people WHERE id = ?", (person_id,)).fetchone())
+
+
+def _person_availability(conn: sqlite3.Connection, person_id: str) -> list[dict[str, Any]]:
+    row = conn.execute(
+        "SELECT availability_json FROM people WHERE id = ?",
+        (person_id,),
+    ).fetchone()
+    if row is None:
+        return []
+    availability = loads(row["availability_json"], [])
+    return availability if isinstance(availability, list) else []
+
+
+def _add_available_minutes(
+    start: datetime,
+    minutes: int,
+    availability: list[dict[str, Any]],
+) -> datetime:
+    if not availability:
+        return start + timedelta(minutes=minutes)
+
+    remaining = minutes
+    current = start
+    for _ in range(21):
+        windows = _availability_windows_for_day(current, availability)
+        for window_start, window_end in windows:
+            if current < window_start:
+                current = window_start
+            if current >= window_end:
+                continue
+
+            available_minutes = int((window_end - current).total_seconds() // 60)
+            if remaining <= available_minutes:
+                return current + timedelta(minutes=remaining)
+            remaining -= available_minutes
+            current = window_end
+
+        current = datetime.combine((current + timedelta(days=1)).date(), time.min)
+
+    raise ValueError("Could not schedule coworker reply within configured availability.")
+
+
+def _availability_windows_for_day(
+    current: datetime,
+    availability: list[dict[str, Any]],
+) -> list[tuple[datetime, datetime]]:
+    day_name = current.strftime("%A").lower()
+    windows = []
+    for window in availability:
+        if str(window.get("day", "")).lower() != day_name:
+            continue
+        start = _parse_clock_time(window.get("start"))
+        end = _parse_clock_time(window.get("end"))
+        if start is None or end is None or end <= start:
+            continue
+        windows.append(
+            (
+                datetime.combine(current.date(), start),
+                datetime.combine(current.date(), end),
+            )
+        )
+    return sorted(windows, key=lambda item: item[0])
+
+
+def _parse_clock_time(value: Any) -> time | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return time.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 def _next_id(conn: sqlite3.Connection, table: str, prefix: str) -> str:
