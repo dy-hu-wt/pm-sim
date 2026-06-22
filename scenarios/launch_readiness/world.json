@@ -822,7 +822,14 @@
       "status": "pending",
       "priority": 100,
       "payload": {
-        "project_id": "project_pr_review_agent"
+        "project_id": "project_pr_review_agent",
+        "calendar_obligation": {
+          "title": "Daisy final Nimbus go/no-go",
+          "attendees": [
+            "agent",
+            "daisy"
+          ]
+        }
       }
     },
     {

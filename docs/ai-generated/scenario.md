@@ -226,7 +226,7 @@ The LLM policy can be run with:
 pm-sim run-agent --policy llm --reset --max-turns 40
 ```
 
-That path lets a model choose workplace tool calls. The model does not get the evaluator during the run; the simulator scores durable state and evidence after the agent stops. A model turn is one model decision round, and it may include multiple tool calls. During an LLM run, progress logs show simulated time, model wait points, tool execution, logical time cost, and short result summaries. After the agent stops, the runner finalizes to the Friday deadline as operator-owned simulation settlement, then grades the settled state. If the model finishes before Daisy's Thursday readiness ask is answered, it should miss `final_readiness_confirmed`.
+That path lets a model choose workplace tool calls. The model does not get the evaluator during the run; the simulator scores durable state and evidence after the agent stops. A model turn is one model decision round, and it may include multiple tool calls. During an LLM run, progress logs show simulated time, model wait points, tool execution, logical time cost, and short result summaries. The runner validates `finish` against visible calendar obligations, so the model cannot successfully finish while the Thursday readiness check, Koopa deadline, or Friday beta deadline is still ahead. After the agent stops, the runner finalizes any remaining deadline settlement as operator-owned simulation settlement, then grades the settled state.
 
 The evaluator reports score components during the week. Once the Friday deadline event has delivered, it also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 

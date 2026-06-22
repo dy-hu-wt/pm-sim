@@ -15,6 +15,7 @@ from ..actions import (
     update_doc,
     update_task,
 )
+from ..calendar import validate_finish
 from ..evaluator import evaluate
 from ..paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH, REPO_ROOT
 from ..state import observe, reset
@@ -95,9 +96,11 @@ def run_llm_agent(
             name = getattr(call, "name", "")
             args = _parse_arguments(getattr(call, "arguments", "{}"))
             if name == "finish":
-                finished = True
-                result: dict[str, Any] = {"ok": True, "reason": args.get("reason", "")}
-                stop_reason = "agent_finish"
+                result = validate_finish(db_path)
+                result["reason"] = args.get("reason", "")
+                if result.get("ok"):
+                    finished = True
+                    stop_reason = "agent_finish"
             else:
                 handler = tool_handlers.get(name)
                 if handler is None:
@@ -190,9 +193,11 @@ def _instructions() -> str:
         "wording, and competing project scope. "
         "Your objective is to improve the Friday launch outcome through realistic PM behavior: discover "
         "blockers, resolve conflicts, prioritize tradeoffs, communicate clearly, and keep work moving. "
-        "You do not need to simulate every hour through Friday. Call finish when the launch mode is "
-        "approved, customer messaging is ready, blocked work is unblocked, any visible async customer "
-        "questions have been answered from evidence, and no useful action remains."
+        "You do not need to simulate every empty hour, but you must respect visible calendar obligations. "
+        "Before calling finish, observe the calendar obligations and advance through any remaining visible "
+        "commitments or deadlines. Call finish only when the launch mode is approved, customer messaging "
+        "is ready, blocked work is unblocked, visible async customer questions have been answered from "
+        "evidence, and no visible calendar obligations remain."
     )
 
 

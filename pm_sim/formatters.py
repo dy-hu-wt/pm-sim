@@ -113,6 +113,18 @@ def _format_observe(value: dict[str, Any]) -> str:
         lines.append("  None")
 
     lines.append("")
+    lines.append("Calendar Obligations")
+    obligations = value.get("calendar_obligations", [])
+    if obligations:
+        for obligation in obligations[:8]:
+            lines.append(
+                f"  {_pretty_time(obligation['start_at'])}  "
+                f"{obligation['title']}  ({obligation['kind']})"
+            )
+    else:
+        lines.append("  None")
+
+    lines.append("")
     lines.append("Next Events")
     events = value.get("pending_events", [])
     if events:

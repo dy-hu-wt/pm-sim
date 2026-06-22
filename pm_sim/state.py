@@ -34,6 +34,8 @@ def reset(
 
 
 def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
+    from .calendar import visible_calendar_obligations
+
     conn = connect(db_path)
     try:
         return {
@@ -120,6 +122,7 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
                     """
                 ).fetchall()
             ),
+            "calendar_obligations": visible_calendar_obligations(db_path),
             "visible_docs": rows_to_dicts(
                 conn.execute(
                     """

@@ -195,6 +195,10 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertFalse(coworker_state[("peach", "scope_unblocked")])
         self.assertFalse(coworker_state[("toad", "approval_recorded")])
         self.assertFalse(coworker_state[("daisy", "koopa_update_received")])
+        obligations = {row["title"] for row in state["calendar_obligations"]}
+        self.assertIn("Daisy final Nimbus go/no-go", obligations)
+        self.assertIn("Admin Audit Log Export deadline", obligations)
+        self.assertIn("PR Review Agent Beta deadline", obligations)
 
     def test_reset_seeds_open_launch_conflict(self) -> None:
         conflict = self._project_metadata()["launch_conflict"]
@@ -2549,7 +2553,7 @@ class LlmAgentTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmpdir.cleanup()
 
-    def test_llm_agent_executes_model_requested_tools(self) -> None:
+    def test_llm_agent_rejects_finish_with_visible_obligations_remaining(self) -> None:
         client = _FakeResponsesClient(
             [
                 [
@@ -2572,13 +2576,48 @@ class LlmAgentTests(unittest.TestCase):
 
         self.assertEqual(result["policy"], "llm")
         self.assertEqual(result["model"], "test-model")
-        self.assertTrue(result["finished"])
-        self.assertEqual(result["stop_reason"], "agent_finish")
+        self.assertFalse(result["finished"])
+        self.assertEqual(result["stop_reason"], "no_tool_calls")
         self.assertTrue(result["finalization"]["advanced"])
         self.assertEqual(result["finalization"]["to"], "2026-06-26T15:00:00")
         self.assertEqual([step["name"] for step in result["steps"]], ["reset", "read_doc", "finish"])
+        self.assertFalse(result["steps"][-1]["result"]["ok"])
+        self.assertIn("remaining_obligations", result["steps"][-1]["result"])
         self.assertIn("reset", action_types)
         self.assertNotIn("send_chat", action_types)
+
+    def test_llm_agent_accepts_finish_after_visible_obligations_pass(self) -> None:
+        client = _FakeResponsesClient(
+            [
+                [_function_call("call_1", "finish", {"reason": "too early"})],
+                [
+                    _function_call(
+                        "call_2",
+                        "advance_time",
+                        {"target": "to:2026-06-26T15:00:00"},
+                    )
+                ],
+                [_function_call("call_3", "finish", {"reason": "calendar complete"})],
+            ]
+        )
+
+        result = run_llm_agent(
+            self.db_path,
+            DEFAULT_SCENARIO_PATH,
+            reset_first=True,
+            model="test-model",
+            client=client,
+            max_turns=4,
+        )
+
+        self.assertTrue(result["finished"])
+        self.assertEqual(result["stop_reason"], "agent_finish")
+        self.assertEqual(
+            [step["name"] for step in result["steps"]],
+            ["reset", "finish", "advance_time", "finish"],
+        )
+        self.assertFalse(result["steps"][1]["result"]["ok"])
+        self.assertTrue(result["steps"][-1]["result"]["ok"])
 
     def test_llm_agent_does_not_expose_evaluator_as_agent_tool(self) -> None:
         client = _FakeResponsesClient([[_function_call("call_1", "finish", {"reason": "done"})]])
@@ -2621,6 +2660,7 @@ class LlmAgentTests(unittest.TestCase):
 
         self.assertEqual(function_outputs[0]["call_id"], "call_1")
         self.assertIn("current_time", function_outputs[0]["output"])
+        self.assertIn("calendar_obligations", function_outputs[0]["output"])
 
     def test_llm_agent_reports_progress(self) -> None:
         messages = []
@@ -2671,8 +2711,9 @@ class LlmAgentTests(unittest.TestCase):
 
         self.assertIn("Coworker attention is limited", instructions)
         self.assertIn("smallest useful set of people", instructions)
-        self.assertIn("You do not need to simulate every hour through Friday", instructions)
-        self.assertIn("Call finish when", instructions)
+        self.assertIn("You do not need to simulate every empty hour", instructions)
+        self.assertIn("visible calendar obligations", instructions)
+        self.assertIn("Call finish only when", instructions)
 
 
 class _FakeResponsesClient:

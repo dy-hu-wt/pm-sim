@@ -34,6 +34,8 @@ advance_time to "Tuesday 09:00"
 
 The week should jump between meaningful events and action costs: replies, meetings, deadlines, escalations, reading, communication, and final evaluation. It does not need minute-by-minute ticks.
 
+Visible calendar obligations are different from hidden background events. If a scheduled commitment or project deadline is visible to the agent, `finish` should not succeed until that obligation has passed. The agent can jump time to the next obligation, but it cannot declare the week done while known calendar work remains.
+
 ### 2. The Agent Interacts Through Internal Tools
 
 The agent should interact through workplace tools, not direct database access.
