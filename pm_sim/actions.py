@@ -8,7 +8,7 @@ from typing import Any
 from .coworkers import CoworkerReply, replies_for_chat
 from .db import connect, row_to_dict, rows_to_dicts
 from .effects import apply_effects
-from .jsonutil import dumps
+from .jsonutil import dumps, loads
 from .paths import DEFAULT_DB_PATH
 from .state import AGENT_ID, get_current_time, log_action
 
@@ -19,6 +19,8 @@ EMAIL_DRAFT_TERMS = frozenset(
     {"fallback", "draft", "draft-mode", "reliable", "de-scope", "descope", "human approval"}
 )
 EMAIL_CUSTOMER_TERMS = frozenset({"nimbus", "friday", "beta", "pilot", "customer", "confidence"})
+COMPLETED_STATUSES = {"complete", "completed", "done", "resolved"}
+UNRESOLVED_BLOCKER_STATUSES = {"open", "surfaced", "blocked"}
 
 
 # Read-only tool: returns visible task state without mutating time, logs, or events.
@@ -163,7 +165,7 @@ def send_email(
         conn.close()
 
 
-# Task tool: updates explicit task fields; evaluator checks whether progress is legitimate.
+# Task tool: updates explicit task fields only when required world state supports completion.
 def update_task(
     db_path: Path | str,
     task_id: str,
@@ -182,6 +184,10 @@ def update_task(
 
         new_status = status if status is not None else task["status"]
         new_priority = priority if priority is not None else task["priority"]
+        validation_error = _validate_task_update(conn, task_id, new_status)
+        if validation_error:
+            return {"ok": False, "error": validation_error}
+
         conn.execute(
             """
             UPDATE tasks
@@ -207,6 +213,129 @@ def update_task(
         return {"ok": True, "task_id": task_id, "status": new_status, "priority": new_priority}
     finally:
         conn.close()
+
+
+def _validate_task_update(conn: sqlite3.Connection, task_id: str, new_status: str) -> str | None:
+    if not _is_completion_status(new_status):
+        return None
+
+    if task_id == "task_repo_sync" and not _blocker_resolved(conn, "blocker_repo_sync_stale"):
+        return (
+            "task_repo_sync cannot be marked complete while "
+            "blocker_repo_sync_stale is unresolved."
+        )
+
+    if task_id == "task_draft_mode_docs":
+        missing = []
+        if not _fact_discovered(conn, "fact_draft_mode_scope_confirmed"):
+            missing.append("draft-mode scope confirmation")
+        if not _blocker_resolved(conn, "blocker_scope_unclear"):
+            missing.append("resolved scope blocker")
+        if not _draft_mode_selected(conn):
+            missing.append("draft-mode approval or selection")
+        if missing:
+            return "task_draft_mode_docs cannot be marked complete without " + ", ".join(missing) + "."
+
+    if task_id == "task_customer_talk_track":
+        missing = []
+        if not _daisy_aligned(conn):
+            missing.append("Daisy alignment")
+        if not _launch_mode_decided(conn):
+            missing.append("launch mode decision")
+        if missing:
+            return "task_customer_talk_track cannot be marked complete without " + ", ".join(missing) + "."
+
+    if task_id == "task_launch_decision" and not _toad_approval_exists(conn):
+        return "task_launch_decision cannot be marked complete without Toad approval."
+
+    return None
+
+
+def _is_completion_status(status: str | None) -> bool:
+    return (status or "").lower() in COMPLETED_STATUSES
+
+
+def _blocker_resolved(conn: sqlite3.Connection, blocker_id: str) -> bool:
+    row = conn.execute("SELECT status FROM blockers WHERE id = ?", (blocker_id,)).fetchone()
+    if row is None:
+        return False
+    return row["status"].lower() not in UNRESOLVED_BLOCKER_STATUSES
+
+
+def _fact_discovered(conn: sqlite3.Connection, fact_id: str) -> bool:
+    return (
+        conn.execute(
+            """
+            SELECT 1
+            FROM facts
+            WHERE id = ?
+              AND discovered_at IS NOT NULL
+            LIMIT 1
+            """,
+            (fact_id,),
+        ).fetchone()
+        is not None
+    )
+
+
+def _draft_mode_selected(conn: sqlite3.Connection) -> bool:
+    decision = _project_decision(conn)
+    return decision in {"draft_mode_selected", "draft_mode_approved"} or _fact_discovered(
+        conn,
+        "fact_draft_mode_approved",
+    )
+
+
+def _daisy_aligned(conn: sqlite3.Connection) -> bool:
+    return _fact_discovered(conn, "fact_nimbus_values_reliability") or _evidence_exists(
+        conn,
+        "stakeholder_alignment",
+    )
+
+
+def _launch_mode_decided(conn: sqlite3.Connection) -> bool:
+    decision = _project_decision(conn)
+    return (
+        decision is not None
+        and decision != "undecided"
+    ) or _fact_discovered(conn, "fact_draft_mode_approved")
+
+
+def _toad_approval_exists(conn: sqlite3.Connection) -> bool:
+    return _fact_discovered(conn, "fact_draft_mode_approved") or _evidence_exists(
+        conn,
+        "draft_mode_approved",
+    )
+
+
+def _evidence_exists(conn: sqlite3.Connection, evidence_key: str) -> bool:
+    return (
+        conn.execute(
+            """
+            SELECT 1
+            FROM evaluation_evidence
+            WHERE evidence_key = ?
+            LIMIT 1
+            """,
+            (evidence_key,),
+        ).fetchone()
+        is not None
+    )
+
+
+def _project_decision(conn: sqlite3.Connection) -> str | None:
+    row = conn.execute(
+        """
+        SELECT metadata_json
+        FROM projects
+        WHERE id = 'project_pr_review_agent'
+        """
+    ).fetchone()
+    if row is None:
+        return None
+    metadata = loads(row["metadata_json"], {})
+    decision = metadata.get("decision")
+    return decision if isinstance(decision, str) else None
 
 
 # Calendar tool: records the meeting and schedules an async meeting_occurs event.

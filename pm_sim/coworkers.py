@@ -51,6 +51,26 @@ RISK_TERMS = frozenset(
     }
 )
 
+LUIGI_RISK_INQUIRY_TERMS = frozenset(
+    {
+        "blocker",
+        "blocked",
+        "risk",
+        "risks",
+        "ready",
+        "readiness",
+        "repo",
+        "repository",
+        "sync",
+        "webhook",
+        "webhooks",
+        "commit",
+        "stale",
+        "auto-comment",
+        "auto-commenting",
+    }
+)
+
 SCOPE_TERMS = frozenset(
     {
         "scope",
@@ -243,7 +263,7 @@ def effects_for_meeting(payload: dict[str, Any]) -> list[Effect]:
 
 def _luigi_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
     # Backend owner: knows the hidden stale repo-sync risk.
-    if _mentions_any(normalized, RISK_TERMS):
+    if _mentions_any(normalized, LUIGI_RISK_INQUIRY_TERMS):
         if _state_has_fact(state, "fact_repo_sync_stale"):
             return CoworkerReply(
                 person_id="luigi",
@@ -317,8 +337,16 @@ def _mario_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
 
 def _peach_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
     # Design/onboarding owner: blocked until launch mode is clear.
-    scope_clear = _state_has_fact(state, "fact_draft_mode_scope_confirmed") or _mentions_any(
-        normalized, {"fallback", "draft", "draft mode", "human approval", "without auto", "no auto-commenting"}
+    draft_requested = _mentions_any(normalized, {"fallback", "draft", "draft mode", "draft-mode"})
+    human_approval_explicit = _mentions_any(normalized, {"human approval", "approval"})
+    auto_commenting_limited = _mentions_any(
+        normalized, {"without auto", "no auto-commenting", "not auto-commenting", "auto-commenting is follow-up"}
+    )
+    launch_context_exists = _state_has_fact(
+        state, "fact_nimbus_values_reliability"
+    ) or _state_has_fact(state, "fact_draft_mode_approved")
+    scope_clear = _state_has_fact(state, "fact_draft_mode_scope_confirmed") or (
+        draft_requested and human_approval_explicit and auto_commenting_limited and launch_context_exists
     )
     if scope_clear:
         return CoworkerReply(
@@ -341,9 +369,9 @@ def _peach_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
         person_id="peach",
         delay_minutes=RESPONSE_DELAYS_MINUTES["peach"],
         body=(
-            "I am blocked on onboarding because I do not know whether "
-            "auto-commenting or draft mode is in Friday's scope. I can finish "
-            "quickly once launch mode is decided."
+            "I am still blocked on onboarding. I need the Friday launch mode, "
+            "human-approval requirement, and auto-commenting limitation made "
+            "explicit before I can finish the draft-mode flow."
         ),
         effects=(_update_blocker("blocker_scope_unclear", "surfaced"),),
     )
@@ -351,10 +379,14 @@ def _peach_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
 
 def _daisy_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
     # Customer success owner: needs reliable Nimbus messaging before Friday.
-    if _mentions_any(
-        normalized,
-        {"risk", "fallback", "draft", "repo", "sync", "stale", "confidence", "blocked", "auto-commenting"},
-    ):
+    risk_explained = _mentions_any(
+        normalized, {"risk", "repo", "sync", "stale", "commit", "webhook", "blocked"}
+    )
+    draft_plan = _mentions_any(
+        normalized, {"fallback", "draft", "draft-mode", "reliable", "human approval"}
+    )
+    customer_context = _mentions_any(normalized, {"nimbus", "customer", "friday", "beta", "pilot"})
+    if risk_explained and draft_plan and customer_context:
         return CoworkerReply(
             person_id="daisy",
             delay_minutes=RESPONSE_DELAYS_MINUTES["daisy"],
@@ -366,6 +398,17 @@ def _daisy_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
             effects=(
                 _add_evidence("stakeholder_alignment", "Daisy supported reliable draft mode with clear messaging."),
                 _discover_fact("fact_nimbus_values_reliability", "daisy_chat_reply"),
+            ),
+        )
+
+    if _state_has_fact(state, "fact_repo_sync_stale") and (risk_explained or draft_plan):
+        return CoworkerReply(
+            person_id="daisy",
+            delay_minutes=RESPONSE_DELAYS_MINUTES["daisy"],
+            body=(
+                "I understand there is launch risk, but I still need customer-safe "
+                "wording: what Nimbus will see Friday, whether comments post "
+                "automatically, and what limitation remains."
             ),
         )
 
@@ -381,10 +424,14 @@ def _daisy_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
 
 def _toad_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
     # Engineering manager: can approve draft mode once technical risk is explicit.
-    has_risk_context = _state_has_fact(state, "fact_repo_sync_stale") or _mentions_any(
-        normalized, {"repo", "sync", "stale", "commit", "risk", "fallback", "draft", "webhook", "auto-commenting"}
+    risk_known = _state_has_fact(state, "fact_repo_sync_stale")
+    stakeholder_aligned = _state_has_fact(state, "fact_nimbus_values_reliability")
+    draft_requested = _mentions_any(normalized, {"draft", "draft-mode", "fallback", "de-scope", "descope"})
+    friday_scope = _mentions_any(normalized, {"friday", "launch", "nimbus", "beta", "pilot"})
+    risk_referenced = _mentions_any(
+        normalized, {"repo", "sync", "stale", "commit", "risk", "webhook", "auto-commenting"}
     )
-    if has_risk_context:
+    if risk_known and stakeholder_aligned and draft_requested and friday_scope and risk_referenced:
         return CoworkerReply(
             person_id="toad",
             delay_minutes=RESPONSE_DELAYS_MINUTES["toad"],
@@ -405,8 +452,9 @@ def _toad_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
         person_id="toad",
         delay_minutes=RESPONSE_DELAYS_MINUTES["toad"],
         body=(
-            "I need the concrete launch risk before approving any de-scope. "
-            "Bring me the blocker, customer impact, and the safer Friday option."
+            "I need the concrete launch risk, customer impact, and safer Friday "
+            "scope before approving any de-scope. Bring me Luigi's blocker and "
+            "Daisy's customer-facing constraint."
         ),
     )
 
