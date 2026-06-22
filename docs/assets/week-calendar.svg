@@ -1,10 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="760" viewBox="0 0 1180 760" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="2360" height="1520" viewBox="0 0 1180 760" role="img" aria-labelledby="title desc">
   <title id="title">Launch Readiness Week Calendar</title>
   <desc id="desc">A Google Calendar style week view from Monday June 22 through Friday June 26, showing scheduled simulation events and deadlines.</desc>
   <defs>
-    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
-      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.18"/>
-    </filter>
     <style>
       .bg { fill: #ffffff; }
       .chrome { fill: #f8fafd; }
