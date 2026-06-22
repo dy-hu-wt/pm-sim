@@ -1557,6 +1557,85 @@
         [
           "go/no-go",
           "go no-go",
+          "go for friday",
+          "final readiness",
+          "readiness",
+          "ready",
+          "on track"
+        ],
+        [
+          "draft mode",
+          "draft-mode",
+          "human approval"
+        ],
+        [
+          "security",
+          "private repo",
+          "source code",
+          "retention"
+        ],
+        [
+          "koopa",
+          "audit",
+          "csv",
+          "one-time"
+        ],
+        [
+          "nimbus",
+          "friday",
+          "beta"
+        ]
+      ],
+      "when": [
+        {
+          "message_exists": {
+            "sender_id": "daisy",
+            "recipient_id": "agent",
+            "terms_any": [
+              "final nimbus agenda",
+              "go/no-go",
+              "go no-go",
+              "final readiness"
+            ]
+          }
+        },
+        {
+          "evidence_exists": "decision_record_written"
+        },
+        {
+          "evidence_exists": "customer_message_ready"
+        },
+        {
+          "evidence_exists": "security_question_answered"
+        },
+        {
+          "evidence_exists": "koopa_update_sent"
+        }
+      ],
+      "effects": [
+        {
+          "type": "add_evaluation_evidence",
+          "key": "final_readiness_confirmed",
+          "note": "Agent gave Daisy a Thursday final readiness note tying together launch mode, security wording, and Koopa scope."
+        },
+        {
+          "type": "update_coworker_state",
+          "person_id": "daisy",
+          "key": "final_readiness_confirmed",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": "chat_daisy_final_readiness_confirmed",
+      "action_type": "send_chat",
+      "priority": 65,
+      "recipient_id": "daisy",
+      "term_groups_all": [
+        [
+          "go/no-go",
+          "go no-go",
+          "go for friday",
           "final readiness",
           "readiness",
           "ready",

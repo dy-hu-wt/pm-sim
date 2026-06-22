@@ -196,6 +196,22 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
         scheduled_reply_ids = [
             _schedule_coworker_reply(conn, reply, current_time) for reply in replies
         ]
+        chat_effects = _effects_for_action(
+            conn,
+            "send_chat",
+            {
+                "recipient_id": person_id,
+                "person_id": person_id,
+                "body": body,
+                "text": body,
+            },
+        )
+        applied_effects = apply_effects(
+            conn,
+            chat_effects,
+            now=current_time,
+            source=f"action:{message_id}",
+        )
         time_cost = consume_action_time(
             conn,
             current_time=current_time,
@@ -212,6 +228,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
             result={
                 "message_id": message_id,
                 "scheduled_reply_ids": scheduled_reply_ids,
+                "applied_effects": applied_effects,
                 "time_cost": time_cost,
             },
         )
@@ -221,6 +238,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
             "ok": True,
             "message_id": message_id,
             "scheduled_reply_ids": scheduled_reply_ids,
+            "applied_effects": applied_effects,
             "time_cost": time_cost,
         }
     finally:

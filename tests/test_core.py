@@ -2080,6 +2080,36 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(result["score"], 115)
         self.assertIn("final_readiness_confirmed", risk_component["missing_evidence"])
 
+    def test_final_readiness_chat_can_confirm_go_no_go(self) -> None:
+        self._drive_happy_path()
+
+        conn = connect(self.db_path)
+        try:
+            conn.execute(
+                "DELETE FROM evaluation_evidence WHERE evidence_key = 'final_readiness_confirmed'"
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        send_chat(
+            self.db_path,
+            "daisy",
+            (
+                "Go for Friday in draft mode. Nimbus beta launch mode is draft mode with "
+                "human approval, private repo security wording is covered, and Koopa audit "
+                "CSV scope stays one-time so it does not derail the Friday beta."
+            ),
+        )
+
+        result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        risk_component = next(
+            component for component in result["components"] if component["key"] == "risk_handling"
+        )
+
+        self.assertEqual(result["score"], 120)
+        self.assertNotIn("final_readiness_confirmed", risk_component["missing_evidence"])
+
     def test_busywork_does_not_score_like_good_pm_work(self) -> None:
         send_chat(self.db_path, "mario", "I am checking on the Friday launch.")
         send_chat(self.db_path, "luigi", "How are things going this week?")

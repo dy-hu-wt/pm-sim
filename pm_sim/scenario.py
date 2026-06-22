@@ -424,7 +424,7 @@ def _validate_action_rules(
         seen.add(rule_id)
 
         action_type = rule.get("action_type")
-        if action_type not in {"send_email", "update_doc"}:
+        if action_type not in {"send_chat", "send_email", "update_doc"}:
             raise ScenarioError(f"Action rule {rule_id} has unsupported action_type: {action_type}")
 
         person_id = rule.get("person_id")
