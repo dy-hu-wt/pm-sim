@@ -245,6 +245,37 @@
           "audit_export_status": "needs_scope"
         }
       ]
+    },
+    {
+      "id": "thursday_final_readiness_check",
+      "event_type": "thursday_final_readiness_check",
+      "when": [
+        {
+          "not": {
+            "evidence_exists": "final_readiness_confirmed"
+          }
+        }
+      ],
+      "effects": [
+        {
+          "type": "create_message",
+          "channel": "chat",
+          "sender_id": "daisy",
+          "recipient_id": "agent",
+          "body": "Before I send the final Nimbus agenda, can you give me a Thursday go/no-go? I need one concise readiness note covering launch mode, private-repo security wording, and whether Koopa stayed scoped away from the Friday beta."
+        },
+        {
+          "type": "update_project",
+          "project_id": "project_pr_review_agent",
+          "stakeholder_pressure_delta": 1
+        },
+        {
+          "type": "update_coworker_state",
+          "person_id": "daisy",
+          "key": "final_readiness_requested",
+          "value": true
+        }
+      ]
     }
   ],
   "coworker_rules": [
@@ -1518,6 +1549,83 @@
       ]
     },
     {
+      "id": "email_daisy_final_readiness_confirmed",
+      "action_type": "send_email",
+      "priority": 65,
+      "recipient_id": "daisy",
+      "term_groups_all": [
+        [
+          "go/no-go",
+          "go no-go",
+          "final readiness",
+          "readiness",
+          "ready",
+          "on track"
+        ],
+        [
+          "draft mode",
+          "draft-mode",
+          "human approval"
+        ],
+        [
+          "security",
+          "private repo",
+          "source code",
+          "retention"
+        ],
+        [
+          "koopa",
+          "audit",
+          "csv",
+          "one-time"
+        ],
+        [
+          "nimbus",
+          "friday",
+          "beta"
+        ]
+      ],
+      "when": [
+        {
+          "message_exists": {
+            "sender_id": "daisy",
+            "recipient_id": "agent",
+            "terms_any": [
+              "final nimbus agenda",
+              "go/no-go",
+              "go no-go",
+              "final readiness"
+            ]
+          }
+        },
+        {
+          "evidence_exists": "decision_record_written"
+        },
+        {
+          "evidence_exists": "customer_message_ready"
+        },
+        {
+          "evidence_exists": "security_question_answered"
+        },
+        {
+          "evidence_exists": "koopa_update_sent"
+        }
+      ],
+      "effects": [
+        {
+          "type": "add_evaluation_evidence",
+          "key": "final_readiness_confirmed",
+          "note": "Agent gave Daisy a Thursday final readiness note tying together launch mode, security wording, and Koopa scope."
+        },
+        {
+          "type": "update_coworker_state",
+          "person_id": "daisy",
+          "key": "final_readiness_confirmed",
+          "value": true
+        }
+      ]
+    },
+    {
       "id": "doc_launch_decision_record_written",
       "action_type": "update_doc",
       "priority": 100,
@@ -2054,7 +2162,8 @@
       "points": 15,
       "evidence_keys": [
         "draft_mode_approved",
-        "decision_record_written"
+        "decision_record_written",
+        "final_readiness_confirmed"
       ],
       "preferred_before": "2026-06-25T15:00:00"
     },
@@ -2315,6 +2424,22 @@
         "person_id": "daisy",
         "subject": "Nimbus private repo security answer",
         "body": "Nimbus can tell their reviewer that private repo source code is processed transiently. Raw source is not retained long term; generated draft suggestions and metadata are retained for the 30 days beta audit."
+      }
+    },
+    {
+      "name": "wait_for_final_readiness_check",
+      "tool": "advance_time",
+      "args": {
+        "target": "to:2026-06-25T12:00:00"
+      }
+    },
+    {
+      "name": "send_final_readiness_note",
+      "tool": "send_email",
+      "args": {
+        "person_id": "daisy",
+        "subject": "Thursday final readiness for Nimbus Friday beta",
+        "body": "Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode with human approval before posting, private repo security wording is covered, and Koopa stays scoped to a one-time audit CSV so it does not derail the Friday beta."
       }
     }
   ],

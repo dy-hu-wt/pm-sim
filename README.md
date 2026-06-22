@@ -74,7 +74,7 @@ pm-sim evaluate --explain
 pm-sim read-doc doc_friday_outcome
 ```
 
-Expected baseline result: `15 / 120`. Luigi eventually surfaces the repo-sync risk, but it happens too late to align Daisy, unblock Peach, approve draft mode, answer the security question, or scope the Koopa audit-log request. The Friday outcome report should say the beta arrived without an approved reliable launch plan.
+Expected baseline result: `15 / 120`. Luigi eventually surfaces the repo-sync risk, but it happens too late to align Daisy, unblock Peach, approve draft mode, answer the security question, scope the Koopa audit-log request, or provide the Thursday final readiness note. The Friday outcome report should say the beta arrived without an approved reliable launch plan.
 
 ## Quick Happy Path
 
@@ -114,15 +114,18 @@ pm-sim advance-time 2h
 pm-sim read-doc doc_private_repo_security_baseline
 pm-sim send-email daisy "Nimbus private repo security answer" "Nimbus can tell their reviewer that private repo source code is processed transiently. Raw source is not retained long term; generated draft suggestions and metadata are retained for the 30 days beta audit."
 
+pm-sim advance-time to:2026-06-25T12:00:00
+pm-sim send-email daisy "Thursday final readiness for Nimbus Friday beta" "Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode with human approval before posting, private repo security wording is covered, and Koopa stays scoped to a one-time audit CSV so it does not derail the Friday beta."
+
 pm-sim evaluate
 
 pm-sim advance-time to:2026-06-26T15:00:00
 pm-sim read-doc doc_friday_outcome
 ```
 
-Expected evaluation result before the Friday deadline: `120 / 120`. The important evidence is recorded through delivered coworker reply events, the decision record, the Daisy launch email, the Koopa scope update, and the security interruption: `blocker_discovered`, `stakeholder_alignment`, `customer_message_ready`, `peach_unblocked`, `draft_mode_approved`, `decision_record_written`, `koopa_scoped`, `koopa_update_sent`, `security_doc_found`, and `security_question_answered`. The security answer only scores after Daisy's security question is visible. Advancing to Friday then records the final project outcome.
+Expected evaluation result before the Friday deadline: `120 / 120`. The important evidence is recorded through delivered coworker reply events, the decision record, the Daisy launch email, the Koopa scope update, the security interruption, and Daisy's Thursday final-readiness check: `blocker_discovered`, `stakeholder_alignment`, `customer_message_ready`, `peach_unblocked`, `draft_mode_approved`, `decision_record_written`, `final_readiness_confirmed`, `koopa_scoped`, `koopa_update_sent`, `security_doc_found`, and `security_question_answered`. The security answer only scores after Daisy's security question is visible, and the final readiness note only scores after Daisy asks for the Thursday go/no-go. Advancing to Friday then records the final project outcome.
 
-The path demonstrates good PM behavior by turning a hidden technical risk into a clear launch tradeoff, aligning the customer-facing owner, unblocking implementation work, handling a smaller competing request without stealing the launch team, and getting explicit decisions before deadlines.
+The path demonstrates good PM behavior by turning a hidden technical risk into a clear launch tradeoff, aligning the customer-facing owner, unblocking implementation work, handling a smaller competing request without stealing the launch team, and confirming readiness after late-week interruptions.
 
 The same path can be run by the deterministic scripted agent:
 
@@ -160,6 +163,9 @@ pm-sim send-chat luigi "Nimbus asked if we store source code from private repos.
 pm-sim advance-time 2h
 pm-sim read-doc doc_private_repo_security_baseline
 pm-sim send-email daisy "Nimbus private repo security answer" "Nimbus can tell their reviewer that private repo source code is processed transiently. Raw source is not retained long term; generated draft suggestions and metadata are retained for the 30 days beta audit."
+
+pm-sim advance-time to:2026-06-25T12:00:00
+pm-sim send-email daisy "Thursday final readiness for Nimbus Friday beta" "Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode with human approval before posting, private repo security wording is covered, and Koopa stays scoped to a one-time audit CSV so it does not derail the Friday beta."
 
 pm-sim evaluate --explain
 pm-sim advance-time to:2026-06-26T15:00:00
@@ -243,11 +249,11 @@ Run the optional LLM agent:
 pm-sim run-agent --policy llm --reset --max-turns 40
 ```
 
-The LLM policy uses the OpenAI API to choose workplace tool calls, then the simulator executes those calls locally. The model does not get the evaluator as a tool during the episode; after the agent stops, the runner finalizes the world to the Friday deadline and grades that settled state.
+The LLM policy uses the OpenAI API to choose workplace tool calls, then the simulator executes those calls locally. The model does not get the evaluator as a tool during the episode; after the agent stops, the runner finalizes the world to the Friday deadline and grades that settled state. Full credit requires handling Daisy's Thursday final-readiness ask before finishing.
 
 An LLM turn means one model decision round: the runner sends the current conversation/tool results to the model, waits for tool calls, runs those tools, and feeds the tool outputs back. A single model turn may contain more than one tool call. LLM runs print concise colorized progress lines with simulated time, action labels, logical time cost, and short results, such as `[agent] [Wed 2026-06-24 14:00] CHAT to luigi: ... — scheduled 1 reply event(s) (+5m)`. Add `--quiet` to suppress those logs. The LLM instructions ask for targeted coordination rather than broad check-ins. The agent action loop can stop when the agent calls `finish`, runs out of turns, or stops producing tool calls; the runner then advances to Friday as an operator finalization step before the final evaluation. The final summary prints both why the agent loop stopped and which deadline events/outcome were delivered; long runs show step counts plus recent steps instead of every action.
 
-If an LLM run stops below full score, the operator summary prints the missing evaluator evidence. For example, `security_doc_found` and `security_question_answered` mean the model did not advance to Daisy's Wednesday security question, ask Luigi about the security doc, read it, and answer Daisy.
+If an LLM run stops below full score, the operator summary prints the missing evaluator evidence. For example, `security_doc_found` and `security_question_answered` mean the model did not advance to Daisy's Wednesday security question, ask Luigi about the security doc, read it, and answer Daisy. `final_readiness_confirmed` means it stopped before answering Daisy's Thursday go/no-go.
 
 ## Evaluation
 

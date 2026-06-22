@@ -635,6 +635,17 @@ class CoreSimulationTests(unittest.TestCase):
                 "and metadata are retained for the 30 days beta audit."
             ),
         )
+        advance_time(self.db_path, "to:2026-06-25T12:00:00")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Thursday final readiness for Nimbus Friday beta",
+            (
+                "Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode "
+                "with human approval before posting, private repo security wording is covered, "
+                "and Koopa stays scoped to a one-time audit CSV so it does not derail the Friday beta."
+            ),
+        )
         advance_time(self.db_path, "to:2026-06-26T15:00:00")
         meeting_event = next(
             event for event in result["delivered_events"] if event["event_type"] == "meeting_occurs"
@@ -1940,6 +1951,18 @@ class EvaluatorTests(unittest.TestCase):
             ),
         )
 
+        advance_time(self.db_path, "to:2026-06-25T12:00:00")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Thursday final readiness for Nimbus Friday beta",
+            (
+                "Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode "
+                "with human approval before posting, private repo security wording is covered, "
+                "and Koopa stays scoped to a one-time audit CSV so it does not derail the Friday beta."
+            ),
+        )
+
     def _project_outcome(self) -> dict[str, Any]:
         conn = connect(self.db_path)
         try:
@@ -1972,6 +1995,26 @@ class EvaluatorTests(unittest.TestCase):
         }
         self.assertEqual(component_scores["blocker_discovery"], 30)
         self.assertEqual(component_scores["risk_handling"], 15)
+
+    def test_final_readiness_check_is_required_for_full_score(self) -> None:
+        self._drive_happy_path()
+
+        conn = connect(self.db_path)
+        try:
+            conn.execute(
+                "DELETE FROM evaluation_evidence WHERE evidence_key = 'final_readiness_confirmed'"
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        risk_component = next(
+            component for component in result["components"] if component["key"] == "risk_handling"
+        )
+
+        self.assertEqual(result["score"], 115)
+        self.assertIn("final_readiness_confirmed", risk_component["missing_evidence"])
 
     def test_busywork_does_not_score_like_good_pm_work(self) -> None:
         send_chat(self.db_path, "mario", "I am checking on the Friday launch.")
@@ -2311,6 +2354,17 @@ class EvaluatorTests(unittest.TestCase):
                 "and metadata are retained for the 30 days beta audit."
             ),
         )
+        self._run_cli("advance-time", "to:2026-06-25T12:00:00")
+        self._run_cli(
+            "send-email",
+            "daisy",
+            "Thursday final readiness for Nimbus Friday beta",
+            (
+                "Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode "
+                "with human approval before posting, private repo security wording is covered, "
+                "and Koopa stays scoped to a one-time audit CSV so it does not derail the Friday beta."
+            ),
+        )
 
         before_deadline = self._run_cli("evaluate", "--explain")
         self._run_cli("advance-time", "to:2026-06-26T15:00:00")
@@ -2363,8 +2417,8 @@ class ScriptedAgentTests(unittest.TestCase):
 
         self.assertIn("reset", action_types)
         self.assertEqual(action_types.count("send_chat"), 7)
-        self.assertEqual(action_types.count("send_email"), 3)
-        self.assertEqual(action_types.count("advance_time"), 8)
+        self.assertEqual(action_types.count("send_email"), 4)
+        self.assertEqual(action_types.count("advance_time"), 9)
         self.assertEqual(action_types.count("finalize_to_deadline"), 1)
 
     def test_cli_run_agent_prints_summary(self) -> None:
@@ -2374,9 +2428,10 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertIn("Policy: scripted", output)
         self.assertIn("Score:  120 / 120", output)
         self.assertIn("Deadline: advanced to Fri 2026-06-26 15:00", output)
-        self.assertIn("events: luigi_proactive_repo_risk, project_deadline", output)
+        self.assertIn("events: project_deadline", output)
         self.assertIn("outcome: draft_mode_beta_shipped", output)
         self.assertIn("send_security_answer", output)
+        self.assertIn("send_final_readiness_note", output)
 
     def test_run_agent_summary_prints_missing_evidence(self) -> None:
         reset(self.db_path, DEFAULT_SCENARIO_PATH)

@@ -74,6 +74,7 @@ Examples:
 
 - Luigi replies two simulated hours after a chat.
 - Daisy sends a midweek security question.
+- Daisy asks for a Thursday final go/no-go after the major interruptions have landed.
 - A scheduled meeting produces a transcript at the end time.
 - The Friday deadline classifies the final project outcome.
 
@@ -153,7 +154,7 @@ pm-sim evaluate --explain
 
 `run-agent --policy scripted --reset` runs the golden path through the same public tool functions used by the CLI. It is a deterministic policy, not an LLM and not a training loop.
 
-`run-agent --policy llm --reset --max-turns 40` uses the OpenAI API to choose simulator tool calls. The local runner exposes observation, docs, chat, email, tasks, meetings, and time as callable tools. The evaluator is not exposed as an agent tool during the episode; final scoring is operator-side after the agent stops. A model turn is one model decision round, not one tool call, and a single model turn may request multiple tools. The LLM instructions tell the model to keep coworker outreach targeted and to call `finish` once the visible project state is defensible. The CLI prints concise colorized progress logs with simulated time, action labels, logical time cost, and short result summaries because model calls can otherwise look idle until the final result is returned. After the agent stops, the runner finalizes to the Friday deadline as operator-owned simulation settlement, then grades the settled state. Long runs summarize step counts and recent steps instead of printing every action. If the run ends below full score, the operator summary prints missing evaluator evidence so the operator can see what the model failed to resolve.
+`run-agent --policy llm --reset --max-turns 40` uses the OpenAI API to choose simulator tool calls. The local runner exposes observation, docs, chat, email, tasks, meetings, and time as callable tools. The evaluator is not exposed as an agent tool during the episode; final scoring is operator-side after the agent stops. A model turn is one model decision round, not one tool call, and a single model turn may request multiple tools. The LLM instructions tell the model to keep coworker outreach targeted and to call `finish` once the visible project state is defensible. The scenario now includes a Thursday final-readiness ask, so finishing Wednesday can still miss evaluator credit even though the runner later settles the world to Friday. The CLI prints concise colorized progress logs with simulated time, action labels, logical time cost, and short result summaries because model calls can otherwise look idle until the final result is returned. After the agent stops, the runner finalizes to the Friday deadline as operator-owned simulation settlement, then grades the settled state. Long runs summarize step counts and recent steps instead of printing every action. If the run ends below full score, the operator summary prints missing evaluator evidence so the operator can see what the model failed to resolve.
 
 ## Scaling Path
 

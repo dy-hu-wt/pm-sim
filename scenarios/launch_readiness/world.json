@@ -816,6 +816,16 @@
       }
     },
     {
+      "id": "event_thursday_final_readiness_check",
+      "event_type": "thursday_final_readiness_check",
+      "scheduled_at": "2026-06-25T12:00:00",
+      "status": "pending",
+      "priority": 100,
+      "payload": {
+        "project_id": "project_pr_review_agent"
+      }
+    },
+    {
       "id": "event_koopa_audit_export_deadline",
       "event_type": "project_deadline",
       "scheduled_at": "2026-06-25T16:00:00",
