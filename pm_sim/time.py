@@ -150,7 +150,7 @@ def _effects_for_delivery(
         ]
 
     if event_type == "meeting_occurs":
-        return effects_for_meeting(payload)
+        return effects_for_meeting(payload, _meeting_state(conn))
 
     if event_type == "friday_nimbus_deadline":
         return _effects_for_friday_deadline(conn)
@@ -229,6 +229,23 @@ def _discovered_fact_ids(conn: sqlite3.Connection) -> set[str]:
         """
     ).fetchall()
     return {row["id"] for row in rows}
+
+
+def _meeting_state(conn: sqlite3.Connection) -> dict[str, Any]:
+    return {
+        "discovered_facts": sorted(_discovered_fact_ids(conn)),
+        "evidence_keys": sorted(_evidence_keys(conn)),
+    }
+
+
+def _evidence_keys(conn: sqlite3.Connection) -> set[str]:
+    rows = conn.execute(
+        """
+        SELECT DISTINCT evidence_key
+        FROM evaluation_evidence
+        """
+    ).fetchall()
+    return {row["evidence_key"] for row in rows}
 
 
 def _has_evidence(conn: sqlite3.Connection, evidence_key: str) -> bool:

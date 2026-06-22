@@ -509,7 +509,7 @@ class EffectApplicationTests(unittest.TestCase):
             "Draft-mode risk review for Nimbus launch",
             "2026-06-22T10:00:00",
             "2026-06-22T10:30:00",
-            ["luigi", "daisy", "mario", "toad"],
+            ["luigi", "daisy", "mario", "toad", "peach"],
         )
 
         result = advance_time(self.db_path, "to:2026-06-22T10:30:00")
@@ -558,6 +558,107 @@ class EffectApplicationTests(unittest.TestCase):
             self.assertIn("draft_mode_approved", evidence_keys)
         finally:
             conn.close()
+
+    def test_meeting_without_luigi_does_not_discover_repo_sync_risk(self) -> None:
+        schedule_meeting(
+            self.db_path,
+            "Draft-mode planning for Nimbus launch",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["daisy", "peach"],
+        )
+
+        advance_time(self.db_path, "to:2026-06-22T10:30:00")
+        state = observe(self.db_path)
+
+        fact_ids = {fact["id"] for fact in state["discovered_facts"]}
+
+        self.assertNotIn("fact_repo_sync_stale", fact_ids)
+        self.assertIn("fact_nimbus_values_reliability", fact_ids)
+        self.assertIn("fact_draft_mode_scope_confirmed", fact_ids)
+
+    def test_meeting_with_luigi_discovers_repo_sync_risk(self) -> None:
+        schedule_meeting(
+            self.db_path,
+            "Repo sync risk review for Nimbus launch",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["luigi"],
+        )
+
+        advance_time(self.db_path, "to:2026-06-22T10:30:00")
+        state = observe(self.db_path)
+
+        fact_ids = {fact["id"] for fact in state["discovered_facts"]}
+        blocker_ids = {blocker["id"] for blocker in state["known_blockers"]}
+
+        self.assertIn("fact_repo_sync_stale", fact_ids)
+        self.assertIn("blocker_repo_sync_stale", blocker_ids)
+
+    def test_meeting_with_toad_before_risk_does_not_approve(self) -> None:
+        schedule_meeting(
+            self.db_path,
+            "Draft-mode approval for Friday launch",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["toad", "daisy"],
+        )
+
+        advance_time(self.db_path, "to:2026-06-22T10:30:00")
+        state = observe(self.db_path)
+
+        fact_ids = {fact["id"] for fact in state["discovered_facts"]}
+
+        self.assertNotIn("fact_repo_sync_stale", fact_ids)
+        self.assertNotIn("fact_draft_mode_approved", fact_ids)
+
+    def test_meeting_with_toad_and_luigi_still_needs_scope_before_approval(self) -> None:
+        schedule_meeting(
+            self.db_path,
+            "Draft-mode risk review for Nimbus launch",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["luigi", "toad"],
+        )
+
+        advance_time(self.db_path, "to:2026-06-22T10:30:00")
+        state = observe(self.db_path)
+
+        fact_ids = {fact["id"] for fact in state["discovered_facts"]}
+
+        self.assertIn("fact_repo_sync_stale", fact_ids)
+        self.assertNotIn("fact_draft_mode_approved", fact_ids)
+
+    def test_meeting_with_luigi_daisy_peach_and_toad_can_fully_align(self) -> None:
+        schedule_meeting(
+            self.db_path,
+            "Draft-mode risk review for Nimbus launch",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["luigi", "daisy", "peach", "toad"],
+        )
+
+        advance_time(self.db_path, "to:2026-06-22T10:30:00")
+        state = observe(self.db_path)
+        conn = connect(self.db_path)
+        try:
+            evidence_keys = {
+                row["evidence_key"]
+                for row in conn.execute("SELECT evidence_key FROM evaluation_evidence").fetchall()
+            }
+        finally:
+            conn.close()
+
+        fact_ids = {fact["id"] for fact in state["discovered_facts"]}
+
+        self.assertIn("fact_repo_sync_stale", fact_ids)
+        self.assertIn("fact_nimbus_values_reliability", fact_ids)
+        self.assertIn("fact_draft_mode_scope_confirmed", fact_ids)
+        self.assertIn("fact_draft_mode_approved", fact_ids)
+        self.assertIn("blocker_discovered", evidence_keys)
+        self.assertIn("stakeholder_alignment", evidence_keys)
+        self.assertIn("peach_unblocked", evidence_keys)
+        self.assertIn("draft_mode_approved", evidence_keys)
 
 
 class ToolActionTests(unittest.TestCase):

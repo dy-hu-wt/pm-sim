@@ -182,13 +182,30 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
     return []
 
 
-def effects_for_meeting(payload: dict[str, Any]) -> list[Effect]:
-    # Meetings always produce a transcript, then add decisions when the right people attend.
+def effects_for_meeting(payload: dict[str, Any], state: dict[str, Any] | None = None) -> list[Effect]:
+    # Meetings always produce a transcript, then add decisions from attendees and known state.
     attendees = {attendee.lower() for attendee in payload.get("attendees", [])}
     title = payload.get("title", "Meeting")
     normalized_topic = _normalize(title)
+    state = state or {}
     transcript_doc_id = payload["transcript_doc_id"]
     calendar_event_id = payload["calendar_event_id"]
+
+    risk_topic = _mentions_any(normalized_topic, RISK_TERMS)
+    draft_topic = _mentions_any(
+        normalized_topic, {"fallback", "draft", "draft-mode", "de-scope", "descope", "scope"}
+    )
+    launch_topic = _mentions_any(normalized_topic, {"launch", "readiness", "friday", "nimbus", "beta"})
+    meeting_has_launch_context = risk_topic or draft_topic or launch_topic
+    risk_known_before = _state_has_fact(state, "fact_repo_sync_stale")
+    risk_can_surface = "luigi" in attendees and meeting_has_launch_context
+    risk_available = risk_known_before or risk_can_surface
+    daisy_customer_context = "daisy" in attendees and meeting_has_launch_context
+    scope_known_before = _state_has_fact(state, "fact_draft_mode_scope_confirmed")
+    scope_can_clarify = "peach" in attendees and draft_topic
+    scope_available = scope_known_before or scope_can_clarify
+    toad_can_approve = "toad" in attendees and risk_available and scope_available and draft_topic
+    mario_accepts_draft = "mario" in attendees and risk_available and (risk_topic or draft_topic)
 
     effects: list[Effect] = [
         {
@@ -197,7 +214,15 @@ def effects_for_meeting(payload: dict[str, Any]) -> list[Effect]:
             "title": f"Transcript: {title}",
             "kind": "meeting_transcript",
             "visible": True,
-            "body": _meeting_transcript_body(title, attendees, normalized_topic),
+            "body": _meeting_transcript_body(
+                title,
+                attendees,
+                normalized_topic,
+                risk_available=risk_available,
+                scope_available=scope_available,
+                toad_can_approve=toad_can_approve,
+                mario_accepts_draft=mario_accepts_draft,
+            ),
             "metadata": {
                 "calendar_event_id": calendar_event_id,
                 "attendees": sorted(attendees),
@@ -211,13 +236,7 @@ def effects_for_meeting(payload: dict[str, Any]) -> list[Effect]:
         },
     ]
 
-    risk_topic = _mentions_any(normalized_topic, RISK_TERMS)
-    draft_topic = _mentions_any(
-        normalized_topic, {"fallback", "draft", "draft-mode", "de-scope", "descope", "scope"}
-    )
-    launch_topic = _mentions_any(normalized_topic, {"launch", "readiness", "friday", "nimbus", "beta"})
-
-    if "luigi" in attendees and (risk_topic or draft_topic or launch_topic):
+    if risk_can_surface:
         effects.extend(
             [
                 _discover_fact("fact_repo_sync_stale", "meeting_occurs"),
@@ -227,15 +246,28 @@ def effects_for_meeting(payload: dict[str, Any]) -> list[Effect]:
             ]
         )
 
-    if {"mario", "daisy"} & attendees and (risk_topic or draft_topic):
+    if daisy_customer_context:
+        effects.append(_discover_fact("fact_nimbus_values_reliability", "meeting_occurs"))
+
+    if "daisy" in attendees and risk_available and (risk_topic or draft_topic):
         effects.append(
             _add_evidence(
                 "stakeholder_alignment",
-                "Meeting aligned stakeholders around repo sync risk and draft-mode messaging.",
+                "Meeting aligned Daisy around repo sync risk and draft-mode messaging.",
             )
         )
 
-    if {"luigi", "toad"}.issubset(attendees) and (risk_topic or draft_topic):
+    if mario_accepts_draft:
+        effects.append(
+            _add_evidence(
+                "stakeholder_alignment",
+                "Mario accepted draft mode after the meeting made repo sync risk concrete.",
+            )
+        )
+    elif "mario" in attendees and meeting_has_launch_context:
+        effects.append(_update_pressure("scope_pressure", 1))
+
+    if toad_can_approve:
         effects.extend(
             [
                 _discover_fact("fact_draft_mode_approved", "meeting_occurs"),
@@ -248,7 +280,7 @@ def effects_for_meeting(payload: dict[str, Any]) -> list[Effect]:
             ]
         )
 
-    if "peach" in attendees and draft_topic:
+    if scope_can_clarify:
         effects.extend(
             [
                 _discover_fact("fact_draft_mode_scope_confirmed", "meeting_occurs"),
@@ -523,7 +555,16 @@ def _add_evidence(key: str, note: str) -> Effect:
     return {"type": "add_evaluation_evidence", "key": key, "note": note}
 
 
-def _meeting_transcript_body(title: str, attendees: set[str], normalized_topic: str) -> str:
+def _meeting_transcript_body(
+    title: str,
+    attendees: set[str],
+    normalized_topic: str,
+    *,
+    risk_available: bool,
+    scope_available: bool,
+    toad_can_approve: bool,
+    mario_accepts_draft: bool,
+) -> str:
     lines = [
         f"Meeting: {title}",
         f"Attendees: {', '.join(sorted(attendees))}",
@@ -534,12 +575,20 @@ def _meeting_transcript_body(title: str, attendees: set[str], normalized_topic: 
         lines.append("- Luigi noted that draft mode keeps suggestions behind human approval.")
     if "daisy" in attendees:
         lines.append("- Daisy asked for reliable Friday beta messaging for Nimbus Labs.")
-    if "mario" in attendees:
+    if "mario" in attendees and mario_accepts_draft:
         lines.append("- Mario agreed auto-commenting is valuable but should not create demo failure risk.")
-    if "toad" in attendees and _mentions_any(
-        normalized_topic, {"fallback", "draft", "risk", "repo", "sync", "stale"}
-    ):
+    elif "mario" in attendees:
+        lines.append("- Mario kept pressure on auto-commenting until the technical risk is concrete.")
+    if toad_can_approve:
         lines.append("- Toad approved draft mode if auto-commenting is unsafe for Friday.")
+    elif "toad" in attendees and _mentions_any(normalized_topic, {"fallback", "draft", "risk", "repo", "sync", "stale"}):
+        missing = []
+        if not risk_available:
+            missing.append("technical risk")
+        if not scope_available:
+            missing.append("draft-mode scope")
+        if missing:
+            lines.append(f"- Toad asked for clearer {' and '.join(missing)} before approving scope.")
     if "peach" in attendees and _mentions_any(normalized_topic, {"fallback", "draft", "draft-mode"}):
         lines.append("- Peach can proceed once draft-mode scope is confirmed.")
     if len(lines) == 3:
