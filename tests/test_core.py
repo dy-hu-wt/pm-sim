@@ -1431,6 +1431,24 @@ class ToolActionTests(unittest.TestCase):
             any(effect.get("key") == "decision_record_written" for effect in valid["applied_effects"])
         )
 
+    def test_decision_record_accepts_natural_out_of_scope_wording(self) -> None:
+        self._drive_to_draft_approval()
+
+        result = update_doc(
+            self.db_path,
+            "doc_launch_decision_record",
+            (
+                "Friday launch decision: Toad approved draft mode for Nimbus. "
+                "Draft suggestions require human approval before posting. "
+                "Auto-commenting is out of Friday scope and remains follow-up work. "
+                "Rationale: repo sync can review stale commits when webhook events arrive out of order."
+            ),
+        )
+
+        self.assertTrue(
+            any(effect.get("key") == "decision_record_written" for effect in result["applied_effects"])
+        )
+
     def test_private_repo_security_doc_is_hidden_until_luigi_reveals_it(self) -> None:
         hidden = read_doc(self.db_path, "doc_private_repo_security_baseline")
 

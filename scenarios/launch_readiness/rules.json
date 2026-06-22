@@ -1540,6 +1540,10 @@
           "auto-commenting as follow-up",
           "auto-commenting remains follow-up",
           "auto-commenting not in friday",
+          "auto-commenting out of friday scope",
+          "auto-commenting is out of friday scope",
+          "auto-commenting is out of scope",
+          "auto-commenting out of scope",
           "no auto-commenting",
           "do not ship auto-commenting"
         ],
