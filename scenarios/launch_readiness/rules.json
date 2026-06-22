@@ -235,6 +235,10 @@
           "source": "koopa_audit_export_request"
         },
         {
+          "type": "reveal_doc",
+          "doc_id": "doc_koopa_audit_export_note"
+        },
+        {
           "type": "update_project",
           "project_id": "project_audit_log_export",
           "risk_level": "medium",

@@ -310,6 +310,19 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(recent["channel"], "email")
         self.assertIn("stores source code", recent["body"])
 
+    def test_koopa_audit_export_note_is_revealed_by_async_request(self) -> None:
+        hidden = read_doc(self.db_path, "doc_koopa_audit_export_note")
+
+        result = advance_time(self.db_path, "to:2026-06-24T10:00:00")
+        revealed = read_doc(self.db_path, "doc_koopa_audit_export_note")
+
+        event_types = {event["event_type"] for event in result["delivered_events"]}
+
+        self.assertFalse(hidden["ok"])
+        self.assertIn("koopa_audit_export_request", event_types)
+        self.assertTrue(revealed["ok"])
+        self.assertIn("one-time CSV", revealed["doc"]["body"])
+
     def test_can_deliver_all_seeded_events_through_friday_deadline(self) -> None:
         result = advance_time(self.db_path, "to:2026-06-26T15:00:00")
 

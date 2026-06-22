@@ -118,6 +118,12 @@ This records:
 - `security_doc_found`
 - `security_question_answered`
 
+## Async Koopa Interruption
+
+On Wednesday at 10:00, Daisy raises the Koopa Bank audit-log export request. The Koopa note is hidden before that event, so the request cannot be fully pre-solved on Monday.
+
+Good behavior is to keep Nimbus as the main launch path while quickly scoping Koopa to a one-time CSV for the Thursday security review. Luigi supplies feasibility, Toad confirms scope, and Daisy receives the customer-facing answer. Full self-serve export remains follow-up work.
+
 ## Meetings
 
 Meetings are scheduled events. When the meeting end time arrives, the simulator creates a transcript and applies deterministic effects based on attendees, topic, and known state.

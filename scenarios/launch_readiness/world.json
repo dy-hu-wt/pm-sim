@@ -721,7 +721,7 @@
       "id": "doc_koopa_audit_export_note",
       "title": "Koopa Audit Export Note",
       "kind": "customer_note",
-      "visible": true,
+      "visible": false,
       "body": "Koopa Bank asked whether admin audit logs can be exported before their Thursday security review. The open question is scope: a one-time CSV for the review may be feasible, while a full self-serve export likely needs follow-up planning."
     }
   ],

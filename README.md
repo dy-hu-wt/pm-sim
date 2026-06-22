@@ -185,7 +185,7 @@ pm-sim read-doc doc_beta_rollout_template
 pm-sim read-doc doc_launch_decision_record
 ```
 
-`doc_private_repo_security_baseline` is hidden until Luigi points the agent to it.
+`doc_private_repo_security_baseline` is hidden until Luigi points the agent to it. `doc_koopa_audit_export_note` is hidden until Daisy's Wednesday Koopa request arrives, so the smaller project is handled as an async interruption rather than pre-solved from reset.
 
 Send messages and update work:
 
