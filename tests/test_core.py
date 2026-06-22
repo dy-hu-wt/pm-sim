@@ -80,6 +80,73 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertIn("fact_crm_sync_flaky", fact_ids)
         self.assertTrue(any("CRM enrichment sync" in body for body in recent_bodies))
 
+    def test_can_deliver_all_seeded_events_through_friday_deadline(self) -> None:
+        result = advance_time(self.db_path, "to:2026-06-26T15:00:00")
+
+        event_types = {event["event_type"] for event in result["delivered_events"]}
+        conn = connect(self.db_path)
+        try:
+            project = conn.execute(
+                """
+                SELECT status, risk_level, metadata_json
+                FROM projects
+                WHERE id = 'project_exec_health_report'
+                """
+            ).fetchone()
+            outcome_doc = conn.execute(
+                """
+                SELECT kind, body
+                FROM docs
+                WHERE id = 'doc_friday_outcome'
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertIn("friday_fireflower_deadline", event_types)
+        self.assertTrue(all(event["result"]["handled"] for event in result["delivered_events"]))
+        self.assertEqual(project["status"], "missed")
+        self.assertEqual(project["risk_level"], "high")
+        self.assertEqual(loads(project["metadata_json"])["final_outcome"], "no_approved_friday_plan")
+        self.assertEqual(outcome_doc["kind"], "outcome_report")
+        self.assertIn("without an approved reliable launch plan", outcome_doc["body"])
+
+    def test_friday_deadline_records_successful_fallback_outcome(self) -> None:
+        schedule_meeting(
+            self.db_path,
+            "Fallback risk review for Fireflower launch",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["luigi", "daisy", "mario", "toad", "peach"],
+        )
+
+        advance_time(self.db_path, "to:2026-06-26T15:00:00")
+
+        conn = connect(self.db_path)
+        try:
+            project = conn.execute(
+                """
+                SELECT status, risk_level, metadata_json
+                FROM projects
+                WHERE id = 'project_exec_health_report'
+                """
+            ).fetchone()
+            outcome_doc = conn.execute(
+                """
+                SELECT body
+                FROM docs
+                WHERE id = 'doc_friday_outcome'
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+
+        metadata = loads(project["metadata_json"])
+        self.assertEqual(project["status"], "shipped")
+        self.assertEqual(project["risk_level"], "low")
+        self.assertEqual(metadata["final_outcome"], "fallback_report_shipped")
+        self.assertIn("shipped the reliable fallback report", outcome_doc["body"])
+
 
 class CoworkerRuleTests(unittest.TestCase):
     def test_luigi_reveals_crm_risk_when_asked_about_blockers(self) -> None:

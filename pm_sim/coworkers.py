@@ -149,15 +149,6 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
             _update_blocker("blocker_scope_unclear", "surfaced"),
         ]
 
-    if event_type == "friday_fireflower_deadline":
-        return [
-            {
-                "type": "deadline",
-                "id": "deadline_fireflower_renewal",
-                "project_id": "project_exec_health_report",
-            }
-        ]
-
     return []
 
 

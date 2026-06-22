@@ -106,7 +106,7 @@ def _deliver_event(
 ) -> dict[str, Any]:
     payload = loads(event["payload_json"], {})
     source = f"event:{event['id']}"
-    effects = _effects_for_delivery(event["event_type"], payload)
+    effects = _effects_for_delivery(conn, event["event_type"], payload)
     applied_effects = apply_effects(conn, effects, now=delivered_at, source=source)
     result = {
         "handled": True,
@@ -130,7 +130,11 @@ def _deliver_event(
     }
 
 
-def _effects_for_delivery(event_type: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
+def _effects_for_delivery(
+    conn: sqlite3.Connection,
+    event_type: str,
+    payload: dict[str, Any],
+) -> list[dict[str, Any]]:
     if event_type == "coworker_reply":
         return [
             {
@@ -147,7 +151,96 @@ def _effects_for_delivery(event_type: str, payload: dict[str, Any]) -> list[dict
     if event_type == "meeting_occurs":
         return effects_for_meeting(payload)
 
+    if event_type == "friday_fireflower_deadline":
+        return _effects_for_friday_deadline(conn)
+
     return effects_for_event(event_type, payload)
+
+
+def _effects_for_friday_deadline(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    facts = _discovered_fact_ids(conn)
+    fallback_approved = "fact_fallback_approved" in facts
+    scope_confirmed = "fact_fallback_scope_confirmed" in facts
+    daisy_aligned = "fact_fireflower_values_reliability" in facts or _has_evidence(
+        conn, "stakeholder_alignment"
+    )
+
+    if fallback_approved and scope_confirmed and daisy_aligned:
+        outcome = {
+            "status": "shipped",
+            "risk_level": "low",
+            "final_outcome": "fallback_report_shipped",
+            "summary": (
+                "The team shipped the reliable fallback report for Fireflower. "
+                "CRM enrichment remains follow-up work."
+            ),
+        }
+    elif fallback_approved:
+        outcome = {
+            "status": "partial",
+            "risk_level": "medium",
+            "final_outcome": "fallback_approved_with_execution_gaps",
+            "summary": (
+                "Fallback was approved, but scope or stakeholder alignment was "
+                "not fully closed before the Friday deadline."
+            ),
+        }
+    else:
+        outcome = {
+            "status": "missed",
+            "risk_level": "high",
+            "final_outcome": "no_approved_friday_plan",
+            "summary": (
+                "Friday arrived without an approved reliable launch plan. "
+                "The full report remains risky because CRM enrichment is unresolved."
+            ),
+        }
+
+    return [
+        {
+            "type": "update_project",
+            "project_id": "project_exec_health_report",
+            "status": outcome["status"],
+            "risk_level": outcome["risk_level"],
+            "deadline_reached": True,
+            "deadline_id": "deadline_fireflower_renewal",
+            "final_outcome": outcome["final_outcome"],
+            "final_outcome_summary": outcome["summary"],
+        },
+        {
+            "type": "create_doc",
+            "id": "doc_friday_outcome",
+            "title": "Friday Outcome",
+            "kind": "outcome_report",
+            "visible": True,
+            "body": outcome["summary"],
+            "metadata": {"final_outcome": outcome["final_outcome"]},
+        },
+    ]
+
+
+def _discovered_fact_ids(conn: sqlite3.Connection) -> set[str]:
+    rows = conn.execute(
+        """
+        SELECT id
+        FROM facts
+        WHERE discovered_at IS NOT NULL
+        """
+    ).fetchall()
+    return {row["id"] for row in rows}
+
+
+def _has_evidence(conn: sqlite3.Connection, evidence_key: str) -> bool:
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM evaluation_evidence
+        WHERE evidence_key = ?
+        LIMIT 1
+        """,
+        (evidence_key,),
+    ).fetchone()
+    return row is not None
 
 
 def _next_action_number(conn: sqlite3.Connection) -> int:

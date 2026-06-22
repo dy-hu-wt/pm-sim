@@ -36,6 +36,32 @@ python3 -m pm_sim.cli reset --scenario scenarios/launch_readiness.json
 
 This creates `data/current.db`, which is ignored by git.
 
+## Reviewer Walkthrough
+
+This golden path exercises the main flow: inspect context, discover Luigi's hidden CRM risk, align Daisy on fallback messaging, unblock Peach, get Toad's fallback approval, and evaluate the final state.
+
+```bash
+python3 -m pm_sim.cli reset
+python3 -m pm_sim.cli observe
+python3 -m pm_sim.cli read-doc doc_project_brief
+
+python3 -m pm_sim.cli send-chat luigi "Any CRM sync blockers or launch risks for Fireflower?"
+python3 -m pm_sim.cli advance-time 2h
+
+python3 -m pm_sim.cli send-chat daisy "CRM sync is risky. Can we message a reliable fallback for Fireflower?"
+python3 -m pm_sim.cli advance-time 45m
+
+python3 -m pm_sim.cli send-chat peach "Please finalize the fallback using usage and support data without CRM fields."
+python3 -m pm_sim.cli advance-time 90m
+
+python3 -m pm_sim.cli send-chat toad "CRM vendor sync is timing out. Approve fallback report for Friday?"
+python3 -m pm_sim.cli advance-time 90m
+
+python3 -m pm_sim.cli evaluate
+```
+
+Expected result: `100 / 100`. The important evidence is recorded through delivered coworker reply events: `blocker_discovered`, `stakeholder_alignment`, `peach_unblocked`, and `fallback_approved`.
+
 ## Commands
 
 Commands print human-readable output by default. Add `--json` before the command for machine-readable output.

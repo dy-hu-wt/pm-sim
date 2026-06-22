@@ -262,6 +262,10 @@ def _format_effect(effect: dict[str, Any]) -> str:
     effect_type = effect.get("type")
     if effect_type == "create_message":
         return f"created message {effect.get('id')}"
+    if effect_type == "create_doc":
+        return f"created doc {effect.get('id')}"
+    if effect_type == "update_calendar_event":
+        return f"updated calendar event {effect.get('calendar_event_id')}"
     if effect_type == "discover_fact":
         return f"discovered fact {effect.get('fact_id')}"
     if effect_type == "update_blocker":
