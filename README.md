@@ -38,10 +38,13 @@ This creates `data/current.db`, which is ignored by git.
 
 ## Commands
 
+Commands print human-readable output by default. Add `--json` before the command for machine-readable output.
+
 Inspect the current visible state:
 
 ```bash
 python3 -m pm_sim.cli observe
+python3 -m pm_sim.cli --json observe
 ```
 
 Read tasks and docs:

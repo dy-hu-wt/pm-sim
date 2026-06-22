@@ -14,6 +14,7 @@ from .actions import (
     send_email,
     update_task,
 )
+from .formatters import format_output
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .scenario import ScenarioError
 from .state import action_log, event_log, observe, reset
@@ -33,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"state error: {error}", file=sys.stderr)
         return 2
 
-    _print_json(result)
+    _print_result(args.command, result, as_json=args.as_json)
     return 0
 
 
@@ -46,6 +47,12 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_DB_PATH,
         help=f"SQLite DB path. Default: {DEFAULT_DB_PATH}",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Print machine-readable JSON instead of human-readable output.",
     )
 
     subparsers = parser.add_subparsers(dest="command")
@@ -119,8 +126,11 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _print_json(value: Any) -> None:
-    print(json.dumps(value, indent=2, sort_keys=True))
+def _print_result(command: str | None, value: Any, *, as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(value, indent=2, sort_keys=True))
+    else:
+        print(format_output(command, value))
 
 
 def sqlite_missing_reset_error() -> tuple[type[Exception], ...]:
