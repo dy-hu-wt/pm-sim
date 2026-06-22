@@ -8,6 +8,7 @@ from ..evaluator import evaluate
 from ..paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from ..state import reset
 from ..time import advance_time
+from .finalize import finalize_to_deadline
 
 
 StepFn = Callable[[], dict[str, Any]]
@@ -103,11 +104,13 @@ def run_scripted_agent(
     for name, run_step in scripted_steps:
         steps.append(_step(name, run_step()))
 
+    finalization = finalize_to_deadline(db_path, scenario_path)
     evaluation = evaluate(db_path, scenario_path)
     return {
         "ok": evaluation.get("score") == evaluation.get("max_score"),
         "policy": "scripted",
         "steps": steps,
+        "finalization": finalization,
         "evaluation": evaluation,
     }
 

@@ -180,7 +180,7 @@ The LLM policy can be run with:
 pm-sim run-agent --policy llm --reset --max-turns 40
 ```
 
-That path lets a model choose workplace tool calls. The model does not get the evaluator during the run; the simulator scores durable state and evidence after the agent stops. A model turn is one model decision round, and it may include multiple tool calls. During an LLM run, progress logs show simulated time, model wait points, tool execution, logical time cost, and short result summaries. The operator runner can stop early once the current state reaches full score, and the final summary records the stop reason.
+That path lets a model choose workplace tool calls. The model does not get the evaluator during the run; the simulator scores durable state and evidence after the agent stops. A model turn is one model decision round, and it may include multiple tool calls. During an LLM run, progress logs show simulated time, model wait points, tool execution, logical time cost, and short result summaries. After the agent stops, the runner finalizes to the Friday deadline as operator-owned simulation settlement, then grades the settled state.
 
 ## Bad Paths
 

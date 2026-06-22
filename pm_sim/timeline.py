@@ -8,7 +8,14 @@ from .jsonutil import loads
 from .paths import DEFAULT_DB_PATH
 
 
-def timeline(db_path: Path | str = DEFAULT_DB_PATH, limit: int = 0) -> list[dict[str, Any]]:
+TIMELINE_KINDS = {"action", "event", "event_scheduled", "event_delivered", "message", "evidence"}
+
+
+def timeline(
+    db_path: Path | str = DEFAULT_DB_PATH,
+    limit: int = 0,
+    kind: str | None = None,
+) -> list[dict[str, Any]]:
     conn = connect(db_path)
     try:
         entries = []
@@ -19,10 +26,18 @@ def timeline(db_path: Path | str = DEFAULT_DB_PATH, limit: int = 0) -> list[dict
     finally:
         conn.close()
 
+    if kind:
+        entries = _filter_entries(entries, kind)
     entries.sort(key=lambda entry: (entry["time"], _kind_rank(entry["kind"]), entry["id"]))
     if limit <= 0:
         return entries
     return entries[:limit]
+
+
+def _filter_entries(entries: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
+    if kind == "event":
+        return [entry for entry in entries if entry["kind"].startswith("event_")]
+    return [entry for entry in entries if entry["kind"] == kind]
 
 
 def _action_entries(conn) -> list[dict[str, Any]]:

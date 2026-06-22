@@ -127,10 +127,13 @@ pm-sim update-task task_launch_decision --status in_progress
 pm-sim schedule-meeting "Draft-mode decision" 2026-06-24T10:00:00 2026-06-24T10:30:00 mario luigi daisy toad
 ```
 
-Inspect scheduled and delivered background events:
+Inspect the chronological simulation history:
 
 ```bash
-pm-sim events
+pm-sim timeline
+pm-sim timeline --limit 20
+pm-sim timeline --kind event
+pm-sim timeline --kind evidence
 ```
 
 Advance simulated time without using wall-clock time:
@@ -142,17 +145,11 @@ pm-sim advance-time until_next_event
 
 Workplace actions also consume deterministic simulated effort: chat costs 5 minutes, email costs 10 minutes, reading a doc costs 15 minutes, scheduling a meeting costs 5 minutes, and task updates cost 1 minute. Meetings themselves resolve at their scheduled end time. Model latency never advances the clock.
 
-Inspect the action log:
+Debug lower-level internals when needed:
 
 ```bash
+pm-sim events
 pm-sim log
-```
-
-Inspect the combined action, event, message, and evidence timeline:
-
-```bash
-pm-sim timeline
-pm-sim timeline --limit 20
 ```
 
 Run the deterministic scripted agent:
@@ -168,9 +165,9 @@ Run the optional LLM agent:
 pm-sim run-agent --policy llm --reset --max-turns 40
 ```
 
-The flag is `--policy`, not `--polciy`. The LLM policy uses the OpenAI API to choose workplace tool calls, then the simulator executes those calls locally. The model does not get the evaluator as a tool during the episode; grading runs after the agent stops.
+The flag is `--policy`, not `--polciy`. The LLM policy uses the OpenAI API to choose workplace tool calls, then the simulator executes those calls locally. The model does not get the evaluator as a tool during the episode; after the agent stops, the runner finalizes the world to the Friday deadline and grades that settled state.
 
-An LLM turn means one model decision round: the runner sends the current conversation/tool results to the model, waits for tool calls, runs those tools, and feeds the tool outputs back. A single model turn may contain more than one tool call. LLM runs print concise colorized progress lines with simulated time, tool details, logical time cost, and short results, such as `[agent] [Wed 2026-06-24 14:00] send_chat -> luigi: ... -> scheduled 1 reply event(s); +5m to Wed 2026-06-24 14:05`. Add `--quiet` to suppress those logs. The LLM instructions ask for targeted coordination rather than broad check-ins, and the operator runner stops early if the current state reaches full score. The final summary prints whether the model actually called `finish` or stopped for another reason; long runs show step counts plus recent steps instead of every action.
+An LLM turn means one model decision round: the runner sends the current conversation/tool results to the model, waits for tool calls, runs those tools, and feeds the tool outputs back. A single model turn may contain more than one tool call. LLM runs print concise colorized progress lines with simulated time, action labels, logical time cost, and short results, such as `[agent] [Wed 2026-06-24 14:00] CHAT to luigi: ... — scheduled 1 reply event(s) (+5m)`. Add `--quiet` to suppress those logs. The LLM instructions ask for targeted coordination rather than broad check-ins. The agent action loop can stop when the agent calls `finish`, runs out of turns, or stops producing tool calls; the runner then advances to Friday as an operator finalization step before the final evaluation. The final summary prints both why the agent loop stopped and which deadline events/outcome were delivered; long runs show step counts plus recent steps instead of every action.
 
 If an LLM run stops below full score, the operator summary prints the missing evaluator evidence. For example, `security_doc_found` and `security_question_answered` mean the model did not advance to Daisy's Wednesday security question, ask Luigi about the security doc, read it, and answer Daisy.
 

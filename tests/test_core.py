@@ -493,6 +493,24 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertTrue(delivered[0]["result"]["applied_effects"])
         self.assertTrue(evidence)
 
+    def test_timeline_filters_by_kind(self) -> None:
+        send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
+        advance_time(self.db_path, "2h")
+
+        actions = timeline(self.db_path, kind="action")
+        events = timeline(self.db_path, kind="event")
+        messages = timeline(self.db_path, kind="message")
+        evidence = timeline(self.db_path, kind="evidence")
+
+        self.assertTrue(actions)
+        self.assertTrue(events)
+        self.assertTrue(messages)
+        self.assertTrue(evidence)
+        self.assertEqual({entry["kind"] for entry in actions}, {"action"})
+        self.assertTrue(all(entry["kind"].startswith("event_") for entry in events))
+        self.assertEqual({entry["kind"] for entry in messages}, {"message"})
+        self.assertEqual({entry["kind"] for entry in evidence}, {"evidence"})
+
 
 class CoworkerRuleTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -1757,6 +1775,15 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertEqual(result["policy"], "scripted")
         self.assertEqual(result["evaluation"]["score"], 110)
         self.assertEqual(result["evaluation"]["score"], result["evaluation"]["max_score"])
+        self.assertTrue(result["finalization"]["advanced"])
+        self.assertEqual(result["finalization"]["to"], "2026-06-26T15:00:00")
+
+        with connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT metadata_json FROM docs WHERE id = ?",
+                ("doc_friday_outcome",),
+            ).fetchone()
+        self.assertEqual(json.loads(row["metadata_json"])["final_outcome"], "draft_mode_beta_shipped")
 
     def test_scripted_agent_uses_public_tool_actions(self) -> None:
         run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
@@ -1768,6 +1795,7 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertEqual(action_types.count("send_chat"), 5)
         self.assertEqual(action_types.count("send_email"), 2)
         self.assertEqual(action_types.count("advance_time"), 6)
+        self.assertEqual(action_types.count("finalize_to_deadline"), 1)
 
     def test_cli_run_agent_prints_summary(self) -> None:
         output = self._run_cli("run-agent", "--policy", "scripted", "--reset")
@@ -1775,6 +1803,9 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertIn("Agent Run", output)
         self.assertIn("Policy: scripted", output)
         self.assertIn("Score:  110 / 110", output)
+        self.assertIn("Deadline: advanced to Fri 2026-06-26 15:00", output)
+        self.assertIn("events: luigi_proactive_repo_risk, friday_nimbus_deadline", output)
+        self.assertIn("outcome: draft_mode_beta_shipped", output)
         self.assertIn("send_security_answer", output)
 
     def test_run_agent_summary_prints_missing_evidence(self) -> None:
@@ -1858,6 +1889,8 @@ class LlmAgentTests(unittest.TestCase):
         self.assertEqual(result["model"], "test-model")
         self.assertTrue(result["finished"])
         self.assertEqual(result["stop_reason"], "agent_finish")
+        self.assertTrue(result["finalization"]["advanced"])
+        self.assertEqual(result["finalization"]["to"], "2026-06-26T15:00:00")
         self.assertEqual([step["name"] for step in result["steps"]], ["reset", "read_doc", "finish"])
         self.assertIn("reset", action_types)
         self.assertNotIn("send_chat", action_types)

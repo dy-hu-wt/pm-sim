@@ -412,6 +412,12 @@ def _format_run_agent(value: dict[str, Any]) -> str:
         lines.append(f"  Model:  {value.get('model')}")
     if value.get("turns") is not None:
         lines.append(f"  Model Turns: {value.get('turns')}")
+    finalization = value.get("finalization")
+    if isinstance(finalization, dict) and finalization.get("deadline"):
+        status = "advanced" if finalization.get("advanced") else "already at/past deadline"
+        details = _finalization_details(finalization)
+        suffix = f"; {details}" if details else ""
+        lines.append(f"  Deadline: {status} to {_pretty_time(finalization.get('to'))}{suffix}")
     missing = _agent_missing_components(evaluation)
     if missing:
         lines.extend(["", "Missing Evaluation"])
@@ -456,10 +462,25 @@ def _agent_missing_components(evaluation: dict[str, Any]) -> list[dict[str, Any]
     ]
 
 
+def _finalization_details(finalization: dict[str, Any]) -> str:
+    parts: list[str] = []
+    delivered = finalization.get("delivered_events") or []
+    event_types = [
+        str(event.get("event_type", "event"))
+        for event in delivered
+        if isinstance(event, dict)
+    ]
+    if event_types:
+        parts.append(f"events: {', '.join(event_types)}")
+    if finalization.get("final_outcome"):
+        parts.append(f"outcome: {finalization['final_outcome']}")
+    return "; ".join(parts)
+
+
 def _agent_stop_reason(reason: str) -> str:
     labels = {
         "agent_finish": "agent called finish",
-        "full_score": "operator stopped after full score",
+        "full_score": "agent loop stopped after full score",
         "max_turns": "max turns reached",
         "no_tool_calls": "model returned no tool calls",
     }

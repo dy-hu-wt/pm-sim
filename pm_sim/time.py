@@ -22,7 +22,13 @@ COMPLETED_STATUSES = {"complete", "completed", "done", "resolved"}
 UNRESOLVED_BLOCKER_STATUSES = {"open", "surfaced", "blocked"}
 
 
-def advance_time(db_path: Path | str = DEFAULT_DB_PATH, target: str = "until_next_event") -> dict[str, Any]:
+def advance_time(
+    db_path: Path | str = DEFAULT_DB_PATH,
+    target: str = "until_next_event",
+    *,
+    actor: str = "agent",
+    action_type: str = "advance_time",
+) -> dict[str, Any]:
     conn = connect(db_path)
     try:
         current_time = get_current_time(conn)
@@ -37,9 +43,9 @@ def advance_time(db_path: Path | str = DEFAULT_DB_PATH, target: str = "until_nex
         set_state_value(conn, "current_time", new_time)
         log_action(
             conn,
-            action_id=f"action_{_next_action_number(conn)}_advance_time",
-            actor="agent",
-            action_type="advance_time",
+            action_id=f"action_{_next_action_number(conn)}_{action_type}",
+            actor=actor,
+            action_type=action_type,
             created_at=new_time,
             payload={"target": target, "from": current_time, "to": new_time},
             result={"delivered_event_ids": [event["id"] for event in delivered]},

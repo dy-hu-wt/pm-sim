@@ -11,6 +11,7 @@ from ..evaluator import evaluate
 from ..paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH, REPO_ROOT
 from ..state import observe, reset
 from ..time import advance_time
+from .finalize import finalize_to_deadline
 
 
 ToolResult = Union[dict[str, Any], list[dict[str, Any]]]
@@ -18,7 +19,6 @@ ToolFn = Callable[[dict[str, Any]], ToolResult]
 ProgressFn = Callable[[str], None]
 
 DEFAULT_MODEL = "gpt-5.5"
-FULL_SCORE_STOP_REASON = "full_score"
 
 
 class LlmAgentError(RuntimeError):
@@ -110,15 +110,7 @@ def run_llm_agent(
         if finished:
             break
 
-        turn_evaluation = evaluate(db_path, scenario_path)
-        if turn_evaluation.get("score") == turn_evaluation.get("max_score"):
-            stop_reason = FULL_SCORE_STOP_REASON
-            _progress(
-                progress,
-                f"{_sim_time_label(db_path)} full score reached; stopping operator run",
-            )
-            break
-
+    finalization = finalize_to_deadline(db_path, scenario_path, progress=progress)
     evaluation = evaluate(db_path, scenario_path)
     _progress(
         progress,
@@ -132,6 +124,7 @@ def run_llm_agent(
         "stop_reason": stop_reason,
         "turns": turn if "turn" in locals() else 0,
         "steps": steps,
+        "finalization": finalization,
         "final_message": final_message,
         "evaluation": evaluation,
     }
@@ -167,9 +160,11 @@ def _instructions() -> str:
         "or claim task progress that the visible world does not support. Discover information through "
         "coworkers, docs, meeting transcripts, messages, and scheduled events. Advancing time is allowed "
         "when you are waiting for replies, meetings, stakeholder follow-ups, or known future events. "
-        "Coworker attention is limited: avoid broad check-ins, duplicate reminders, and courtesy updates "
-        "that do not unblock a decision. Message the smallest useful set of people, prefer one targeted "
-        "meeting over repeated individual pings when several people need the same context, and do not "
+        "Coworker attention is limited. Do not broadcast routine updates, send courtesy confirmations, "
+        "or ask the same person to confirm a decision that is already visible in a message, transcript, "
+        "or task. Message the smallest useful set of people. Prefer one concise email or one focused "
+        "meeting over repeated individual pings when several people need the same context. Only message "
+        "someone when you need private information, a concrete decision, or a specific unblock. Do not "
         "update a task just to show activity. "
         "Your objective is to improve the Friday launch outcome through realistic PM behavior: discover "
         "blockers, resolve conflicts, prioritize tradeoffs, communicate clearly, and keep work moving. "
@@ -394,8 +389,8 @@ def _result_summary(name: str, result: ToolResult) -> str:
         delivered = result.get("delivered_events", [])
         if delivered:
             event_types = ", ".join(event.get("event_type", "event") for event in delivered)
-            return f"{_pretty_time(result.get('to'))}; delivered {event_types}"
-        return f"{_pretty_time(result.get('to'))}; delivered no events"
+            return f"{_pretty_time(result.get('to'))}; events: {event_types}"
+        return f"{_pretty_time(result.get('to'))}; events: none"
     if name == "send_chat":
         replies = result.get("scheduled_reply_ids", [])
         return f"scheduled {len(replies)} reply event(s){_time_cost_summary(result)}"
@@ -420,7 +415,7 @@ def _time_cost_summary(result: dict[str, Any]) -> str:
     delivered_summary = ""
     if delivered:
         event_types = ", ".join(event.get("event_type", "event") for event in delivered)
-        delivered_summary = f"; delivered {event_types}"
+        delivered_summary = f"; events: {event_types}"
     return f" (+{time_cost.get('minutes')}m){delivered_summary}"
 
 

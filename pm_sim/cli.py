@@ -24,7 +24,7 @@ from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .scenario import ScenarioError
 from .state import action_log, event_log, observe, reset
 from .time import advance_time
-from .timeline import timeline
+from .timeline import TIMELINE_KINDS, timeline
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -117,17 +117,22 @@ def _build_parser() -> argparse.ArgumentParser:
         )
     )
 
-    log_parser = subparsers.add_parser("log", help="Print recent action log.")
+    log_parser = subparsers.add_parser("log", help="Debug direct action log.")
     log_parser.add_argument("--limit", type=int, default=20)
     log_parser.set_defaults(func=lambda args: action_log(args.db, args.limit))
 
-    events_parser = subparsers.add_parser("events", help="Print scheduled/delivered events.")
+    events_parser = subparsers.add_parser("events", help="Debug scheduled/delivered event queue.")
     events_parser.add_argument("--limit", type=int, default=20)
     events_parser.set_defaults(func=lambda args: event_log(args.db, args.limit))
 
-    timeline_parser = subparsers.add_parser("timeline", help="Print the simulation timeline.")
+    timeline_parser = subparsers.add_parser("timeline", help="Show chronological simulation history.")
     timeline_parser.add_argument("--limit", type=int, default=0)
-    timeline_parser.set_defaults(func=lambda args: timeline(args.db, args.limit))
+    timeline_parser.add_argument(
+        "--kind",
+        choices=sorted(TIMELINE_KINDS),
+        help="Filter to action, event, event_scheduled, event_delivered, message, or evidence.",
+    )
+    timeline_parser.set_defaults(func=lambda args: timeline(args.db, args.limit, args.kind))
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Score the current simulation state.")
     evaluate_parser.add_argument(
