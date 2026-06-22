@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS projects (
 
 CREATE TABLE IF NOT EXISTS facts (
   id TEXT PRIMARY KEY,
-  knowledge_scope TEXT NOT NULL,
+  visibility_scope TEXT NOT NULL,
   owner_id TEXT REFERENCES people(id),
   summary TEXT NOT NULL,
   visible_at TEXT,
@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS blockers (
   severity TEXT NOT NULL,
   status TEXT NOT NULL,
   owner_id TEXT REFERENCES people(id),
+  visibility_scope TEXT NOT NULL,
   visible_at TEXT,
   resolved_at TEXT,
   metadata_json TEXT NOT NULL DEFAULT '{}'
@@ -109,6 +110,7 @@ CREATE TABLE IF NOT EXISTS docs (
   title TEXT NOT NULL,
   kind TEXT NOT NULL,
   body TEXT NOT NULL,
+  visibility_scope TEXT NOT NULL,
   visible_at TEXT,
   updated_at TEXT NOT NULL,
   metadata_json TEXT NOT NULL DEFAULT '{}'

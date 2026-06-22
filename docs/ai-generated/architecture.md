@@ -50,7 +50,7 @@ The scenario file owns initial authored content. After reset, the database owns 
 
 This keeps state transitions inspectable. A reviewer can see both the final state and the path that produced it.
 
-Discoverability is represented consistently with `visible_at` on state that can become visible over time. Docs are readable when `docs.visible_at` is set, facts are known when `facts.visible_at` is set, and blockers appear in observation when `blockers.visible_at` is set. Fact rules still use names like `fact_discovered` because that is the domain action, but the storage field is the same visibility timestamp.
+Discoverability uses two fields on state that can become visible over time. `visibility_scope` is authored scenario metadata such as `public`, `hidden`, `private`, `derived`, or `generated`. `visible_at` is mutable runtime state. Docs are readable when `docs.visible_at` is set, facts are known when `facts.visible_at` is set, and blockers appear in observation when `blockers.visible_at` is set. Fact rules still use names like `fact_discovered` because that is the domain action, but storage uses the same visibility timestamp.
 
 ## Tool Surfaces
 

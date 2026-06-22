@@ -357,20 +357,20 @@ def _insert_projects(conn: sqlite3.Connection, projects: list[dict[str, Any]]) -
 
 def _insert_facts(conn: sqlite3.Connection, facts: list[dict[str, Any]]) -> None:
     for fact in facts:
-        knowledge_scope = fact.get("knowledge_scope", "hidden")
+        visibility_scope = fact.get("visibility_scope", "hidden")
         visible_at = (
             fact.get("visible_at")
-            or (get_current_time(conn) if knowledge_scope == "public" else None)
+            or (get_current_time(conn) if visibility_scope == "public" else None)
         )
         conn.execute(
             """
             INSERT INTO facts
-              (id, knowledge_scope, owner_id, summary, visible_at, source, metadata_json)
+              (id, visibility_scope, owner_id, summary, visible_at, source, metadata_json)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 fact["id"],
-                knowledge_scope,
+                visibility_scope,
                 fact.get("owner_id"),
                 fact["summary"],
                 visible_at,
@@ -382,7 +382,7 @@ def _insert_facts(conn: sqlite3.Connection, facts: list[dict[str, Any]]) -> None
                         if key
                         not in {
                             "id",
-                            "knowledge_scope",
+                            "visibility_scope",
                             "owner_id",
                             "summary",
                             "visible_at",
@@ -438,13 +438,14 @@ def _insert_dependencies(conn: sqlite3.Connection, dependencies: list[dict[str, 
 
 def _insert_blockers(conn: sqlite3.Connection, blockers: list[dict[str, Any]]) -> None:
     for blocker in blockers:
+        visibility_scope = blocker.get("visibility_scope", "hidden")
         visible_at = blocker.get("visible_at")
         conn.execute(
             """
             INSERT INTO blockers
               (id, project_id, title, description, severity, status, owner_id,
-               visible_at, resolved_at, metadata_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               visibility_scope, visible_at, resolved_at, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 blocker["id"],
@@ -454,9 +455,28 @@ def _insert_blockers(conn: sqlite3.Connection, blockers: list[dict[str, Any]]) -
                 blocker.get("severity", "medium"),
                 blocker.get("status", "open"),
                 blocker.get("owner_id"),
+                visibility_scope,
                 visible_at,
                 blocker.get("resolved_at"),
-                dumps(blocker.get("metadata", {})),
+                dumps(
+                    {
+                        key: value
+                        for key, value in blocker.items()
+                        if key
+                        not in {
+                            "id",
+                            "project_id",
+                            "title",
+                            "description",
+                            "severity",
+                            "status",
+                            "owner_id",
+                            "visibility_scope",
+                            "visible_at",
+                            "resolved_at",
+                        }
+                    }
+                ),
             ),
         )
 
@@ -467,21 +487,38 @@ def _insert_docs(
     default_time: str,
 ) -> None:
     for doc in docs:
+        visibility_scope = doc.get("visibility_scope", "hidden")
         visible_at = doc.get("visible_at")
         conn.execute(
             """
             INSERT INTO docs
-              (id, title, kind, body, visible_at, updated_at, metadata_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+              (id, title, kind, body, visibility_scope, visible_at, updated_at, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 doc["id"],
                 doc["title"],
                 doc.get("kind", "doc"),
                 doc.get("body", ""),
+                visibility_scope,
                 visible_at,
                 doc.get("updated_at", default_time),
-                dumps(doc.get("metadata", {})),
+                dumps(
+                    {
+                        key: value
+                        for key, value in doc.items()
+                        if key
+                        not in {
+                            "id",
+                            "title",
+                            "kind",
+                            "body",
+                            "visibility_scope",
+                            "visible_at",
+                            "updated_at",
+                        }
+                    }
+                ),
             ),
         )
 

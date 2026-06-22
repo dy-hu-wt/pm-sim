@@ -373,7 +373,7 @@
   "facts": [
     {
       "id": "fact_repo_sync_stale",
-      "knowledge_scope": "hidden",
+      "visibility_scope": "hidden",
       "owner_id": "luigi",
       "summary": "The repo sync worker sometimes reviews an older commit because webhook events can arrive out of order.",
       "revealed_by": [
@@ -383,7 +383,7 @@
     },
     {
       "id": "fact_draft_mode_limits_customer_visible_risk",
-      "knowledge_scope": "hidden",
+      "visibility_scope": "hidden",
       "owner_id": "luigi",
       "summary": "Draft mode may still prepare an imperfect suggestion, but no customer-visible comment is posted until a human approves it.",
       "revealed_by": [
@@ -393,41 +393,41 @@
     },
     {
       "id": "fact_design_blocked_by_scope",
-      "knowledge_scope": "private",
+      "visibility_scope": "private",
       "owner_id": "peach",
       "summary": "Peach cannot finish onboarding screens until the Friday launch mode is clarified."
     },
     {
       "id": "fact_nimbus_values_reliability",
-      "knowledge_scope": "private",
+      "visibility_scope": "private",
       "owner_id": "daisy",
       "summary": "For Nimbus Labs, reliable draft suggestions are better than auto-posted comments that might review stale code."
     },
     {
       "id": "fact_draft_mode_scope_confirmed",
-      "knowledge_scope": "derived",
+      "visibility_scope": "derived",
       "summary": "The Friday beta scope is draft-suggestions mode with human approval before comments are posted."
     },
     {
       "id": "fact_draft_mode_approved",
-      "knowledge_scope": "derived",
+      "visibility_scope": "derived",
       "summary": "Toad approved shipping draft mode for Friday."
     },
     {
       "id": "fact_koopa_needs_audit_csv",
-      "knowledge_scope": "private",
+      "visibility_scope": "private",
       "owner_id": "daisy",
       "summary": "Koopa Bank needs a CSV export of admin audit logs for a Thursday security review, but they mostly need a clear scoped answer."
     },
     {
       "id": "fact_audit_log_one_time_export_feasible",
-      "knowledge_scope": "hidden",
+      "visibility_scope": "hidden",
       "owner_id": "luigi",
       "summary": "A one-time CSV export is feasible this week, but a full self-serve audit export needs follow-up work after the PR Review Agent beta."
     },
     {
       "id": "fact_audit_export_scope_confirmed",
-      "knowledge_scope": "derived",
+      "visibility_scope": "derived",
       "summary": "The Koopa Bank audit log export scope is one-time CSV for the security review, with full self-serve export deferred."
     }
   ],
@@ -616,6 +616,7 @@
       "status": "open",
       "severity": "high",
       "owner_id": "luigi",
+      "visibility_scope": "hidden",
       "description": "Auto-commenting may post review comments against an older commit instead of the latest PR diff.",
       "metadata": {
         "fact_id": "fact_repo_sync_stale"
@@ -628,6 +629,7 @@
       "status": "open",
       "severity": "medium",
       "owner_id": "peach",
+      "visibility_scope": "public",
       "visible_at": "2026-06-22T09:00:00",
       "description": "Onboarding and customer messaging cannot finish until auto-commenting versus draft mode is decided.",
       "metadata": {
@@ -641,6 +643,7 @@
       "status": "open",
       "severity": "high",
       "owner_id": "toad",
+      "visibility_scope": "public",
       "visible_at": "2026-06-22T09:00:00",
       "description": "The team may drift into a risky auto-commenting beta without explicit approval."
     },
@@ -651,6 +654,7 @@
       "status": "open",
       "severity": "medium",
       "owner_id": "toad",
+      "visibility_scope": "public",
       "visible_at": "2026-06-22T09:00:00",
       "description": "Koopa Bank needs an answer for Thursday, but the team has not confirmed whether this is a one-time CSV export or a full self-serve feature."
     }
@@ -660,6 +664,7 @@
       "id": "doc_project_brief",
       "title": "PR Review Agent Beta Brief",
       "kind": "brief",
+      "visibility_scope": "public",
       "visible_at": "2026-06-22T09:00:00",
       "body": "PR Review Agent goal: help engineering teams review pull requests faster. Friday pilot: Nimbus Labs. Full beta mode posts review comments automatically on PRs. Draft-mode beta prepares suggestions for human approval before posting. Draft mode is less flashy, but safer if repo sync is not reliable."
     },
@@ -667,6 +672,7 @@
       "id": "doc_monday_standup",
       "title": "Monday Standup Notes",
       "kind": "meeting_notes",
+      "visibility_scope": "public",
       "visible_at": "2026-06-22T09:00:00",
       "body": "Mario wants auto-commenting if possible. Peach needs launch-mode confirmation before final onboarding. Daisy needs confidence language before she updates Nimbus. Luigi said he is still hardening repo sync ordering."
     },
@@ -674,6 +680,7 @@
       "id": "doc_beta_rollout_template",
       "title": "Nimbus Beta Rollout Template",
       "kind": "customer_note_template",
+      "visibility_scope": "public",
       "visible_at": "2026-06-22T09:00:00",
       "body": "Rollout note must answer three questions: whether the agent posts comments automatically, what human approval means in draft mode, and what known limitation remains after Friday. Avoid promising auto-commenting until repo sync is proven reliable."
     },
@@ -681,6 +688,7 @@
       "id": "doc_launch_decision_record",
       "title": "Friday Launch Decision Record",
       "kind": "decision_record",
+      "visibility_scope": "public",
       "visible_at": "2026-06-22T09:00:00",
       "body": "Decision pending. Record the approved Friday launch mode, approval owner, customer-visible behavior, and any follow-up scope before Daisy updates Nimbus."
     },
@@ -688,6 +696,7 @@
       "id": "doc_repo_sync_notes",
       "title": "Repo Sync Notes",
       "kind": "engineering_notes",
+      "visibility_scope": "hidden",
       "owner_id": "luigi",
       "metadata": {
         "owner_id": "luigi"
@@ -698,6 +707,7 @@
       "id": "doc_private_repo_security_baseline",
       "title": "Private Repo Security Baseline",
       "kind": "security_note",
+      "visibility_scope": "hidden",
       "owner_id": "luigi",
       "metadata": {
         "owner_id": "luigi"
@@ -708,6 +718,7 @@
       "id": "doc_koopa_audit_export_note",
       "title": "Koopa Audit Export Note",
       "kind": "customer_note",
+      "visibility_scope": "hidden",
       "body": "Koopa Bank asked whether admin audit logs can be exported before their Thursday security review. The open question is scope: a one-time CSV for the review may be feasible, while a full self-serve export likely needs follow-up planning."
     }
   ],

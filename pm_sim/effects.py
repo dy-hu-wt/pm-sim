@@ -90,14 +90,15 @@ def _apply_create_doc(
     conn.execute(
         """
         INSERT INTO docs
-          (id, title, kind, body, visible_at, updated_at, metadata_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+          (id, title, kind, body, visibility_scope, visible_at, updated_at, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             doc_id,
             _required(effect, "title"),
             effect.get("kind", "doc"),
             effect.get("body", ""),
+            effect.get("visibility_scope", "generated"),
             effect.get("visible_at", now),
             effect.get("updated_at", now),
             dumps({"source": source, **effect.get("metadata", {})}),
