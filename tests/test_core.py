@@ -1315,6 +1315,14 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         return output.getvalue()
 
+    def _run_cli_with_stderr(self, *args: str) -> tuple[str, str]:
+        output = io.StringIO()
+        error = io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(error):
+            exit_code = cli_main(["--db", str(self.db_path), *args])
+        self.assertEqual(exit_code, 0)
+        return output.getvalue(), error.getvalue()
+
     def _drive_happy_path(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
         advance_time(self.db_path, "2h")
@@ -1732,6 +1740,29 @@ class LlmAgentTests(unittest.TestCase):
 
         self.assertEqual(function_outputs[0]["call_id"], "call_1")
         self.assertIn("current_time", function_outputs[0]["output"])
+
+    def test_llm_agent_reports_progress(self) -> None:
+        messages = []
+        client = _FakeResponsesClient(
+            [
+                [_function_call("call_1", "observe", {})],
+                [_function_call("call_2", "finish", {"reason": "observed"})],
+            ]
+        )
+
+        run_llm_agent(
+            self.db_path,
+            DEFAULT_SCENARIO_PATH,
+            reset_first=True,
+            model="test-model",
+            client=client,
+            max_turns=3,
+            progress=messages.append,
+        )
+
+        self.assertIn("resetting scenario", messages)
+        self.assertTrue(any("waiting for model" in message for message in messages))
+        self.assertTrue(any("running tool: observe" in message for message in messages))
 
 
 class _FakeResponsesClient:

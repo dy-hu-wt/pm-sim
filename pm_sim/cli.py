@@ -163,6 +163,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Maximum model/tool loop turns for --policy llm.",
     )
     agent_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress progress logs for --policy llm.",
+    )
+    agent_parser.add_argument(
         "--reset",
         action="store_true",
         dest="reset_first",
@@ -197,14 +202,20 @@ def _run_agent_command(args: argparse.Namespace) -> dict[str, Any]:
     if args.policy == "scripted":
         return run_scripted_agent(args.db, args.scenario, reset_first=args.reset_first)
     if args.policy == "llm":
+        progress = None if args.quiet or args.as_json else _agent_progress
         return run_llm_agent(
             args.db,
             args.scenario,
             reset_first=args.reset_first,
             model=args.model,
             max_turns=args.max_turns,
+            progress=progress,
         )
     raise ValueError(f"Unsupported policy: {args.policy}")
+
+
+def _agent_progress(message: str) -> None:
+    print(f"[agent] {message}", file=sys.stderr, flush=True)
 
 
 def sqlite_missing_reset_error() -> tuple[type[Exception], ...]:

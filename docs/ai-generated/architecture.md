@@ -128,7 +128,7 @@ pm-sim evaluate --explain
 
 `run-agent --policy scripted --reset` runs the golden path through the same public tool functions used by the CLI. It is a deterministic policy, not an LLM and not a training loop.
 
-`run-agent --policy llm --reset` uses the OpenAI API to choose simulator tool calls. The local runner exposes docs, chat, email, tasks, meetings, time, and evaluation as callable tools. The model selects actions; the simulator still owns state transitions and grading.
+`run-agent --policy llm --reset` uses the OpenAI API to choose simulator tool calls. The local runner exposes docs, chat, email, tasks, meetings, time, and evaluation as callable tools. The model selects actions; the simulator still owns state transitions and grading. The CLI prints progress logs during LLM runs because model calls can otherwise look idle until the final result is returned.
 
 ## Scaling Path
 

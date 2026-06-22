@@ -14,6 +14,7 @@ from ..time import advance_time
 
 ToolResult = Union[dict[str, Any], list[dict[str, Any]]]
 ToolFn = Callable[[dict[str, Any]], ToolResult]
+ProgressFn = Callable[[str], None]
 
 DEFAULT_MODEL = "gpt-5.5"
 
@@ -30,15 +31,18 @@ def run_llm_agent(
     model: str | None = None,
     max_turns: int = 20,
     client: Any | None = None,
+    progress: ProgressFn | None = None,
 ) -> dict[str, Any]:
     _load_dotenv()
     model = model or os.environ.get("OPENAI_MODEL") or DEFAULT_MODEL
     steps: list[dict[str, Any]] = []
 
     if reset_first:
+        _progress(progress, "resetting scenario")
         steps.append(_step("reset", reset(db_path, scenario_path)))
 
     if client is None:
+        _progress(progress, f"creating OpenAI client for model {model}")
         client = _openai_client()
 
     tools = _tool_specs()
@@ -53,6 +57,7 @@ def run_llm_agent(
     finished = False
     final_message = ""
     for turn in range(1, max_turns + 1):
+        _progress(progress, f"turn {turn}/{max_turns}: waiting for model")
         response = client.responses.create(
             model=model,
             instructions=_instructions(),
@@ -64,6 +69,7 @@ def run_llm_agent(
         input_items.extend(output)
         final_message = getattr(response, "output_text", "") or final_message
         tool_calls = [item for item in output if getattr(item, "type", None) == "function_call"]
+        _progress(progress, f"turn {turn}/{max_turns}: model returned {len(tool_calls)} tool call(s)")
 
         if not tool_calls:
             break
@@ -71,6 +77,7 @@ def run_llm_agent(
         for call in tool_calls:
             name = getattr(call, "name", "")
             args = _parse_arguments(getattr(call, "arguments", "{}"))
+            _progress(progress, f"running tool: {name}")
             if name == "finish":
                 finished = True
                 result: dict[str, Any] = {"ok": True, "reason": args.get("reason", "")}
@@ -94,6 +101,10 @@ def run_llm_agent(
             break
 
     evaluation = evaluate(db_path, scenario_path)
+    _progress(
+        progress,
+        f"evaluation complete: {evaluation.get('score')} / {evaluation.get('max_score')}",
+    )
     return {
         "ok": evaluation.get("score") == evaluation.get("max_score"),
         "policy": "llm",
@@ -272,3 +283,8 @@ def _step(name: str, result: ToolResult) -> dict[str, Any]:
         "ok": ok,
         "result": result,
     }
+
+
+def _progress(progress: ProgressFn | None, message: str) -> None:
+    if progress is not None:
+        progress(message)

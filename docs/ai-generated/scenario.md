@@ -175,7 +175,7 @@ The LLM policy can be run with:
 pm-sim run-agent --policy llm --reset --max-turns 20
 ```
 
-That path lets a model choose the next tool call. The simulator still evaluates only durable state and evidence.
+That path lets a model choose the next tool call. The simulator still evaluates only durable state and evidence. During an LLM run, progress logs show when the runner is waiting for the model and which tool is executing.
 
 ## Bad Paths
 

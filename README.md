@@ -166,7 +166,9 @@ Run the optional LLM agent:
 pm-sim run-agent --policy llm --reset --max-turns 20
 ```
 
-The LLM policy uses the OpenAI API to choose tool calls, then the simulator executes those calls locally. Grading still comes from the deterministic evaluator, not from the model.
+The flag is `--policy`, not `--polciy`. The LLM policy uses the OpenAI API to choose tool calls, then the simulator executes those calls locally. Grading still comes from the deterministic evaluator, not from the model.
+
+LLM runs print progress lines like `[agent] turn 1/20: waiting for model` while the model is thinking or the simulator is running a tool. Add `--quiet` to suppress those logs.
 
 ## Evaluation
 
