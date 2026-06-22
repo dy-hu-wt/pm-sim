@@ -240,18 +240,19 @@ def _color_agent_message(message: str) -> str:
         return f"{prefix} {_dim(message)}"
     if "full score reached" in message or "evaluation complete" in message:
         return f"{prefix} {_green(message)}"
-    for tool, color in {
-        "read_doc": _blue,
-        "send_chat": _magenta,
-        "send_email": _cyan,
-        "schedule_meeting": _yellow,
-        "update_task": _yellow,
-        "advance_time": _green,
-        "observe": _dim,
-        "list_tasks": _dim,
-        "finish": _green,
+    message = re.sub(r"\(\+\d+m\)", lambda match: _yellow(match.group(0)), message)
+    for label, color in {
+        "READ": _blue,
+        "CHAT": _magenta,
+        "EMAIL": _cyan,
+        "MEETING": _yellow,
+        "TASKS": _dim,
+        "TASK": _yellow,
+        "WAIT": _green,
+        "OBSERVE": _dim,
+        "FINISH": _green,
     }.items():
-        message = re.sub(rf"\b{tool}\b", lambda match, color=color: color(match.group(0)), message, count=1)
+        message = re.sub(rf"\b{label}\b", lambda match, color=color: color(match.group(0)), message, count=1)
     return f"{prefix} {message}"
 
 

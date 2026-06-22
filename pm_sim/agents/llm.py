@@ -339,23 +339,28 @@ def _pretty_time(value: str | None) -> str:
 
 def _args_summary(name: str, args: dict[str, Any]) -> str:
     if name == "send_chat":
-        return f" -> {args.get('person_id')}: {_short(args.get('body', ''), 80)}"
+        return f"CHAT to {args.get('person_id')}: {_short(args.get('body', ''), 80)}"
     if name == "send_email":
-        return f" -> {args.get('person_id')} [{_short(args.get('subject', ''), 60)}]"
+        return f"EMAIL to {args.get('person_id')} [{_short(args.get('subject', ''), 60)}]"
     if name == "read_doc":
-        return f" {args.get('doc_id')}"
+        return f"READ {args.get('doc_id')}"
     if name == "advance_time":
-        return f" {args.get('target')}"
+        return f"WAIT {args.get('target')}"
     if name == "update_task":
         updates = ", ".join(
             f"{key}={value}" for key, value in args.items() if key in {"status", "priority"}
         )
-        return f" {args.get('task_id')} {updates}".rstrip()
+        suffix = f" {updates}" if updates else ""
+        return f"TASK {args.get('task_id')}{suffix}"
     if name == "schedule_meeting":
         attendees = ", ".join(args.get("attendees", []))
-        return f" [{_short(args.get('title', ''), 60)}] {args.get('start_at')}->{args.get('end_at')} with {attendees}"
+        return f"MEETING [{_short(args.get('title', ''), 60)}] {args.get('start_at')}->{args.get('end_at')} with {attendees}"
+    if name == "observe":
+        return "OBSERVE"
+    if name == "list_tasks":
+        return "TASKS"
     if name == "finish":
-        return f": {_short(args.get('reason', ''), 80)}"
+        return f"FINISH: {_short(args.get('reason', ''), 80)}"
     return ""
 
 
@@ -371,10 +376,11 @@ def _tool_call_summary(tool_calls: list[Any]) -> str:
 
 
 def _tool_progress_line(name: str, args: dict[str, Any], result: ToolResult) -> str:
+    action = _args_summary(name, args) or name
     summary = _result_summary(name, result)
     if summary:
-        return f"{name}{_args_summary(name, args)} -> {summary}"
-    return f"{name}{_args_summary(name, args)}"
+        return f"{action} — {summary}"
+    return action
 
 
 def _result_summary(name: str, result: ToolResult) -> str:
@@ -415,7 +421,7 @@ def _time_cost_summary(result: dict[str, Any]) -> str:
     if delivered:
         event_types = ", ".join(event.get("event_type", "event") for event in delivered)
         delivered_summary = f"; delivered {event_types}"
-    return f"; +{time_cost.get('minutes')}m to {_pretty_time(time_cost.get('to'))}{delivered_summary}"
+    return f" (+{time_cost.get('minutes')}m){delivered_summary}"
 
 
 def _short(value: str, limit: int) -> str:
