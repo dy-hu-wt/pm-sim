@@ -215,7 +215,7 @@ def _effects_for_project_deadline(
             "id": outcome_doc_id,
             "title": payload.get("outcome_doc_title", "Project Outcome"),
             "kind": "outcome_report",
-            "visible": True,
+            "visible_at": get_current_time(conn),
             "body": outcome["summary"],
             "metadata": {"final_outcome": outcome["final_outcome"]},
         },
@@ -242,7 +242,7 @@ def _discovered_fact_ids(conn: sqlite3.Connection) -> set[str]:
         """
         SELECT id
         FROM facts
-        WHERE discovered_at IS NOT NULL
+        WHERE visible_at IS NOT NULL
         """
     ).fetchall()
     return {row["id"] for row in rows}

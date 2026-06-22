@@ -51,7 +51,7 @@ def read_doc(db_path: Path | str, doc_id: str) -> dict[str, Any]:
         doc = row_to_dict(
             conn.execute(
                 """
-                SELECT id, title, kind, body, visible, updated_at
+                SELECT id, title, kind, body, visible_at, updated_at
                 FROM docs
                 WHERE id = ?
                 """,
@@ -60,7 +60,7 @@ def read_doc(db_path: Path | str, doc_id: str) -> dict[str, Any]:
         )
         if doc is None:
             return {"ok": False, "error": f"Doc not found: {doc_id}"}
-        if doc["visible"] != 1:
+        if doc["visible_at"] is None:
             return {"ok": False, "error": f"Doc is not visible: {doc_id}"}
         time_cost = consume_action_time(
             conn,
@@ -94,7 +94,7 @@ def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
         doc = row_to_dict(
             conn.execute(
                 """
-                SELECT id, title, kind, body, visible
+                SELECT id, title, kind, body, visible_at
                 FROM docs
                 WHERE id = ?
                 """,
@@ -103,7 +103,7 @@ def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
         )
         if doc is None:
             return {"ok": False, "error": f"Doc not found: {doc_id}"}
-        if doc["visible"] != 1:
+        if doc["visible_at"] is None:
             return {"ok": False, "error": f"Doc is not visible: {doc_id}"}
 
         revision_id = _next_id(conn, "doc_revisions", "doc_revision")
@@ -589,7 +589,7 @@ def _behavior_state(conn: sqlite3.Connection) -> dict[str, Any]:
         """
         SELECT id
         FROM facts
-        WHERE discovered_at IS NOT NULL
+        WHERE visible_at IS NOT NULL
         """
     ).fetchall()
     rules = loads(get_state_value(conn, "coworker_rules_json") or "[]", [])

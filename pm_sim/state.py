@@ -52,10 +52,10 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
             "discovered_facts": rows_to_dicts(
                 conn.execute(
                     """
-                    SELECT id, owner_id, summary, discovered_at, source
+                    SELECT id, owner_id, summary, visible_at, source
                     FROM facts
-                    WHERE discovered_at IS NOT NULL OR visibility = 'public'
-                    ORDER BY discovered_at, id
+                    WHERE visible_at IS NOT NULL
+                    ORDER BY visible_at, id
                     """
                 ).fetchall()
             ),
@@ -92,9 +92,9 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
                 conn.execute(
                     """
                     SELECT id, project_id, title, description, severity, status,
-                           owner_id, discovered_at, resolved_at
+                           owner_id, visible_at, resolved_at
                     FROM blockers
-                    WHERE hidden = 0 OR discovered_at IS NOT NULL
+                    WHERE visible_at IS NOT NULL
                     ORDER BY severity DESC, id
                     """
                 ).fetchall()
@@ -125,7 +125,7 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
                     """
                     SELECT id, title, kind, updated_at
                     FROM docs
-                    WHERE visible = 1
+                    WHERE visible_at IS NOT NULL
                     ORDER BY updated_at DESC, id
                     """
                 ).fetchall()
@@ -357,18 +357,23 @@ def _insert_projects(conn: sqlite3.Connection, projects: list[dict[str, Any]]) -
 
 def _insert_facts(conn: sqlite3.Connection, facts: list[dict[str, Any]]) -> None:
     for fact in facts:
+        knowledge_scope = fact.get("knowledge_scope", "hidden")
+        visible_at = (
+            fact.get("visible_at")
+            or (get_current_time(conn) if knowledge_scope == "public" else None)
+        )
         conn.execute(
             """
             INSERT INTO facts
-              (id, visibility, owner_id, summary, discovered_at, source, metadata_json)
+              (id, knowledge_scope, owner_id, summary, visible_at, source, metadata_json)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 fact["id"],
-                fact.get("visibility", "hidden"),
+                knowledge_scope,
                 fact.get("owner_id"),
                 fact["summary"],
-                fact.get("discovered_at"),
+                visible_at,
                 fact.get("source"),
                 dumps(
                     {
@@ -377,10 +382,10 @@ def _insert_facts(conn: sqlite3.Connection, facts: list[dict[str, Any]]) -> None
                         if key
                         not in {
                             "id",
-                            "visibility",
+                            "knowledge_scope",
                             "owner_id",
                             "summary",
-                            "discovered_at",
+                            "visible_at",
                             "source",
                         }
                     }
@@ -433,12 +438,13 @@ def _insert_dependencies(conn: sqlite3.Connection, dependencies: list[dict[str, 
 
 def _insert_blockers(conn: sqlite3.Connection, blockers: list[dict[str, Any]]) -> None:
     for blocker in blockers:
+        visible_at = blocker.get("visible_at")
         conn.execute(
             """
             INSERT INTO blockers
               (id, project_id, title, description, severity, status, owner_id,
-               discovered_at, resolved_at, hidden, metadata_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               visible_at, resolved_at, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 blocker["id"],
@@ -448,9 +454,8 @@ def _insert_blockers(conn: sqlite3.Connection, blockers: list[dict[str, Any]]) -
                 blocker.get("severity", "medium"),
                 blocker.get("status", "open"),
                 blocker.get("owner_id"),
-                blocker.get("discovered_at"),
+                visible_at,
                 blocker.get("resolved_at"),
-                1 if blocker.get("hidden", False) else 0,
                 dumps(blocker.get("metadata", {})),
             ),
         )
@@ -462,10 +467,11 @@ def _insert_docs(
     default_time: str,
 ) -> None:
     for doc in docs:
+        visible_at = doc.get("visible_at")
         conn.execute(
             """
             INSERT INTO docs
-              (id, title, kind, body, visible, updated_at, metadata_json)
+              (id, title, kind, body, visible_at, updated_at, metadata_json)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -473,7 +479,7 @@ def _insert_docs(
                 doc["title"],
                 doc.get("kind", "doc"),
                 doc.get("body", ""),
-                0 if doc.get("visible") is False else 1,
+                visible_at,
                 doc.get("updated_at", default_time),
                 dumps(doc.get("metadata", {})),
             ),

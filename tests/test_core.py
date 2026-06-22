@@ -996,10 +996,10 @@ class EffectApplicationTests(unittest.TestCase):
 
             self.assertEqual(len(applied), 6)
             fact = conn.execute(
-                "SELECT discovered_at FROM facts WHERE id = 'fact_repo_sync_stale'"
+                "SELECT visible_at FROM facts WHERE id = 'fact_repo_sync_stale'"
             ).fetchone()
             blocker = conn.execute(
-                "SELECT status, discovered_at FROM blockers WHERE id = 'blocker_repo_sync_stale'"
+                "SELECT status, visible_at FROM blockers WHERE id = 'blocker_repo_sync_stale'"
             ).fetchone()
             task = conn.execute(
                 "SELECT status FROM tasks WHERE id = 'task_draft_mode_docs'"
@@ -1011,9 +1011,9 @@ class EffectApplicationTests(unittest.TestCase):
                 "SELECT evidence_key FROM evaluation_evidence WHERE evidence_key = 'blocker_discovered'"
             ).fetchone()
 
-            self.assertEqual(fact["discovered_at"], "2026-06-22T11:00:00")
+            self.assertEqual(fact["visible_at"], "2026-06-22T11:00:00")
             self.assertEqual(blocker["status"], "surfaced")
-            self.assertEqual(blocker["discovered_at"], "2026-06-22T11:00:00")
+            self.assertEqual(blocker["visible_at"], "2026-06-22T11:00:00")
             self.assertEqual(task["status"], "in_progress")
             self.assertEqual(loads(project["metadata_json"])["decision"], "draft_mode_approved")
             self.assertEqual(evidence["evidence_key"], "blocker_discovered")
@@ -1192,7 +1192,7 @@ class EffectApplicationTests(unittest.TestCase):
             ).fetchone()
             transcript = conn.execute(
                 """
-                SELECT title, kind, body, visible
+                SELECT title, kind, body, visible_at
                 FROM docs
                 WHERE id = ?
                 """,
@@ -1214,7 +1214,7 @@ class EffectApplicationTests(unittest.TestCase):
             self.assertEqual(calendar_event["status"], "completed")
             self.assertEqual(calendar_event["transcript_doc_id"], "doc_transcript_cal_1")
             self.assertEqual(transcript["kind"], "meeting_transcript")
-            self.assertEqual(transcript["visible"], 1)
+            self.assertEqual(transcript["visible_at"], "2026-06-22T10:30:00")
             self.assertIn("repo sync", transcript["body"])
             self.assertIn("blocker_repo_sync_stale", blocker_ids)
             self.assertIn("fact_repo_sync_stale", fact_ids)

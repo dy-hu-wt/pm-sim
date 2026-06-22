@@ -90,7 +90,7 @@ def _apply_create_doc(
     conn.execute(
         """
         INSERT INTO docs
-          (id, title, kind, body, visible, updated_at, metadata_json)
+          (id, title, kind, body, visible_at, updated_at, metadata_json)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
@@ -98,7 +98,7 @@ def _apply_create_doc(
             _required(effect, "title"),
             effect.get("kind", "doc"),
             effect.get("body", ""),
-            0 if effect.get("visible") is False else 1,
+            effect.get("visible_at", now),
             effect.get("updated_at", now),
             dumps({"source": source, **effect.get("metadata", {})}),
         ),
@@ -140,7 +140,7 @@ def _apply_discover_fact(
     cursor = conn.execute(
         """
         UPDATE facts
-        SET discovered_at = COALESCE(discovered_at, ?),
+        SET visible_at = COALESCE(visible_at, ?),
             source = COALESCE(source, ?)
         WHERE id = ?
         """,
@@ -161,11 +161,11 @@ def _apply_reveal_doc(
     cursor = conn.execute(
         """
         UPDATE docs
-        SET visible = 1,
+        SET visible_at = COALESCE(visible_at, ?),
             updated_at = ?
         WHERE id = ?
         """,
-        (now, doc_id),
+        (now, now, doc_id),
     )
     if cursor.rowcount == 0:
         raise ValueError(f"Cannot reveal unknown doc: {doc_id}")
@@ -189,18 +189,18 @@ def _apply_update_blocker(
     if existing["status"] == "resolved" and status != "resolved":
         return {"blocker_id": blocker_id, "status": existing["status"], "skipped": True}
 
-    discovered_at = now if status in {"surfaced", "open", "resolved"} else None
+    visible_at = now if status in {"surfaced", "open", "resolved"} else None
     resolved_at = now if status == "resolved" else None
 
     conn.execute(
         """
         UPDATE blockers
         SET status = ?,
-            discovered_at = COALESCE(discovered_at, ?),
+            visible_at = COALESCE(visible_at, ?),
             resolved_at = CASE WHEN ? IS NULL THEN resolved_at ELSE ? END
         WHERE id = ?
         """,
-        (status, discovered_at, resolved_at, resolved_at, blocker_id),
+        (status, visible_at, resolved_at, resolved_at, blocker_id),
     )
     return {"blocker_id": blocker_id, "status": status}
 

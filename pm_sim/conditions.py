@@ -99,14 +99,14 @@ def condition_time(conn: sqlite3.Connection, source: dict[str, Any]) -> str | No
 def fact_discovered_at(conn: sqlite3.Connection, fact_id: str) -> str | None:
     row = conn.execute(
         """
-        SELECT discovered_at
+        SELECT visible_at
         FROM facts
         WHERE id = ?
-          AND discovered_at IS NOT NULL
+          AND visible_at IS NOT NULL
         """,
         (fact_id,),
     ).fetchone()
-    return None if row is None else row["discovered_at"]
+    return None if row is None else row["visible_at"]
 
 
 def first_evidence_time(conn: sqlite3.Connection, evidence_key: str) -> str | None:

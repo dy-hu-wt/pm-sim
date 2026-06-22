@@ -158,7 +158,6 @@ def effects_for_meeting(payload: dict[str, Any], state: dict[str, Any] | None = 
             "id": transcript_doc_id,
             "title": f"Transcript: {title}",
             "kind": "meeting_transcript",
-            "visible": True,
             "body": _meeting_transcript_body(title, attendees, transcript_lines),
             "metadata": {
                 "calendar_event_id": calendar_event_id,
