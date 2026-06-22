@@ -18,7 +18,7 @@ from pm_sim.actions import (
     send_email,
     update_task,
 )
-from pm_sim.agents.llm import run_llm_agent
+from pm_sim.agents.llm import _instructions, run_llm_agent
 from pm_sim.agents.scripted import run_scripted_agent
 from pm_sim.cli import main as cli_main
 from pm_sim.coworkers import effects_for_event, replies_for_chat
@@ -1860,6 +1860,14 @@ class LlmAgentTests(unittest.TestCase):
 
         self.assertFalse(result["finished"])
         self.assertEqual(result["stop_reason"], "max_turns")
+
+    def test_llm_instructions_discourage_chatty_busywork(self) -> None:
+        instructions = _instructions()
+
+        self.assertIn("Coworker attention is limited", instructions)
+        self.assertIn("smallest useful set of people", instructions)
+        self.assertIn("You do not need to simulate every hour through Friday", instructions)
+        self.assertIn("Call finish when", instructions)
 
 
 class _FakeResponsesClient:

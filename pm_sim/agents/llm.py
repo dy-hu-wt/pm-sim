@@ -167,9 +167,15 @@ def _instructions() -> str:
         "or claim task progress that the visible world does not support. Discover information through "
         "coworkers, docs, meeting transcripts, messages, and scheduled events. Advancing time is allowed "
         "when you are waiting for replies, meetings, stakeholder follow-ups, or known future events. "
+        "Coworker attention is limited: avoid broad check-ins, duplicate reminders, and courtesy updates "
+        "that do not unblock a decision. Message the smallest useful set of people, prefer one targeted "
+        "meeting over repeated individual pings when several people need the same context, and do not "
+        "update a task just to show activity. "
         "Your objective is to improve the Friday launch outcome through realistic PM behavior: discover "
         "blockers, resolve conflicts, prioritize tradeoffs, communicate clearly, and keep work moving. "
-        "Call finish when you believe the project is in a defensible state or no useful action remains."
+        "You do not need to simulate every hour through Friday. Call finish when the launch mode is "
+        "approved, customer messaging is ready, blocked work is unblocked, any visible async customer "
+        "questions have been answered from evidence, and no useful action remains."
     )
 
 
