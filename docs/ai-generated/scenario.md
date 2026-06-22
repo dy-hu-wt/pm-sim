@@ -169,6 +169,14 @@ pm-sim run-agent --policy scripted --reset
 
 That command runs a deterministic policy through the normal docs, chat, email, time, and evaluation functions. It is useful as a one-command reviewer demo and as the future insertion point for an LLM policy.
 
+The LLM policy can be run with:
+
+```text
+pm-sim run-agent --policy llm --reset --max-turns 20
+```
+
+That path lets a model choose the next tool call. The simulator still evaluates only durable state and evidence.
+
 ## Bad Paths
 
 The scenario should score lower if the agent:
@@ -180,3 +188,7 @@ The scenario should score lower if the agent:
 - answers Daisy's security question without finding the hidden doc
 
 These cases are useful because they show the evaluator is checking durable outcomes and state consistency, not just whether the agent used tools.
+
+## Possible Expansion
+
+A good future expansion is a second project or competing interruption during the week. For example, Mario could ask the PM to triage a separate customer bug while the Nimbus launch is still moving. That would make prioritization pressure more explicit without changing the core engine.

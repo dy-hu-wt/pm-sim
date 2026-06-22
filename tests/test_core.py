@@ -7,6 +7,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from pm_sim.actions import (
@@ -17,6 +18,7 @@ from pm_sim.actions import (
     send_email,
     update_task,
 )
+from pm_sim.agents.llm import run_llm_agent
 from pm_sim.agents.scripted import run_scripted_agent
 from pm_sim.cli import main as cli_main
 from pm_sim.coworkers import effects_for_event, replies_for_chat
@@ -1667,6 +1669,90 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertIn("Policy: scripted", output)
         self.assertIn("Score:  110 / 110", output)
         self.assertIn("send_security_answer", output)
+
+
+class LlmAgentTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.tmpdir.name) / "test.db"
+
+    def tearDown(self) -> None:
+        self.tmpdir.cleanup()
+
+    def test_llm_agent_executes_model_requested_tools(self) -> None:
+        client = _FakeResponsesClient(
+            [
+                [
+                    _function_call("call_1", "read_doc", {"doc_id": "doc_project_brief"}),
+                    _function_call("call_2", "evaluate", {}),
+                ],
+                [_function_call("call_3", "finish", {"reason": "done"})],
+            ]
+        )
+
+        result = run_llm_agent(
+            self.db_path,
+            DEFAULT_SCENARIO_PATH,
+            reset_first=True,
+            model="test-model",
+            client=client,
+            max_turns=3,
+        )
+        log = action_log(self.db_path, limit=100)
+        action_types = [entry["action_type"] for entry in log]
+
+        self.assertEqual(result["policy"], "llm")
+        self.assertEqual(result["model"], "test-model")
+        self.assertTrue(result["finished"])
+        self.assertEqual([step["name"] for step in result["steps"]], ["reset", "read_doc", "evaluate", "finish"])
+        self.assertIn("reset", action_types)
+        self.assertNotIn("send_chat", action_types)
+
+    def test_llm_agent_appends_function_outputs_to_model_input(self) -> None:
+        client = _FakeResponsesClient(
+            [
+                [_function_call("call_1", "observe", {})],
+                [_function_call("call_2", "finish", {"reason": "observed"})],
+            ]
+        )
+
+        run_llm_agent(
+            self.db_path,
+            DEFAULT_SCENARIO_PATH,
+            reset_first=True,
+            model="test-model",
+            client=client,
+            max_turns=3,
+        )
+
+        second_input = client.calls[1]["input"]
+        function_outputs = [
+            item for item in second_input if isinstance(item, dict) and item.get("type") == "function_call_output"
+        ]
+
+        self.assertEqual(function_outputs[0]["call_id"], "call_1")
+        self.assertIn("current_time", function_outputs[0]["output"])
+
+
+class _FakeResponsesClient:
+    def __init__(self, outputs: list[list[SimpleNamespace]]) -> None:
+        self._outputs = outputs
+        self.calls: list[dict[str, Any]] = []
+        self.responses = self
+
+    def create(self, **kwargs: Any) -> SimpleNamespace:
+        self.calls.append(kwargs)
+        output = self._outputs.pop(0) if self._outputs else []
+        return SimpleNamespace(output=output, output_text="")
+
+
+def _function_call(call_id: str, name: str, arguments: dict[str, Any]) -> SimpleNamespace:
+    return SimpleNamespace(
+        type="function_call",
+        call_id=call_id,
+        name=name,
+        arguments=json.dumps(arguments),
+    )
 
 
 if __name__ == "__main__":

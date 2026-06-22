@@ -126,7 +126,9 @@ pm-sim evaluate --explain
 
 `timeline` combines actions, events, messages, and evidence into one ordered view. This is useful for understanding why a score was earned or missed.
 
-`run-agent --policy scripted --reset` runs the golden path through the same public tool functions used by the CLI. It is a deterministic agent policy, not an LLM and not a training loop. Its purpose is to prove the environment can be driven by an agent loop before adding model-based action selection.
+`run-agent --policy scripted --reset` runs the golden path through the same public tool functions used by the CLI. It is a deterministic policy, not an LLM and not a training loop.
+
+`run-agent --policy llm --reset` uses the OpenAI API to choose simulator tool calls. The local runner exposes docs, chat, email, tasks, meetings, time, and evaluation as callable tools. The model selects actions; the simulator still owns state transitions and grading.
 
 ## Scaling Path
 

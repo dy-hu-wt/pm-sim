@@ -14,6 +14,7 @@ from .actions import (
     send_email,
     update_task,
 )
+from .agents.llm import LlmAgentError, run_llm_agent
 from .agents.scripted import run_scripted_agent
 from .evaluator import evaluate
 from .formatters import format_output
@@ -32,6 +33,9 @@ def main(argv: list[str] | None = None) -> int:
         result = args.func(args)
     except ScenarioError as error:
         print(f"scenario error: {error}", file=sys.stderr)
+        return 2
+    except LlmAgentError as error:
+        print(f"agent error: {error}", file=sys.stderr)
         return 2
     except sqlite_missing_reset_error() as error:
         print(f"state error: {error}", file=sys.stderr)
@@ -147,9 +151,16 @@ def _build_parser() -> argparse.ArgumentParser:
     agent_parser = subparsers.add_parser("run-agent", help="Run an agent policy through tools.")
     agent_parser.add_argument(
         "--policy",
-        choices=["scripted"],
+        choices=["scripted", "llm"],
         default="scripted",
         help="Agent policy to run. Default: scripted.",
+    )
+    agent_parser.add_argument("--model", help="Model for --policy llm. Defaults to OPENAI_MODEL.")
+    agent_parser.add_argument(
+        "--max-turns",
+        type=int,
+        default=20,
+        help="Maximum model/tool loop turns for --policy llm.",
     )
     agent_parser.add_argument(
         "--reset",
@@ -183,9 +194,17 @@ def _evaluate_command(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _run_agent_command(args: argparse.Namespace) -> dict[str, Any]:
-    if args.policy != "scripted":
-        raise ValueError(f"Unsupported policy: {args.policy}")
-    return run_scripted_agent(args.db, args.scenario, reset_first=args.reset_first)
+    if args.policy == "scripted":
+        return run_scripted_agent(args.db, args.scenario, reset_first=args.reset_first)
+    if args.policy == "llm":
+        return run_llm_agent(
+            args.db,
+            args.scenario,
+            reset_first=args.reset_first,
+            model=args.model,
+            max_turns=args.max_turns,
+        )
+    raise ValueError(f"Unsupported policy: {args.policy}")
 
 
 def sqlite_missing_reset_error() -> tuple[type[Exception], ...]:

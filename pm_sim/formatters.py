@@ -382,9 +382,12 @@ def _format_run_agent(value: dict[str, Any]) -> str:
         f"  Result: {'passed' if value.get('ok') else 'incomplete'}",
         f"  Score:  {evaluation.get('score')} / {evaluation.get('max_score')}",
         f"  Steps:  {len(steps)}",
-        "",
-        "Steps",
     ]
+    if value.get("model"):
+        lines.append(f"  Model:  {value.get('model')}")
+    if value.get("turns") is not None:
+        lines.append(f"  Turns:  {value.get('turns')}")
+    lines.extend(["", "Steps"])
     for index, step in enumerate(steps, start=1):
         status = "ok" if step.get("ok") else "failed"
         lines.append(f"  {index}. {step.get('name')} [{status}]")

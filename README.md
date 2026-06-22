@@ -28,10 +28,11 @@ Then run the tests:
 python -m unittest discover -s tests
 ```
 
-Optional LLM settings can be copied later if model-driven wording or rollout support is added:
+Optional LLM settings are only needed for the model-driven agent policy:
 
 ```bash
 cp .env.example .env
+python -m pip install -e ".[llm]"
 ```
 
 ## Start
@@ -158,6 +159,14 @@ Run the deterministic scripted agent:
 pm-sim run-agent --policy scripted --reset
 pm-sim --json run-agent --policy scripted --reset
 ```
+
+Run the optional LLM agent:
+
+```bash
+pm-sim run-agent --policy llm --reset --max-turns 20
+```
+
+The LLM policy uses the OpenAI API to choose tool calls, then the simulator executes those calls locally. Grading still comes from the deterministic evaluator, not from the model.
 
 ## Evaluation
 
