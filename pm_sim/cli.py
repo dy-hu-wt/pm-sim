@@ -6,6 +6,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .actions import (
+    list_tasks,
+    read_doc,
+    schedule_meeting,
+    send_chat,
+    send_email,
+    update_task,
+)
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .scenario import ScenarioError
 from .state import action_log, event_log, observe, reset
@@ -53,6 +61,45 @@ def _build_parser() -> argparse.ArgumentParser:
 
     observe_parser = subparsers.add_parser("observe", help="Print current observation.")
     observe_parser.set_defaults(func=lambda args: observe(args.db))
+
+    tasks_parser = subparsers.add_parser("list-tasks", help="List project tasks.")
+    tasks_parser.set_defaults(func=lambda args: list_tasks(args.db))
+
+    read_doc_parser = subparsers.add_parser("read-doc", help="Read a visible document.")
+    read_doc_parser.add_argument("doc_id")
+    read_doc_parser.set_defaults(func=lambda args: read_doc(args.db, args.doc_id))
+
+    chat_parser = subparsers.add_parser("send-chat", help="Send a chat to a coworker.")
+    chat_parser.add_argument("person_id")
+    chat_parser.add_argument("body")
+    chat_parser.set_defaults(func=lambda args: send_chat(args.db, args.person_id, args.body))
+
+    email_parser = subparsers.add_parser("send-email", help="Send an email to a coworker.")
+    email_parser.add_argument("person_id")
+    email_parser.add_argument("subject")
+    email_parser.add_argument("body")
+    email_parser.set_defaults(
+        func=lambda args: send_email(args.db, args.person_id, args.subject, args.body)
+    )
+
+    update_task_parser = subparsers.add_parser("update-task", help="Update task status or priority.")
+    update_task_parser.add_argument("task_id")
+    update_task_parser.add_argument("--status")
+    update_task_parser.add_argument("--priority")
+    update_task_parser.set_defaults(
+        func=lambda args: update_task(args.db, args.task_id, args.status, args.priority)
+    )
+
+    meeting_parser = subparsers.add_parser("schedule-meeting", help="Schedule a meeting.")
+    meeting_parser.add_argument("title")
+    meeting_parser.add_argument("start_at")
+    meeting_parser.add_argument("end_at")
+    meeting_parser.add_argument("attendees", nargs="+")
+    meeting_parser.set_defaults(
+        func=lambda args: schedule_meeting(
+            args.db, args.title, args.start_at, args.end_at, args.attendees
+        )
+    )
 
     log_parser = subparsers.add_parser("log", help="Print recent action log.")
     log_parser.add_argument("--limit", type=int, default=20)

@@ -4,9 +4,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from pm_sim.actions import list_tasks, read_doc, send_chat, send_email, update_task
 from pm_sim.coworkers import effects_for_event, replies_for_chat
+from pm_sim.db import connect
+from pm_sim.effects import apply_effects
+from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
-from pm_sim.state import observe, reset
+from pm_sim.state import event_log, observe, reset
 from pm_sim.time import advance_time
 
 
@@ -53,7 +57,20 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(result["to"], "2026-06-23T10:00:00")
         self.assertEqual(len(result["delivered_events"]), 1)
         self.assertEqual(result["delivered_events"][0]["id"], "event_mario_full_report_push")
+        self.assertTrue(result["delivered_events"][0]["result"]["handled"])
         self.assertEqual(state["current_time"], "2026-06-23T10:00:00")
+
+    def test_background_event_applies_coworker_effects(self) -> None:
+        advance_time(self.db_path, "to:2026-06-25T10:00:00")
+        state = observe(self.db_path)
+
+        blocker_ids = {blocker["id"] for blocker in state["known_blockers"]}
+        fact_ids = {fact["id"] for fact in state["discovered_facts"]}
+        recent_bodies = [message["body"] for message in state["recent_messages"]]
+
+        self.assertIn("blocker_crm_sync_flaky", blocker_ids)
+        self.assertIn("fact_crm_sync_flaky", fact_ids)
+        self.assertTrue(any("CRM enrichment sync" in body for body in recent_bodies))
 
 
 class CoworkerRuleTests(unittest.TestCase):
@@ -78,6 +95,164 @@ class CoworkerRuleTests(unittest.TestCase):
         self.assertGreaterEqual(len(effects), 3)
         self.assertEqual(effects[0]["type"], "create_message")
         self.assertIn("CRM enrichment sync", effects[0]["body"])
+
+
+class EffectApplicationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.tmpdir.name) / "test.db"
+        reset(self.db_path, DEFAULT_SCENARIO_PATH)
+
+    def tearDown(self) -> None:
+        self.tmpdir.cleanup()
+
+    def test_apply_effects_mutates_supported_state(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            applied = apply_effects(
+                conn,
+                [
+                    {
+                        "type": "create_message",
+                        "sender_id": "luigi",
+                        "recipient_id": "agent",
+                        "body": "CRM sync is risky.",
+                    },
+                    {
+                        "type": "discover_fact",
+                        "fact_id": "fact_crm_sync_flaky",
+                    },
+                    {
+                        "type": "update_blocker",
+                        "blocker_id": "blocker_crm_sync_flaky",
+                        "status": "surfaced",
+                    },
+                    {
+                        "type": "update_task",
+                        "task_id": "task_fallback_design",
+                        "status": "in_progress",
+                    },
+                    {
+                        "type": "update_project",
+                        "project_id": "project_exec_health_report",
+                        "decision": "fallback_report_approved",
+                    },
+                    {
+                        "type": "add_evaluation_evidence",
+                        "key": "blocker_discovered",
+                        "note": "Luigi disclosed CRM risk.",
+                    },
+                ],
+                now="2026-06-22T11:00:00",
+                source="test",
+            )
+            conn.commit()
+
+            self.assertEqual(len(applied), 6)
+            fact = conn.execute(
+                "SELECT discovered_at FROM facts WHERE id = 'fact_crm_sync_flaky'"
+            ).fetchone()
+            blocker = conn.execute(
+                "SELECT status, discovered_at FROM blockers WHERE id = 'blocker_crm_sync_flaky'"
+            ).fetchone()
+            task = conn.execute(
+                "SELECT status FROM tasks WHERE id = 'task_fallback_design'"
+            ).fetchone()
+            project = conn.execute(
+                "SELECT metadata_json FROM projects WHERE id = 'project_exec_health_report'"
+            ).fetchone()
+            evidence = conn.execute(
+                "SELECT evidence_key FROM evaluation_evidence WHERE evidence_key = 'blocker_discovered'"
+            ).fetchone()
+
+            self.assertEqual(fact["discovered_at"], "2026-06-22T11:00:00")
+            self.assertEqual(blocker["status"], "surfaced")
+            self.assertEqual(blocker["discovered_at"], "2026-06-22T11:00:00")
+            self.assertEqual(task["status"], "in_progress")
+            self.assertEqual(loads(project["metadata_json"])["decision"], "fallback_report_approved")
+            self.assertEqual(evidence["evidence_key"], "blocker_discovered")
+        finally:
+            conn.close()
+
+    def test_coworker_reply_event_creates_message_and_applies_attached_effects(self) -> None:
+        send_chat(self.db_path, "luigi", "Any CRM sync blockers for launch?")
+
+        result = advance_time(self.db_path, "2h")
+        state = observe(self.db_path)
+
+        self.assertEqual(result["delivered_events"][0]["event_type"], "coworker_reply")
+        self.assertTrue(result["delivered_events"][0]["result"]["handled"])
+        self.assertEqual(state["recent_messages"][0]["sender_id"], "luigi")
+        self.assertIn("fact_crm_sync_flaky", {fact["id"] for fact in state["discovered_facts"]})
+
+
+class ToolActionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.tmpdir.name) / "test.db"
+        reset(self.db_path, DEFAULT_SCENARIO_PATH)
+
+    def tearDown(self) -> None:
+        self.tmpdir.cleanup()
+
+    def test_list_tasks_returns_seeded_tasks(self) -> None:
+        tasks = list_tasks(self.db_path)
+
+        task_ids = {task["id"] for task in tasks}
+        self.assertIn("task_crm_enrichment", task_ids)
+        self.assertIn("task_launch_decision", task_ids)
+
+    def test_read_doc_returns_visible_doc_body(self) -> None:
+        result = read_doc(self.db_path, "doc_project_brief")
+
+        self.assertTrue(result["ok"])
+        self.assertIn("customer success leaders", result["doc"]["body"])
+
+    def test_read_doc_blocks_invisible_doc(self) -> None:
+        result = read_doc(self.db_path, "doc_crm_retry_notes")
+
+        self.assertFalse(result["ok"])
+        self.assertIn("not visible", result["error"])
+
+    def test_send_chat_schedules_coworker_reply(self) -> None:
+        result = send_chat(self.db_path, "luigi", "Any CRM sync blockers for launch?")
+        events = event_log(self.db_path, limit=20)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(len(result["scheduled_reply_ids"]), 1)
+        reply_events = [event for event in events if event["event_type"] == "coworker_reply"]
+        self.assertEqual(len(reply_events), 1)
+        self.assertIn("CRM enrichment sync", reply_events[0]["payload_json"])
+
+    def test_send_email_records_message_without_scheduling_reply(self) -> None:
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Friday confidence",
+            "I am checking the launch risk and will follow up.",
+        )
+        state = observe(self.db_path)
+
+        self.assertTrue(result["ok"])
+        message = next(
+            message for message in state["recent_messages"] if message["id"] == result["message_id"]
+        )
+        self.assertEqual(message["channel"], "email")
+        self.assertEqual(message["recipient_id"], "daisy")
+
+    def test_update_task_changes_status_and_priority(self) -> None:
+        result = update_task(
+            self.db_path,
+            "task_launch_decision",
+            status="in_progress",
+            priority="critical",
+        )
+        tasks = list_tasks(self.db_path)
+        task = next(task for task in tasks if task["id"] == "task_launch_decision")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(task["status"], "in_progress")
+        self.assertEqual(task["priority"], "critical")
 
 
 if __name__ == "__main__":

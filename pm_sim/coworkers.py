@@ -355,9 +355,12 @@ def _update_project_decision(decision: str) -> Effect:
 
 
 def _update_pressure(metric: str, delta: int) -> Effect:
-    return {"type": "update_metric", "metric": metric, "delta": delta}
+    return {
+        "type": "update_project",
+        "project_id": "project_exec_health_report",
+        f"{metric}_delta": delta,
+    }
 
 
 def _add_evidence(key: str, note: str) -> Effect:
     return {"type": "add_evaluation_evidence", "key": key, "note": note}
-

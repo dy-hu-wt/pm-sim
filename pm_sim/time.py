@@ -6,7 +6,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from .coworkers import effects_for_event
 from .db import connect, rows_to_dicts
+from .effects import apply_effects
 from .jsonutil import dumps, loads
 from .paths import DEFAULT_DB_PATH
 from .state import get_current_time, log_action, set_state_value
@@ -102,12 +104,14 @@ def _deliver_event(
     event: dict[str, Any],
     delivered_at: str,
 ) -> dict[str, Any]:
-    # Specific event handlers will live next to coworker rules. Until then,
-    # delivery is still explicit and inspectable.
+    payload = loads(event["payload_json"], {})
+    source = f"event:{event['id']}"
+    effects = _effects_for_delivery(event["event_type"], payload)
+    applied_effects = apply_effects(conn, effects, now=delivered_at, source=source)
     result = {
-        "handled": False,
-        "note": "No handler registered yet.",
-        "payload": loads(event["payload_json"], {}),
+        "handled": True,
+        "payload": payload,
+        "applied_effects": applied_effects,
     }
     conn.execute(
         """
@@ -124,6 +128,23 @@ def _deliver_event(
         "delivered_at": delivered_at,
         "result": result,
     }
+
+
+def _effects_for_delivery(event_type: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
+    if event_type == "coworker_reply":
+        return [
+            {
+                "type": "create_message",
+                "channel": payload.get("channel", "chat"),
+                "sender_id": payload["person_id"],
+                "recipient_id": payload.get("recipient_id", "agent"),
+                "subject": payload.get("subject"),
+                "body": payload.get("body", ""),
+            },
+            *payload.get("effects", []),
+        ]
+
+    return effects_for_event(event_type, payload)
 
 
 def _next_action_number(conn: sqlite3.Connection) -> int:

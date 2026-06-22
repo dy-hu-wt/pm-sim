@@ -4,6 +4,14 @@
 
 The first scenario is Mushroom Metrics launching an Executive Health Report for Fireflower CRM's Friday renewal meeting. The project has stakeholder pressure, task dependencies, hidden CRM sync risk, and a full-report versus fallback-report tradeoff.
 
+## Scenario
+
+The included scenario is `launch_readiness`.
+
+Mushroom Metrics is a B2B SaaS company preparing an Executive Health Report for Fireflower CRM's Friday renewal meeting. The full report depends on a flaky CRM enrichment sync, while a fallback report using reliable internal usage and support data is safer but less complete.
+
+The agent's job is to discover the CRM risk, align Mario, Luigi, Peach, Daisy, and Toad, clarify scope, and improve the Friday launch outcome.
+
 ## Setup
 
 Use Python 3.9 or newer. No package install is required for the current backend.
@@ -28,12 +36,28 @@ python3 -m pm_sim.cli reset --scenario scenarios/launch_readiness.json
 
 This creates `data/current.db`, which is ignored by git.
 
-## Drive The Flow
+## Commands
 
 Inspect the current visible state:
 
 ```bash
 python3 -m pm_sim.cli observe
+```
+
+Read tasks and docs:
+
+```bash
+python3 -m pm_sim.cli list-tasks
+python3 -m pm_sim.cli read-doc doc_project_brief
+```
+
+Send messages and update work:
+
+```bash
+python3 -m pm_sim.cli send-chat luigi "Any CRM sync blockers for launch?"
+python3 -m pm_sim.cli send-email daisy "Friday confidence" "I am checking launch risk and will follow up."
+python3 -m pm_sim.cli update-task task_launch_decision --status in_progress
+python3 -m pm_sim.cli schedule-meeting "Fallback decision" 2026-06-24T10:00:00 2026-06-24T10:30:00 mario luigi daisy toad
 ```
 
 Inspect scheduled and delivered background events:

@@ -452,7 +452,7 @@
       "title": "Executive Health Report Project Brief",
       "kind": "brief",
       "visible": true,
-      "body": "Goal: give customer success leaders an executive-ready report before renewal meetings. Friday pilot: Fireflower CRM. Full report fields: usage trends, seat adoption, support ticket volume, renewal risk, CRM account tier, CRM renewal date, and customer health summary. Fallback report fields: usage trends, seat adoption, support ticket volume, renewal risk, and customer health summary."
+      "body": "Executive Health Report goal: give customer success leaders an executive-ready report before renewal meetings. Friday pilot: Fireflower CRM. Full report fields: usage trends, seat adoption, support ticket volume, renewal risk, CRM account tier, CRM renewal date, and customer health summary. Fallback report fields: usage trends, seat adoption, support ticket volume, renewal risk, and customer health summary."
     },
     {
       "id": "doc_monday_standup",
@@ -476,7 +476,7 @@
   "messages": [
     {
       "id": "msg_initial_mario",
-      "sent_at": "2026-06-22T09:05:00",
+      "sent_at": "2026-06-22T08:50:00",
       "channel": "chat",
       "sender_id": "mario",
       "recipient_id": "agent",
@@ -485,7 +485,7 @@
     },
     {
       "id": "msg_initial_daisy",
-      "sent_at": "2026-06-22T09:15:00",
+      "sent_at": "2026-06-22T08:55:00",
       "channel": "email",
       "sender_id": "daisy",
       "recipient_id": "agent",
