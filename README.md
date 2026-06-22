@@ -84,6 +84,10 @@ Expected evaluation result before the Friday deadline: `110 / 110`. The importan
 
 The path demonstrates good PM behavior by turning a hidden technical risk into a clear launch tradeoff, aligning the customer-facing owner, unblocking implementation work, and getting an explicit decision before the deadline.
 
+## Bad-Path Sanity Check
+
+The evaluator is not counting messages or task updates. A busywork path that sends vague chats, moves tasks to `in_progress`, and sends Daisy a generic status email will still miss evidence such as `customer_message_ready`, `draft_mode_approved`, and the security interruption. The test suite covers this as `test_busywork_does_not_score_like_good_pm_work`.
+
 ## Commands
 
 Commands print human-readable output by default. Add `--json` before the command for machine-readable output.

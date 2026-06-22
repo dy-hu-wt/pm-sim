@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import copy
 import contextlib
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -22,9 +24,59 @@ from pm_sim.evaluator import evaluate
 from pm_sim.effects import apply_effects
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
+from pm_sim.scenario import ScenarioError, load_scenario
 from pm_sim.state import event_log, observe, reset
 from pm_sim.time import advance_time
 from pm_sim.timeline import timeline
+
+
+class ScenarioValidationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.base = load_scenario(DEFAULT_SCENARIO_PATH)
+        self.tmpdir = tempfile.TemporaryDirectory()
+
+    def tearDown(self) -> None:
+        self.tmpdir.cleanup()
+
+    def test_invalid_task_owner_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        scenario["tasks"][0]["owner_id"] = "unknown_person"
+
+        with self.assertRaises(ScenarioError):
+            load_scenario(self._write_scenario(scenario))
+
+    def test_invalid_dependency_task_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        scenario["dependencies"][0]["upstream_task_id"] = "missing_task"
+
+        with self.assertRaises(ScenarioError):
+            load_scenario(self._write_scenario(scenario))
+
+    def test_invalid_event_project_payload_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        scenario["events"][0]["payload"]["project_id"] = "missing_project"
+
+        with self.assertRaises(ScenarioError):
+            load_scenario(self._write_scenario(scenario))
+
+    def test_duplicate_ids_raise_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        scenario["events"][1]["id"] = scenario["events"][0]["id"]
+
+        with self.assertRaises(ScenarioError):
+            load_scenario(self._write_scenario(scenario))
+
+    def test_event_before_start_time_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        scenario["events"][0]["scheduled_at"] = "2026-06-22T08:59:00"
+
+        with self.assertRaises(ScenarioError):
+            load_scenario(self._write_scenario(scenario))
+
+    def _write_scenario(self, scenario: dict[str, Any]) -> Path:
+        path = Path(self.tmpdir.name) / "scenario.json"
+        path.write_text(json.dumps(scenario))
+        return path
 
 
 class CoreSimulationTests(unittest.TestCase):
@@ -439,8 +491,19 @@ class CoreSimulationTests(unittest.TestCase):
 
 
 class CoworkerRuleTests(unittest.TestCase):
+    def setUp(self) -> None:
+        scenario = load_scenario(DEFAULT_SCENARIO_PATH)
+        self.rules = scenario.get("coworker_rules", [])
+
+    def _state(self, facts: list[str] | None = None) -> dict[str, Any]:
+        return {"discovered_facts": facts or [], "coworker_rules": self.rules}
+
     def test_luigi_reveals_repo_sync_risk_when_asked_about_blockers(self) -> None:
-        replies = replies_for_chat("luigi", "Any blockers or repo sync stale-code risk for launch?")
+        replies = replies_for_chat(
+            "luigi",
+            "Any blockers or repo sync stale-code risk for launch?",
+            self._state(),
+        )
 
         self.assertEqual(len(replies), 1)
         self.assertIn("repo sync", replies[0].body)
@@ -457,7 +520,7 @@ class CoworkerRuleTests(unittest.TestCase):
         replies = replies_for_chat(
             "luigi",
             "Any repo sync blockers for launch?",
-            {"discovered_facts": ["fact_repo_sync_stale"]},
+            self._state(["fact_repo_sync_stale"]),
         )
 
         self.assertEqual(len(replies), 1)
@@ -465,7 +528,7 @@ class CoworkerRuleTests(unittest.TestCase):
         self.assertEqual(replies[0].effects, ())
 
     def test_luigi_does_not_reveal_hidden_risk_to_vague_status_ping(self) -> None:
-        replies = replies_for_chat("luigi", "How is your week going?")
+        replies = replies_for_chat("luigi", "How is your week going?", self._state())
 
         self.assertEqual(len(replies), 1)
         effect_types = {effect["type"] for effect in replies[0].effects}
@@ -476,12 +539,12 @@ class CoworkerRuleTests(unittest.TestCase):
         vague = replies_for_chat(
             "daisy",
             "We found some risk and are working on it.",
-            {"discovered_facts": ["fact_repo_sync_stale"]},
+            self._state(["fact_repo_sync_stale"]),
         )
         concrete = replies_for_chat(
             "daisy",
             "Repo sync has stale-code risk. Can we message reliable draft mode for Nimbus?",
-            {"discovered_facts": ["fact_repo_sync_stale"]},
+            self._state(["fact_repo_sync_stale"]),
         )
 
         self.assertEqual(vague[0].effects, ())
@@ -496,12 +559,12 @@ class CoworkerRuleTests(unittest.TestCase):
         early = replies_for_chat(
             "peach",
             "Please finalize draft-mode onboarding with human approval and no auto-commenting.",
-            {"discovered_facts": ["fact_repo_sync_stale"]},
+            self._state(["fact_repo_sync_stale"]),
         )
         ready = replies_for_chat(
             "peach",
             "Please finalize draft-mode onboarding with human approval and no auto-commenting.",
-            {"discovered_facts": ["fact_repo_sync_stale", "fact_nimbus_values_reliability"]},
+            self._state(["fact_repo_sync_stale", "fact_nimbus_values_reliability"]),
         )
 
         self.assertEqual({effect["type"] for effect in early[0].effects}, {"update_blocker"})
@@ -516,17 +579,17 @@ class CoworkerRuleTests(unittest.TestCase):
         early = replies_for_chat(
             "toad",
             "Approve draft mode for Friday?",
-            {"discovered_facts": []},
+            self._state([]),
         )
         missing_customer_context = replies_for_chat(
             "toad",
             "Repo sync can review stale commits. Approve draft mode for Friday?",
-            {"discovered_facts": ["fact_repo_sync_stale"]},
+            self._state(["fact_repo_sync_stale"]),
         )
         ready = replies_for_chat(
             "toad",
             "Repo sync can review stale commits. Approve draft mode for Friday?",
-            {"discovered_facts": ["fact_repo_sync_stale", "fact_nimbus_values_reliability"]},
+            self._state(["fact_repo_sync_stale", "fact_nimbus_values_reliability"]),
         )
 
         self.assertEqual(early[0].effects, ())
@@ -948,6 +1011,35 @@ class ToolActionTests(unittest.TestCase):
         self.assertIn("Raw source code is not stored long term", revealed["doc"]["body"])
         self.assertIsNotNone(evidence)
 
+    def test_private_repo_security_reply_is_scenario_rule_driven(self) -> None:
+        scenario = load_scenario(DEFAULT_SCENARIO_PATH)
+        scenario["coworker_rules"] = []
+        scenario_path = Path(self.tmpdir.name) / "no_coworker_rules.json"
+        scenario_path.write_text(json.dumps(scenario))
+        reset(self.db_path, scenario_path)
+
+        send_chat(
+            self.db_path,
+            "luigi",
+            "Nimbus asked if we store source code from private repos. Is there a security doc?",
+        )
+        advance_time(self.db_path, "2h")
+        revealed = read_doc(self.db_path, "doc_private_repo_security_baseline")
+        conn = connect(self.db_path)
+        try:
+            evidence = conn.execute(
+                """
+                SELECT evidence_key
+                FROM evaluation_evidence
+                WHERE evidence_key = 'security_doc_found'
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertFalse(revealed["ok"])
+        self.assertIsNone(evidence)
+
     def test_send_chat_schedules_coworker_reply(self) -> None:
         result = send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
         events = event_log(self.db_path, limit=20)
@@ -1269,6 +1361,24 @@ class EvaluatorTests(unittest.TestCase):
             ),
         )
 
+    def _project_outcome(self) -> dict[str, Any]:
+        conn = connect(self.db_path)
+        try:
+            project = conn.execute(
+                """
+                SELECT status, risk_level, metadata_json
+                FROM projects
+                WHERE id = 'project_pr_review_agent'
+                """
+            ).fetchone()
+            return {
+                "status": project["status"],
+                "risk_level": project["risk_level"],
+                "metadata": loads(project["metadata_json"]),
+            }
+        finally:
+            conn.close()
+
     def test_reset_state_scores_below_agent_improved_path(self) -> None:
         baseline = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
 
@@ -1282,6 +1392,33 @@ class EvaluatorTests(unittest.TestCase):
         }
         self.assertEqual(component_scores["blocker_discovery"], 30)
         self.assertEqual(component_scores["risk_handling"], 15)
+
+    def test_busywork_does_not_score_like_good_pm_work(self) -> None:
+        send_chat(self.db_path, "mario", "I am checking on the Friday launch.")
+        send_chat(self.db_path, "luigi", "How are things going this week?")
+        send_chat(self.db_path, "peach", "Please keep making progress on onboarding.")
+        update_task(self.db_path, "task_launch_decision", status="in_progress", priority=None)
+        update_task(self.db_path, "task_customer_talk_track", status="in_progress", priority=None)
+        send_email(
+            self.db_path,
+            "daisy",
+            "Friday status",
+            "We are actively checking on the beta and will follow up with details.",
+        )
+
+        advance_time(self.db_path, "to:2026-06-26T15:00:00")
+
+        result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        stakeholder_component = next(
+            component
+            for component in result["components"]
+            if component["key"] == "stakeholder_communication"
+        )
+        outcome = self._project_outcome()
+
+        self.assertLess(result["score"], result["max_score"])
+        self.assertIn("customer_message_ready", stakeholder_component["missing_evidence"])
+        self.assertNotEqual(outcome["metadata"]["final_outcome"], "draft_mode_beta_shipped")
 
     def test_late_evidence_gets_partial_timing_credit(self) -> None:
         advance_time(self.db_path, "to:2026-06-25T10:00:00")

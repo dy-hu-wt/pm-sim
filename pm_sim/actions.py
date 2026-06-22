@@ -10,7 +10,7 @@ from .db import connect, row_to_dict, rows_to_dicts
 from .effects import apply_effects
 from .jsonutil import dumps, loads
 from .paths import DEFAULT_DB_PATH
-from .state import AGENT_ID, get_current_time, log_action
+from .state import AGENT_ID, get_current_time, get_state_value, log_action
 
 EMAIL_RISK_TERMS = frozenset(
     {"risk", "blocker", "blocked", "repo", "sync", "stale", "commit", "webhook"}
@@ -556,7 +556,11 @@ def _behavior_state(conn: sqlite3.Connection) -> dict[str, Any]:
         WHERE discovered_at IS NOT NULL
         """
     ).fetchall()
-    return {"discovered_facts": [row["id"] for row in facts]}
+    rules = loads(get_state_value(conn, "coworker_rules_json") or "[]", [])
+    return {
+        "discovered_facts": [row["id"] for row in facts],
+        "coworker_rules": rules,
+    }
 
 
 def _get_person(conn: sqlite3.Connection, person_id: str) -> dict[str, Any] | None:

@@ -631,6 +631,521 @@
       }
     }
   ],
+  "coworker_rules": [
+    {
+      "id": "luigi_private_repo_security_doc",
+      "person_id": "luigi",
+      "channel": "chat",
+      "priority": 120,
+      "match": {
+        "terms_any": [
+          "security",
+          "private repo",
+          "private repos",
+          "source code",
+          "store source",
+          "stored",
+          "retention",
+          "data",
+          "privacy",
+          "github app",
+          "permissions"
+        ]
+      },
+      "reply": {
+        "delay_minutes": 120,
+        "body": "Use the private repo security baseline doc before answering Daisy. Short version: we process source snippets transiently for review generation, do not store raw source long term, and retain generated draft suggestions plus metadata for the beta audit window."
+      },
+      "effects": [
+        {
+          "type": "reveal_doc",
+          "doc_id": "doc_private_repo_security_baseline"
+        },
+        {
+          "type": "add_evaluation_evidence",
+          "key": "security_doc_found",
+          "note": "Luigi pointed the agent to the private repo security baseline."
+        }
+      ]
+    },
+    {
+      "id": "luigi_repeat_repo_sync_risk",
+      "person_id": "luigi",
+      "channel": "chat",
+      "priority": 110,
+      "match": {
+        "required_facts": [
+          "fact_repo_sync_stale"
+        ],
+        "terms_any": [
+          "blocker",
+          "blocked",
+          "risk",
+          "risks",
+          "ready",
+          "readiness",
+          "repo",
+          "repository",
+          "sync",
+          "webhook",
+          "webhooks",
+          "commit",
+          "stale",
+          "auto-comment",
+          "auto-commenting"
+        ]
+      },
+      "reply": {
+        "delay_minutes": 120,
+        "body": "Same repo sync risk as before: the review context pipeline is solid, but webhook ordering can still make the agent review a stale commit. I still recommend draft mode unless Toad accepts the auto-commenting risk."
+      },
+      "effects": []
+    },
+    {
+      "id": "luigi_reveals_repo_sync_risk",
+      "person_id": "luigi",
+      "channel": "chat",
+      "priority": 100,
+      "match": {
+        "absent_facts": [
+          "fact_repo_sync_stale"
+        ],
+        "terms_any": [
+          "blocker",
+          "blocked",
+          "risk",
+          "risks",
+          "ready",
+          "readiness",
+          "repo",
+          "repository",
+          "sync",
+          "webhook",
+          "webhooks",
+          "commit",
+          "stale",
+          "auto-comment",
+          "auto-commenting"
+        ]
+      },
+      "reply": {
+        "delay_minutes": 120,
+        "body": "The risky part is repo sync. The review context pipeline is solid, but webhook events can arrive out of order, so the agent may review a stale commit on Friday. I can keep hardening the worker, but I recommend draft mode unless Toad accepts the auto-commenting risk."
+      },
+      "effects": [
+        {
+          "type": "discover_fact",
+          "fact_id": "fact_repo_sync_stale",
+          "source": "luigi_chat_reply"
+        },
+        {
+          "type": "discover_fact",
+          "fact_id": "fact_draft_mode_limits_customer_visible_risk",
+          "source": "luigi_chat_reply"
+        },
+        {
+          "type": "update_blocker",
+          "blocker_id": "blocker_repo_sync_stale",
+          "status": "surfaced"
+        },
+        {
+          "type": "update_project",
+          "project_id": "project_pr_review_agent",
+          "launch_conflict": {
+            "status": "investigated",
+            "inputs": {
+              "technical_risk_substantiated": true
+            }
+          }
+        },
+        {
+          "type": "add_evaluation_evidence",
+          "key": "blocker_discovered",
+          "note": "Luigi disclosed stale repo sync risk."
+        }
+      ]
+    },
+    {
+      "id": "luigi_default_status",
+      "person_id": "luigi",
+      "channel": "chat",
+      "priority": 0,
+      "match": {},
+      "reply": {
+        "delay_minutes": 120,
+        "body": "I am working on repo sync hardening. If you need launch confidence, ask me specifically about stale-code or auto-commenting risk."
+      },
+      "effects": []
+    },
+    {
+      "id": "mario_accepts_draft_if_risk_known",
+      "person_id": "mario",
+      "channel": "chat",
+      "priority": 100,
+      "match": {
+        "required_facts": [
+          "fact_repo_sync_stale"
+        ]
+      },
+      "reply": {
+        "delay_minutes": 60,
+        "body": "Auto-commenting is still the strongest product story, but I do not want a Friday demo failure. If Luigi's stale-code risk is real, align Daisy and Toad on draft mode and keep auto-commenting as a follow-up."
+      },
+      "effects": [
+        {
+          "type": "update_project",
+          "project_id": "project_pr_review_agent",
+          "launch_conflict": {
+            "status": "investigated",
+            "inputs": {
+              "product_pressure_acknowledged": true
+            }
+          }
+        },
+        {
+          "type": "add_evaluation_evidence",
+          "key": "stakeholder_alignment",
+          "note": "Mario accepted draft mode if repo sync risk is confirmed."
+        }
+      ]
+    },
+    {
+      "id": "mario_accepts_draft_if_risk_message_is_concrete",
+      "person_id": "mario",
+      "channel": "chat",
+      "priority": 90,
+      "match": {
+        "terms_any": [
+          "risk",
+          "blocker",
+          "fallback",
+          "draft",
+          "repo",
+          "sync",
+          "stale",
+          "commit"
+        ]
+      },
+      "reply": {
+        "delay_minutes": 60,
+        "body": "Auto-commenting is still the strongest product story, but I do not want a Friday demo failure. If Luigi's stale-code risk is real, align Daisy and Toad on draft mode and keep auto-commenting as a follow-up."
+      },
+      "effects": [
+        {
+          "type": "update_project",
+          "project_id": "project_pr_review_agent",
+          "launch_conflict": {
+            "status": "investigated",
+            "inputs": {
+              "product_pressure_acknowledged": true
+            }
+          }
+        },
+        {
+          "type": "add_evaluation_evidence",
+          "key": "stakeholder_alignment",
+          "note": "Mario accepted draft mode if repo sync risk is confirmed."
+        }
+      ]
+    },
+    {
+      "id": "mario_default_auto_comment_push",
+      "person_id": "mario",
+      "channel": "chat",
+      "priority": 0,
+      "match": {},
+      "reply": {
+        "delay_minutes": 60,
+        "body": "Please push for the auto-commenting beta. Nimbus needs to see the agent comment on pull requests if we can possibly ship it."
+      },
+      "effects": [
+        {
+          "type": "update_project",
+          "project_id": "project_pr_review_agent",
+          "launch_conflict": {
+            "status": "investigated",
+            "inputs": {
+              "product_pressure_acknowledged": true
+            }
+          }
+        },
+        {
+          "type": "update_project",
+          "project_id": "project_pr_review_agent",
+          "scope_pressure_delta": 1
+        }
+      ]
+    },
+    {
+      "id": "daisy_aligns_on_customer_safe_draft_mode",
+      "person_id": "daisy",
+      "channel": "chat",
+      "priority": 100,
+      "match": {
+        "term_groups_all": [
+          [
+            "risk",
+            "repo",
+            "sync",
+            "stale",
+            "commit",
+            "webhook",
+            "blocked"
+          ],
+          [
+            "fallback",
+            "draft",
+            "draft-mode",
+            "reliable",
+            "human approval"
+          ],
+          [
+            "nimbus",
+            "customer",
+            "friday",
+            "beta",
+            "pilot"
+          ]
+        ]
+      },
+      "reply": {
+        "delay_minutes": 45,
+        "body": "For Nimbus, reliability matters more than auto-posting comments. I can message draft mode as a safer beta if you give me clear language by Thursday morning."
+      },
+      "effects": [
+        {
+          "type": "add_evaluation_evidence",
+          "key": "stakeholder_alignment",
+          "note": "Daisy supported reliable draft mode with clear messaging."
+        },
+        {
+          "type": "discover_fact",
+          "fact_id": "fact_nimbus_values_reliability",
+          "source": "daisy_chat_reply"
+        },
+        {
+          "type": "update_project",
+          "project_id": "project_pr_review_agent",
+          "launch_conflict": {
+            "status": "investigated",
+            "inputs": {
+              "customer_constraint_known": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "daisy_asks_for_customer_safe_wording",
+      "person_id": "daisy",
+      "channel": "chat",
+      "priority": 50,
+      "match": {
+        "required_facts": [
+          "fact_repo_sync_stale"
+        ],
+        "terms_any": [
+          "risk",
+          "repo",
+          "sync",
+          "stale",
+          "commit",
+          "webhook",
+          "blocked",
+          "fallback",
+          "draft",
+          "draft-mode",
+          "reliable",
+          "human approval"
+        ]
+      },
+      "reply": {
+        "delay_minutes": 45,
+        "body": "I understand there is launch risk, but I still need customer-safe wording: what Nimbus will see Friday, whether comments post automatically, and what limitation remains."
+      },
+      "effects": []
+    },
+    {
+      "id": "daisy_default_confidence_request",
+      "person_id": "daisy",
+      "channel": "chat",
+      "priority": 0,
+      "match": {},
+      "reply": {
+        "delay_minutes": 45,
+        "body": "Nimbus expects the beta on Friday. I need to know what we can confidently show them and what language I should use with their team."
+      },
+      "effects": []
+    },
+    {
+      "id": "peach_unblocks_draft_mode_docs",
+      "person_id": "peach",
+      "channel": "chat",
+      "priority": 100,
+      "match": {
+        "required_facts_any": [
+          "fact_nimbus_values_reliability",
+          "fact_draft_mode_approved"
+        ],
+        "term_groups_all": [
+          [
+            "fallback",
+            "draft",
+            "draft mode",
+            "draft-mode"
+          ],
+          [
+            "human approval",
+            "approval"
+          ],
+          [
+            "without auto",
+            "no auto-commenting",
+            "not auto-commenting",
+            "auto-commenting is follow-up"
+          ]
+        ]
+      },
+      "reply": {
+        "delay_minutes": 90,
+        "body": "That unblocks the onboarding work. I will finalize the draft-mode flow with human approval before comments are posted and a clear note that auto-commenting is follow-up."
+      },
+      "effects": [
+        {
+          "type": "discover_fact",
+          "fact_id": "fact_draft_mode_scope_confirmed",
+          "source": "peach_chat_reply"
+        },
+        {
+          "type": "update_task",
+          "task_id": "task_draft_mode_docs",
+          "status": "in_progress"
+        },
+        {
+          "type": "update_blocker",
+          "blocker_id": "blocker_scope_unclear",
+          "status": "resolved"
+        },
+        {
+          "type": "update_project",
+          "project_id": "project_pr_review_agent",
+          "launch_conflict": {
+            "status": "investigated",
+            "inputs": {
+              "implementation_scope_clear": true
+            }
+          }
+        },
+        {
+          "type": "add_evaluation_evidence",
+          "key": "peach_unblocked",
+          "note": "Draft-mode scope clarified for Peach."
+        }
+      ]
+    },
+    {
+      "id": "peach_default_scope_blocked",
+      "person_id": "peach",
+      "channel": "chat",
+      "priority": 0,
+      "match": {},
+      "reply": {
+        "delay_minutes": 90,
+        "body": "I am still blocked on onboarding. I need the Friday launch mode, human-approval requirement, and auto-commenting limitation made explicit before I can finish the draft-mode flow."
+      },
+      "effects": [
+        {
+          "type": "update_blocker",
+          "blocker_id": "blocker_scope_unclear",
+          "status": "surfaced"
+        }
+      ]
+    },
+    {
+      "id": "toad_approves_friday_draft_mode",
+      "person_id": "toad",
+      "channel": "chat",
+      "priority": 100,
+      "match": {
+        "required_facts": [
+          "fact_repo_sync_stale",
+          "fact_nimbus_values_reliability"
+        ],
+        "term_groups_all": [
+          [
+            "draft",
+            "draft-mode",
+            "fallback",
+            "de-scope",
+            "descope"
+          ],
+          [
+            "friday",
+            "launch",
+            "nimbus",
+            "beta",
+            "pilot"
+          ],
+          [
+            "repo",
+            "sync",
+            "stale",
+            "commit",
+            "risk",
+            "webhook",
+            "auto-commenting"
+          ]
+        ]
+      },
+      "reply": {
+        "delay_minutes": 90,
+        "body": "Approved to de-scope auto-commenting for Friday. Ship draft mode with human approval, keep Luigi on repo sync hardening, and document auto-commenting as the follow-up."
+      },
+      "effects": [
+        {
+          "type": "discover_fact",
+          "fact_id": "fact_draft_mode_approved",
+          "source": "toad_chat_reply"
+        },
+        {
+          "type": "update_project",
+          "project_id": "project_pr_review_agent",
+          "decision": "draft_mode_approved"
+        },
+        {
+          "type": "update_project",
+          "project_id": "project_pr_review_agent",
+          "launch_conflict": {
+            "status": "resolved",
+            "final_launch_mode": "draft_mode",
+            "resolution": "draft_mode"
+          }
+        },
+        {
+          "type": "update_blocker",
+          "blocker_id": "blocker_launch_scope_decision",
+          "status": "resolved"
+        },
+        {
+          "type": "add_evaluation_evidence",
+          "key": "draft_mode_approved",
+          "note": "Toad approved Friday draft mode after stale-code risk was raised."
+        }
+      ]
+    },
+    {
+      "id": "toad_default_needs_evidence",
+      "person_id": "toad",
+      "channel": "chat",
+      "priority": 0,
+      "match": {},
+      "reply": {
+        "delay_minutes": 90,
+        "body": "I need the concrete launch risk, customer impact, and safer Friday scope before approving any de-scope. Bring me Luigi's blocker and Daisy's customer-facing constraint."
+      },
+      "effects": []
+    }
+  ],
   "evaluation_targets": {
     "blocker_discovery": {
       "points": 30,

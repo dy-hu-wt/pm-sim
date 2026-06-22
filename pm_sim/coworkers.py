@@ -89,41 +89,75 @@ SCOPE_TERMS = frozenset(
     }
 )
 
-SECURITY_TERMS = frozenset(
-    {
-        "security",
-        "private repo",
-        "private repos",
-        "source code",
-        "store source",
-        "stored",
-        "retention",
-        "data",
-        "privacy",
-        "github app",
-        "permissions",
-    }
-)
-
-
 def replies_for_chat(
     person_id: str, body: str, state: dict[str, Any] | None = None
 ) -> list[CoworkerReply]:
     person_id = person_id.lower()
     normalized = _normalize(body)
     state = state or {}
+    structured_replies = _structured_replies_for_chat(person_id, normalized, state)
+    return structured_replies[:1]
 
-    if person_id == "luigi":
-        return [_luigi_reply(normalized, state)]
-    if person_id == "mario":
-        return [_mario_reply(normalized, state)]
-    if person_id == "peach":
-        return [_peach_reply(normalized, state)]
-    if person_id == "daisy":
-        return [_daisy_reply(normalized, state)]
-    if person_id == "toad":
-        return [_toad_reply(normalized, state)]
-    return []
+
+def _structured_replies_for_chat(
+    person_id: str,
+    normalized: str,
+    state: dict[str, Any],
+) -> list[CoworkerReply]:
+    replies = []
+    rules = sorted(
+        state.get("coworker_rules", []),
+        key=lambda rule: int(rule.get("priority", 0)),
+        reverse=True,
+    )
+    for rule in rules:
+        if rule.get("channel", "chat") != "chat":
+            continue
+        if rule.get("person_id", "").lower() != person_id:
+            continue
+        if not _rule_matches(rule.get("match", rule), normalized, state):
+            continue
+
+        reply = rule.get("reply", {})
+        replies.append(
+            CoworkerReply(
+                person_id=person_id,
+                delay_minutes=int(reply.get("delay_minutes", RESPONSE_DELAYS_MINUTES.get(person_id, 60))),
+                body=reply.get("body", ""),
+                effects=tuple(dict(effect) for effect in rule.get("effects", [])),
+            )
+        )
+    return replies
+
+
+def _rule_matches(match: dict[str, Any], normalized: str, state: dict[str, Any]) -> bool:
+    terms_any = {_normalize(term) for term in match.get("terms_any", [])}
+    if terms_any and not _mentions_any(normalized, terms_any):
+        return False
+
+    terms_all = {_normalize(term) for term in match.get("terms_all", [])}
+    if terms_all and not all(term in normalized for term in terms_all):
+        return False
+
+    for group in match.get("term_groups_all", []):
+        terms = {_normalize(term) for term in group}
+        if not terms or not _mentions_any(normalized, terms):
+            return False
+
+    discovered = set(state.get("discovered_facts", ()))
+    required_facts = set(match.get("required_facts", []))
+    if required_facts and not required_facts.issubset(discovered):
+        return False
+
+    required_facts_any = set(match.get("required_facts_any", []))
+    if required_facts_any and not discovered.intersection(required_facts_any):
+        return False
+
+    absent_facts = set(match.get("absent_facts", []))
+    if absent_facts and discovered.intersection(absent_facts):
+        return False
+
+    return True
 
 
 def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
@@ -378,250 +412,6 @@ def effects_for_meeting(payload: dict[str, Any], state: dict[str, Any] | None = 
     return effects
 
 
-def _luigi_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
-    # Backend owner: knows the hidden stale repo-sync risk.
-    if _mentions_any(normalized, SECURITY_TERMS):
-        return CoworkerReply(
-            person_id="luigi",
-            delay_minutes=RESPONSE_DELAYS_MINUTES["luigi"],
-            body=(
-                "Use the private repo security baseline doc before answering Daisy. "
-                "Short version: we process source snippets transiently for review "
-                "generation, do not store raw source long term, and retain generated "
-                "draft suggestions plus metadata for the beta audit window."
-            ),
-            effects=(
-                _reveal_doc("doc_private_repo_security_baseline"),
-                _add_evidence(
-                    "security_doc_found",
-                    "Luigi pointed the agent to the private repo security baseline.",
-                ),
-            ),
-        )
-
-    if _mentions_any(normalized, LUIGI_RISK_INQUIRY_TERMS):
-        if _state_has_fact(state, "fact_repo_sync_stale"):
-            return CoworkerReply(
-                person_id="luigi",
-                delay_minutes=RESPONSE_DELAYS_MINUTES["luigi"],
-                body=(
-                    "Same repo sync risk as before: the review context pipeline "
-                    "is solid, but webhook ordering can still make the agent "
-                    "review a stale commit. I still recommend draft mode unless "
-                    "Toad accepts the auto-commenting risk."
-                ),
-            )
-
-        return CoworkerReply(
-            person_id="luigi",
-            delay_minutes=RESPONSE_DELAYS_MINUTES["luigi"],
-            body=(
-                "The risky part is repo sync. The review context pipeline is "
-                "solid, but webhook events can arrive out of order, so the "
-                "agent may review a stale commit on Friday. I can keep "
-                "hardening the worker, but I recommend draft mode unless Toad "
-                "accepts the auto-commenting risk."
-            ),
-            effects=(
-                _discover_fact("fact_repo_sync_stale", "luigi_chat_reply"),
-                _discover_fact("fact_draft_mode_limits_customer_visible_risk", "luigi_chat_reply"),
-                _update_blocker("blocker_repo_sync_stale", "surfaced"),
-                _update_launch_conflict(
-                    status="investigated",
-                    technical_risk_substantiated=True,
-                ),
-                _add_evidence("blocker_discovered", "Luigi disclosed stale repo sync risk."),
-            ),
-        )
-
-    return CoworkerReply(
-        person_id="luigi",
-        delay_minutes=RESPONSE_DELAYS_MINUTES["luigi"],
-        body=(
-            "I am working on repo sync hardening. If you need launch "
-            "confidence, ask me specifically about stale-code or auto-commenting risk."
-        ),
-    )
-
-
-def _mario_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
-    # Product owner: prefers auto-commenting but accepts draft mode when risk is concrete.
-    risk_known = _state_has_fact(state, "fact_repo_sync_stale") or _mentions_any(
-        normalized, {"risk", "blocker", "fallback", "draft", "repo", "sync", "stale", "commit"}
-    )
-    if risk_known:
-        return CoworkerReply(
-            person_id="mario",
-            delay_minutes=RESPONSE_DELAYS_MINUTES["mario"],
-            body=(
-                "Auto-commenting is still the strongest product story, but I "
-                "do not want a Friday demo failure. If Luigi's stale-code risk "
-                "is real, align Daisy and Toad on draft mode and keep "
-                "auto-commenting as a follow-up."
-            ),
-            effects=(
-                _update_launch_conflict(
-                    status="investigated",
-                    product_pressure_acknowledged=True,
-                ),
-                _add_evidence("stakeholder_alignment", "Mario accepted draft mode if repo sync risk is confirmed."),
-            ),
-        )
-
-    return CoworkerReply(
-        person_id="mario",
-        delay_minutes=RESPONSE_DELAYS_MINUTES["mario"],
-        body=(
-            "Please push for the auto-commenting beta. Nimbus needs to see the "
-            "agent comment on pull requests if we can possibly ship it."
-        ),
-        effects=(
-            _update_launch_conflict(
-                status="investigated",
-                product_pressure_acknowledged=True,
-            ),
-            _update_pressure("scope_pressure", 1),
-        ),
-    )
-
-
-def _peach_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
-    # Design/onboarding owner: blocked until launch mode is clear.
-    draft_requested = _mentions_any(normalized, {"fallback", "draft", "draft mode", "draft-mode"})
-    human_approval_explicit = _mentions_any(normalized, {"human approval", "approval"})
-    auto_commenting_limited = _mentions_any(
-        normalized, {"without auto", "no auto-commenting", "not auto-commenting", "auto-commenting is follow-up"}
-    )
-    launch_context_exists = _state_has_fact(
-        state, "fact_nimbus_values_reliability"
-    ) or _state_has_fact(state, "fact_draft_mode_approved")
-    scope_clear = _state_has_fact(state, "fact_draft_mode_scope_confirmed") or (
-        draft_requested and human_approval_explicit and auto_commenting_limited and launch_context_exists
-    )
-    if scope_clear:
-        return CoworkerReply(
-            person_id="peach",
-            delay_minutes=RESPONSE_DELAYS_MINUTES["peach"],
-            body=(
-                "That unblocks the onboarding work. I will finalize the "
-                "draft-mode flow with human approval before comments are posted "
-                "and a clear note that auto-commenting is follow-up."
-            ),
-            effects=(
-                _discover_fact("fact_draft_mode_scope_confirmed", "peach_chat_reply"),
-                _update_task("task_draft_mode_docs", "in_progress"),
-                _update_blocker("blocker_scope_unclear", "resolved"),
-                _update_launch_conflict(
-                    status="investigated",
-                    implementation_scope_clear=True,
-                ),
-                _add_evidence("peach_unblocked", "Draft-mode scope clarified for Peach."),
-            ),
-        )
-
-    return CoworkerReply(
-        person_id="peach",
-        delay_minutes=RESPONSE_DELAYS_MINUTES["peach"],
-        body=(
-            "I am still blocked on onboarding. I need the Friday launch mode, "
-            "human-approval requirement, and auto-commenting limitation made "
-            "explicit before I can finish the draft-mode flow."
-        ),
-        effects=(_update_blocker("blocker_scope_unclear", "surfaced"),),
-    )
-
-
-def _daisy_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
-    # Customer success owner: needs reliable Nimbus messaging before Friday.
-    risk_explained = _mentions_any(
-        normalized, {"risk", "repo", "sync", "stale", "commit", "webhook", "blocked"}
-    )
-    draft_plan = _mentions_any(
-        normalized, {"fallback", "draft", "draft-mode", "reliable", "human approval"}
-    )
-    customer_context = _mentions_any(normalized, {"nimbus", "customer", "friday", "beta", "pilot"})
-    if risk_explained and draft_plan and customer_context:
-        return CoworkerReply(
-            person_id="daisy",
-            delay_minutes=RESPONSE_DELAYS_MINUTES["daisy"],
-            body=(
-                "For Nimbus, reliability matters more than auto-posting comments. "
-                "I can message draft mode as a safer beta if you give me clear "
-                "language by Thursday morning."
-            ),
-            effects=(
-                _add_evidence("stakeholder_alignment", "Daisy supported reliable draft mode with clear messaging."),
-                _discover_fact("fact_nimbus_values_reliability", "daisy_chat_reply"),
-                _update_launch_conflict(
-                    status="investigated",
-                    customer_constraint_known=True,
-                ),
-            ),
-        )
-
-    if _state_has_fact(state, "fact_repo_sync_stale") and (risk_explained or draft_plan):
-        return CoworkerReply(
-            person_id="daisy",
-            delay_minutes=RESPONSE_DELAYS_MINUTES["daisy"],
-            body=(
-                "I understand there is launch risk, but I still need customer-safe "
-                "wording: what Nimbus will see Friday, whether comments post "
-                "automatically, and what limitation remains."
-            ),
-        )
-
-    return CoworkerReply(
-        person_id="daisy",
-        delay_minutes=RESPONSE_DELAYS_MINUTES["daisy"],
-        body=(
-            "Nimbus expects the beta on Friday. I need to know what we can "
-            "confidently show them and what language I should use with their team."
-        ),
-    )
-
-
-def _toad_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
-    # Engineering manager: can approve draft mode once technical risk is explicit.
-    risk_known = _state_has_fact(state, "fact_repo_sync_stale")
-    stakeholder_aligned = _state_has_fact(state, "fact_nimbus_values_reliability")
-    draft_requested = _mentions_any(normalized, {"draft", "draft-mode", "fallback", "de-scope", "descope"})
-    friday_scope = _mentions_any(normalized, {"friday", "launch", "nimbus", "beta", "pilot"})
-    risk_referenced = _mentions_any(
-        normalized, {"repo", "sync", "stale", "commit", "risk", "webhook", "auto-commenting"}
-    )
-    if risk_known and stakeholder_aligned and draft_requested and friday_scope and risk_referenced:
-        return CoworkerReply(
-            person_id="toad",
-            delay_minutes=RESPONSE_DELAYS_MINUTES["toad"],
-            body=(
-                "Approved to de-scope auto-commenting for Friday. Ship draft "
-                "mode with human approval, keep Luigi on repo sync hardening, "
-                "and document auto-commenting as the follow-up."
-            ),
-            effects=(
-                _discover_fact("fact_draft_mode_approved", "toad_chat_reply"),
-                _update_project_decision("draft_mode_approved"),
-                _update_launch_conflict(
-                    status="resolved",
-                    final_launch_mode="draft_mode",
-                    resolution="draft_mode",
-                ),
-                _update_blocker("blocker_launch_scope_decision", "resolved"),
-                _add_evidence("draft_mode_approved", "Toad approved Friday draft mode after stale-code risk was raised."),
-            ),
-        )
-
-    return CoworkerReply(
-        person_id="toad",
-        delay_minutes=RESPONSE_DELAYS_MINUTES["toad"],
-        body=(
-            "I need the concrete launch risk, customer impact, and safer Friday "
-            "scope before approving any de-scope. Bring me Luigi's blocker and "
-            "Daisy's customer-facing constraint."
-        ),
-    )
-
-
 def _normalize(body: str) -> str:
     return " ".join(body.lower().split())
 
@@ -660,10 +450,6 @@ def _message_with_subject(
 
 def _discover_fact(fact_id: str, source: str) -> Effect:
     return {"type": "discover_fact", "fact_id": fact_id, "source": source}
-
-
-def _reveal_doc(doc_id: str) -> Effect:
-    return {"type": "reveal_doc", "doc_id": doc_id}
 
 
 def _update_blocker(blocker_id: str, status: str) -> Effect:
