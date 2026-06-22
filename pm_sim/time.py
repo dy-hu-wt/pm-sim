@@ -15,6 +15,11 @@ from .state import get_current_time, log_action, set_state_value
 
 
 _DURATION_RE = re.compile(r"^(?P<amount>\d+)(?P<unit>m|h|d)$")
+DAISY_READY_BY = "2026-06-25T10:00:00"
+PEACH_READY_BY = "2026-06-25T10:00:00"
+DRAFT_APPROVAL_BY = "2026-06-25T15:00:00"
+COMPLETED_STATUSES = {"complete", "completed", "done", "resolved"}
+UNRESOLVED_BLOCKER_STATUSES = {"open", "surfaced", "blocked"}
 
 
 def advance_time(db_path: Path | str = DEFAULT_DB_PATH, target: str = "until_next_event") -> dict[str, Any]:
@@ -159,43 +164,7 @@ def _effects_for_delivery(
 
 
 def _effects_for_friday_deadline(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    facts = _discovered_fact_ids(conn)
-    draft_approved = "fact_draft_mode_approved" in facts
-    scope_confirmed = "fact_draft_mode_scope_confirmed" in facts
-    daisy_aligned = "fact_nimbus_values_reliability" in facts or _has_evidence(
-        conn, "stakeholder_alignment"
-    )
-
-    if draft_approved and scope_confirmed and daisy_aligned:
-        outcome = {
-            "status": "shipped",
-            "risk_level": "low",
-            "final_outcome": "draft_mode_beta_shipped",
-            "summary": (
-                "The team shipped the reliable draft-mode beta for Nimbus Labs. "
-                "Auto-commenting remains follow-up work."
-            ),
-        }
-    elif draft_approved:
-        outcome = {
-            "status": "partial",
-            "risk_level": "medium",
-            "final_outcome": "draft_mode_approved_with_execution_gaps",
-            "summary": (
-                "Draft mode was approved, but scope or stakeholder alignment was "
-                "not fully closed before the Friday deadline."
-            ),
-        }
-    else:
-        outcome = {
-            "status": "missed",
-            "risk_level": "high",
-            "final_outcome": "no_approved_friday_plan",
-            "summary": (
-                "Friday arrived without an approved reliable launch plan. "
-                "Auto-commenting remains risky because repo sync can review stale code."
-            ),
-        }
+    outcome = _classify_friday_outcome(conn)
 
     return [
         {
@@ -218,6 +187,99 @@ def _effects_for_friday_deadline(conn: sqlite3.Connection) -> list[dict[str, Any
             "metadata": {"final_outcome": outcome["final_outcome"]},
         },
     ]
+
+
+def _classify_friday_outcome(conn: sqlite3.Connection) -> dict[str, str]:
+    facts = _discovered_fact_ids(conn)
+    decision = _project_decision(conn)
+    draft_approved_at = _first_fact_or_evidence_time(
+        conn,
+        "fact_draft_mode_approved",
+        "draft_mode_approved",
+    )
+    stakeholder_aligned_at = _first_fact_or_evidence_time(
+        conn,
+        "fact_nimbus_values_reliability",
+        "stakeholder_alignment",
+    )
+    customer_message_ready_at = _first_evidence_time(conn, "customer_message_ready")
+    peach_unblocked_at = _first_evidence_time(conn, "peach_unblocked")
+
+    draft_approved = draft_approved_at is not None or decision == "draft_mode_approved"
+    stale_repo_risk_unresolved = not _blocker_resolved(conn, "blocker_repo_sync_stale")
+    auto_commenting_committed = decision in {
+        "auto_commenting_approved",
+        "auto_commenting_selected",
+        "auto_commenting_committed",
+    }
+    launch_mode_chosen = decision is not None and decision != "undecided"
+
+    if auto_commenting_committed and stale_repo_risk_unresolved:
+        return {
+            "status": "shipped",
+            "risk_level": "high",
+            "final_outcome": "risky_auto_commenting",
+            "summary": (
+                "The project shipped with an auto-commenting commitment while repo sync "
+                "risk remained unresolved, leaving Nimbus exposed to stale-code comments."
+            ),
+        }
+
+    if not draft_approved and not launch_mode_chosen:
+        return {
+            "status": "missed",
+            "risk_level": "high",
+            "final_outcome": "no_approved_friday_plan",
+            "summary": (
+                "Friday arrived without an approved reliable launch plan. "
+                "Auto-commenting remains risky because repo sync can review stale code."
+            ),
+        }
+
+    customer_ready = stakeholder_aligned_at is not None and customer_message_ready_at is not None
+    onboarding_ready = _draft_mode_onboarding_ready(conn, facts)
+    if not (customer_ready and onboarding_ready):
+        return {
+            "status": "missed",
+            "risk_level": "high",
+            "final_outcome": "missed_due_to_blockers",
+            "summary": (
+                "A launch mode was chosen, but Friday execution was still blocked: "
+                "customer messaging or draft-mode onboarding was not ready."
+            ),
+        }
+
+    late_reasons = []
+    if draft_approved_at and draft_approved_at >= DRAFT_APPROVAL_BY:
+        late_reasons.append("draft approval landed after Thursday afternoon")
+    if stakeholder_aligned_at and stakeholder_aligned_at >= DAISY_READY_BY:
+        late_reasons.append("Daisy alignment landed after Thursday morning")
+    if customer_message_ready_at and customer_message_ready_at >= DAISY_READY_BY:
+        late_reasons.append("customer-ready email landed after Thursday morning")
+    if peach_unblocked_at and peach_unblocked_at >= PEACH_READY_BY:
+        late_reasons.append("Peach onboarding was unblocked after Thursday morning")
+    if late_reasons:
+        return {
+            "status": "partial",
+            "risk_level": "medium",
+            "final_outcome": "late_draft_mode",
+            "summary": (
+                "Draft mode was approved, but it landed late for a confident Friday launch: "
+                + "; ".join(late_reasons)
+                + "."
+            ),
+        }
+
+    return {
+        "status": "shipped",
+        "risk_level": "low",
+        "final_outcome": "draft_mode_beta_shipped",
+        "summary": (
+            "The team shipped the reliable draft-mode beta for Nimbus Labs. "
+            "Customer messaging was aligned, onboarding was unblocked, and "
+            "auto-commenting remained follow-up work."
+        ),
+    }
 
 
 def _discovered_fact_ids(conn: sqlite3.Connection) -> set[str]:
@@ -248,17 +310,82 @@ def _evidence_keys(conn: sqlite3.Connection) -> set[str]:
     return {row["evidence_key"] for row in rows}
 
 
-def _has_evidence(conn: sqlite3.Connection, evidence_key: str) -> bool:
+def _project_decision(conn: sqlite3.Connection) -> str | None:
     row = conn.execute(
         """
-        SELECT 1
+        SELECT metadata_json
+        FROM projects
+        WHERE id = 'project_pr_review_agent'
+        """
+    ).fetchone()
+    if row is None:
+        return None
+    metadata = loads(row["metadata_json"], {}) or {}
+    decision = metadata.get("decision")
+    return decision if isinstance(decision, str) else None
+
+
+def _blocker_resolved(conn: sqlite3.Connection, blocker_id: str) -> bool:
+    row = conn.execute("SELECT status FROM blockers WHERE id = ?", (blocker_id,)).fetchone()
+    if row is None:
+        return False
+    return row["status"].lower() not in UNRESOLVED_BLOCKER_STATUSES
+
+
+def _task_status(conn: sqlite3.Connection, task_id: str) -> str | None:
+    row = conn.execute("SELECT status FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    return None if row is None else row["status"]
+
+
+def _draft_mode_onboarding_ready(conn: sqlite3.Connection, facts: set[str]) -> bool:
+    return (
+        "fact_draft_mode_scope_confirmed" in facts
+        and _blocker_resolved(conn, "blocker_scope_unclear")
+        and _task_status(conn, "task_draft_mode_docs") in {"in_progress", *COMPLETED_STATUSES}
+    )
+
+
+def _first_fact_or_evidence_time(
+    conn: sqlite3.Connection,
+    fact_id: str,
+    evidence_key: str,
+) -> str | None:
+    times = [
+        time
+        for time in (
+            _fact_discovered_at(conn, fact_id),
+            _first_evidence_time(conn, evidence_key),
+        )
+        if time is not None
+    ]
+    return min(times) if times else None
+
+
+def _fact_discovered_at(conn: sqlite3.Connection, fact_id: str) -> str | None:
+    row = conn.execute(
+        """
+        SELECT discovered_at
+        FROM facts
+        WHERE id = ?
+          AND discovered_at IS NOT NULL
+        """,
+        (fact_id,),
+    ).fetchone()
+    return None if row is None else row["discovered_at"]
+
+
+def _first_evidence_time(conn: sqlite3.Connection, evidence_key: str) -> str | None:
+    row = conn.execute(
+        """
+        SELECT created_at
         FROM evaluation_evidence
         WHERE evidence_key = ?
+        ORDER BY created_at, id
         LIMIT 1
         """,
         (evidence_key,),
     ).fetchone()
-    return row is not None
+    return None if row is None else row["created_at"]
 
 
 def _next_action_number(conn: sqlite3.Connection) -> int:

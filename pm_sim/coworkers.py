@@ -125,6 +125,10 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
             ),
             _discover_fact("fact_repo_sync_stale", "luigi_proactive_repo_risk"),
             _update_blocker("blocker_repo_sync_stale", "surfaced"),
+            _update_launch_conflict(
+                status="investigated",
+                technical_risk_substantiated=True,
+            ),
             _add_evidence("blocker_discovered", "Luigi proactively disclosed stale repo sync risk."),
         ]
 
@@ -136,6 +140,10 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
                 "agent",
                 "Nimbus asked whether Friday's coding-agent beta is still on "
                 "track. I need a confidence update before I talk to them.",
+            ),
+            _update_launch_conflict(
+                status="investigated",
+                customer_constraint_known=True,
             ),
             _update_pressure("stakeholder_pressure", 1),
         ]
@@ -151,6 +159,10 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
                 "a clear answer before I update them Thursday morning.",
                 "Nimbus launch mode question",
             ),
+            _update_launch_conflict(
+                status="investigated",
+                customer_constraint_known=True,
+            ),
             _update_pressure("stakeholder_pressure", 1),
         ]
 
@@ -164,6 +176,10 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
                 "make it work. Please call out any launch risk clearly before "
                 "we cut scope.",
             ),
+            _update_launch_conflict(
+                status="investigated",
+                product_pressure_acknowledged=True,
+            ),
             _update_pressure("scope_pressure", 1),
         ]
 
@@ -175,6 +191,10 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
                 "agent",
                 "I am blocked on onboarding until someone confirms whether "
                 "auto-commenting or draft mode is in scope for Friday.",
+            ),
+            _update_launch_conflict(
+                status="investigated",
+                implementation_scope_clear=False,
             ),
             _update_blocker("blocker_scope_unclear", "surfaced"),
         ]
@@ -242,12 +262,24 @@ def effects_for_meeting(payload: dict[str, Any], state: dict[str, Any] | None = 
                 _discover_fact("fact_repo_sync_stale", "meeting_occurs"),
                 _discover_fact("fact_draft_mode_limits_customer_visible_risk", "meeting_occurs"),
                 _update_blocker("blocker_repo_sync_stale", "surfaced"),
+                _update_launch_conflict(
+                    status="investigated",
+                    technical_risk_substantiated=True,
+                ),
                 _add_evidence("blocker_discovered", "Meeting surfaced Luigi's stale repo sync risk."),
             ]
         )
 
     if daisy_customer_context:
-        effects.append(_discover_fact("fact_nimbus_values_reliability", "meeting_occurs"))
+        effects.extend(
+            [
+                _discover_fact("fact_nimbus_values_reliability", "meeting_occurs"),
+                _update_launch_conflict(
+                    status="investigated",
+                    customer_constraint_known=True,
+                ),
+            ]
+        )
 
     if "daisy" in attendees and risk_available and (risk_topic or draft_topic):
         effects.append(
@@ -258,20 +290,39 @@ def effects_for_meeting(payload: dict[str, Any], state: dict[str, Any] | None = 
         )
 
     if mario_accepts_draft:
-        effects.append(
-            _add_evidence(
-                "stakeholder_alignment",
-                "Mario accepted draft mode after the meeting made repo sync risk concrete.",
-            )
+        effects.extend(
+            [
+                _update_launch_conflict(
+                    status="investigated",
+                    product_pressure_acknowledged=True,
+                ),
+                _add_evidence(
+                    "stakeholder_alignment",
+                    "Mario accepted draft mode after the meeting made repo sync risk concrete.",
+                ),
+            ]
         )
     elif "mario" in attendees and meeting_has_launch_context:
-        effects.append(_update_pressure("scope_pressure", 1))
+        effects.extend(
+            [
+                _update_launch_conflict(
+                    status="investigated",
+                    product_pressure_acknowledged=True,
+                ),
+                _update_pressure("scope_pressure", 1),
+            ]
+        )
 
     if toad_can_approve:
         effects.extend(
             [
                 _discover_fact("fact_draft_mode_approved", "meeting_occurs"),
                 _update_project_decision("draft_mode_approved"),
+                _update_launch_conflict(
+                    status="resolved",
+                    final_launch_mode="draft_mode",
+                    resolution="draft_mode",
+                ),
                 _update_blocker("blocker_launch_scope_decision", "resolved"),
                 _add_evidence(
                     "draft_mode_approved",
@@ -286,6 +337,10 @@ def effects_for_meeting(payload: dict[str, Any], state: dict[str, Any] | None = 
                 _discover_fact("fact_draft_mode_scope_confirmed", "meeting_occurs"),
                 _update_task("task_draft_mode_docs", "in_progress"),
                 _update_blocker("blocker_scope_unclear", "resolved"),
+                _update_launch_conflict(
+                    status="investigated",
+                    implementation_scope_clear=True,
+                ),
                 _add_evidence("peach_unblocked", "Meeting clarified draft-mode scope for Peach."),
             ]
         )
@@ -322,6 +377,10 @@ def _luigi_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
                 _discover_fact("fact_repo_sync_stale", "luigi_chat_reply"),
                 _discover_fact("fact_draft_mode_limits_customer_visible_risk", "luigi_chat_reply"),
                 _update_blocker("blocker_repo_sync_stale", "surfaced"),
+                _update_launch_conflict(
+                    status="investigated",
+                    technical_risk_substantiated=True,
+                ),
                 _add_evidence("blocker_discovered", "Luigi disclosed stale repo sync risk."),
             ),
         )
@@ -352,6 +411,10 @@ def _mario_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
                 "auto-commenting as a follow-up."
             ),
             effects=(
+                _update_launch_conflict(
+                    status="investigated",
+                    product_pressure_acknowledged=True,
+                ),
                 _add_evidence("stakeholder_alignment", "Mario accepted draft mode if repo sync risk is confirmed."),
             ),
         )
@@ -363,7 +426,13 @@ def _mario_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
             "Please push for the auto-commenting beta. Nimbus needs to see the "
             "agent comment on pull requests if we can possibly ship it."
         ),
-        effects=(_update_pressure("scope_pressure", 1),),
+        effects=(
+            _update_launch_conflict(
+                status="investigated",
+                product_pressure_acknowledged=True,
+            ),
+            _update_pressure("scope_pressure", 1),
+        ),
     )
 
 
@@ -393,6 +462,10 @@ def _peach_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
                 _discover_fact("fact_draft_mode_scope_confirmed", "peach_chat_reply"),
                 _update_task("task_draft_mode_docs", "in_progress"),
                 _update_blocker("blocker_scope_unclear", "resolved"),
+                _update_launch_conflict(
+                    status="investigated",
+                    implementation_scope_clear=True,
+                ),
                 _add_evidence("peach_unblocked", "Draft-mode scope clarified for Peach."),
             ),
         )
@@ -430,6 +503,10 @@ def _daisy_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
             effects=(
                 _add_evidence("stakeholder_alignment", "Daisy supported reliable draft mode with clear messaging."),
                 _discover_fact("fact_nimbus_values_reliability", "daisy_chat_reply"),
+                _update_launch_conflict(
+                    status="investigated",
+                    customer_constraint_known=True,
+                ),
             ),
         )
 
@@ -475,6 +552,11 @@ def _toad_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
             effects=(
                 _discover_fact("fact_draft_mode_approved", "toad_chat_reply"),
                 _update_project_decision("draft_mode_approved"),
+                _update_launch_conflict(
+                    status="resolved",
+                    final_launch_mode="draft_mode",
+                    resolution="draft_mode",
+                ),
                 _update_blocker("blocker_launch_scope_decision", "resolved"),
                 _add_evidence("draft_mode_approved", "Toad approved Friday draft mode after stale-code risk was raised."),
             ),
@@ -541,6 +623,43 @@ def _update_task(task_id: str, status: str) -> Effect:
 
 def _update_project_decision(decision: str) -> Effect:
     return {"type": "update_project", "project_id": "project_pr_review_agent", "decision": decision}
+
+
+def _update_launch_conflict(
+    *,
+    status: str | None = None,
+    product_pressure_acknowledged: bool | None = None,
+    technical_risk_substantiated: bool | None = None,
+    customer_constraint_known: bool | None = None,
+    implementation_scope_clear: bool | None = None,
+    final_launch_mode: str | None = None,
+    resolution: str | None = None,
+) -> Effect:
+    inputs = {}
+    if product_pressure_acknowledged is not None:
+        inputs["product_pressure_acknowledged"] = product_pressure_acknowledged
+    if technical_risk_substantiated is not None:
+        inputs["technical_risk_substantiated"] = technical_risk_substantiated
+    if customer_constraint_known is not None:
+        inputs["customer_constraint_known"] = customer_constraint_known
+    if implementation_scope_clear is not None:
+        inputs["implementation_scope_clear"] = implementation_scope_clear
+
+    conflict: dict[str, Any] = {}
+    if status is not None:
+        conflict["status"] = status
+    if inputs:
+        conflict["inputs"] = inputs
+    if final_launch_mode is not None:
+        conflict["final_launch_mode"] = final_launch_mode
+    if resolution is not None:
+        conflict["resolution"] = resolution
+
+    return {
+        "type": "update_project",
+        "project_id": "project_pr_review_agent",
+        "launch_conflict": conflict,
+    }
 
 
 def _update_pressure(metric: str, delta: int) -> Effect:

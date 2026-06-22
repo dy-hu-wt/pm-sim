@@ -221,7 +221,11 @@ def _apply_update_project(conn: sqlite3.Connection, effect: dict[str, Any]) -> d
     metadata = loads(row["metadata_json"], {}) or {}
     for key, value in effect.items():
         if key not in {"type", "project_id", "status", "risk_level", "stakeholder_pressure", "deadline"}:
-            metadata[key] = value
+            if key == "launch_conflict" and isinstance(value, dict):
+                existing = metadata.get(key, {})
+                metadata[key] = _deep_merge(existing if isinstance(existing, dict) else {}, value)
+            else:
+                metadata[key] = value
 
     direct_updates.append("metadata_json = ?")
     values.append(dumps(metadata))
@@ -231,6 +235,17 @@ def _apply_update_project(conn: sqlite3.Connection, effect: dict[str, Any]) -> d
         values,
     )
     return {"project_id": project_id}
+
+
+def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in patch.items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = _deep_merge(existing, value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def _apply_update_metric(conn: sqlite3.Connection, effect: dict[str, Any]) -> dict[str, Any]:

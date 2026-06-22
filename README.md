@@ -2,13 +2,13 @@
 
 `pm-sim` is a local project-manager simulation environment. The current backend models a simulated SaaS launch week with persistent SQLite state, scheduled events, coworker rules, internal tool surfaces, and an inspectable action/event log.
 
-The first scenario is Starboard DevTools launching a PR Review Agent beta for Nimbus Labs. The project has stakeholder pressure, task dependencies, hidden repo-sync risk, and an auto-commenting versus draft-mode tradeoff.
+The first scenario is Fireflower launching a PR Review Agent beta for Nimbus Labs. The project has stakeholder pressure, task dependencies, hidden repo-sync risk, and an auto-commenting versus draft-mode tradeoff.
 
 ## Scenario
 
 The included scenario is `launch_readiness`.
 
-Starboard DevTools is a B2B SaaS company preparing a PR Review Agent beta for Nimbus Labs. The full beta would auto-post review comments on pull requests, but that depends on repo sync always using the latest commit. A safer draft mode prepares suggestions for human approval before comments are posted. During the week, Nimbus asks whether comments will auto-post, and Daisy needs rollout language before she updates them.
+Fireflower is a B2B SaaS company preparing a PR Review Agent beta for Nimbus Labs. The full beta would auto-post review comments on pull requests, but that depends on repo sync always using the latest commit. A safer draft mode prepares suggestions for human approval before comments are posted. During the week, Nimbus asks whether comments will auto-post, and Daisy needs rollout language before she updates them.
 
 The agent's job is to discover the stale-code risk, align Mario, Luigi, Peach, Daisy, and Toad, clarify scope, and improve the Friday launch outcome.
 
@@ -66,13 +66,15 @@ pm-sim advance-time 90m
 pm-sim send-chat toad "Repo sync can review stale commits. Approve draft mode for Friday?"
 pm-sim advance-time 90m
 
+pm-sim send-email daisy "Nimbus Friday draft-mode update" "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has stale-commit risk, so comments should require human approval before posting."
+
 pm-sim evaluate
 
 pm-sim advance-time to:2026-06-26T15:00:00
 pm-sim read-doc doc_friday_outcome
 ```
 
-Expected evaluation result before the Friday deadline: `100 / 100`. The important evidence is recorded through delivered coworker reply events: `blocker_discovered`, `stakeholder_alignment`, `peach_unblocked`, and `draft_mode_approved`. Advancing to Friday then records the final project outcome.
+Expected evaluation result before the Friday deadline: `100 / 100`. The important evidence is recorded through delivered coworker reply events plus the final Daisy email: `blocker_discovered`, `stakeholder_alignment`, `customer_message_ready`, `peach_unblocked`, and `draft_mode_approved`. Advancing to Friday then records the final project outcome.
 
 The path demonstrates good PM behavior by turning a hidden technical risk into a clear launch tradeoff, aligning the customer-facing owner, unblocking implementation work, and getting an explicit decision before the deadline.
 
@@ -99,7 +101,7 @@ Send messages and update work:
 
 ```bash
 pm-sim send-chat luigi "Any repo sync blockers for launch?"
-pm-sim send-email daisy "Nimbus Friday draft-mode status" "Repo sync has stale-commit risk. I recommend reliable draft mode for Friday with human approval."
+pm-sim send-email daisy "Nimbus Friday draft-mode status" "Repo sync has stale-commit risk. I recommend reliable draft mode for Friday with human approval before posting."
 pm-sim update-task task_launch_decision --status in_progress
 pm-sim schedule-meeting "Draft-mode decision" 2026-06-24T10:00:00 2026-06-24T10:30:00 mario luigi daisy toad
 ```

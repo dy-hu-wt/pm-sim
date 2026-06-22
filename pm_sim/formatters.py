@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 
@@ -55,6 +56,19 @@ def _format_observe(value: dict[str, Any]) -> str:
             lines.append(f"  Deadline: {_pretty_time(project['deadline'])}")
         if project.get("stakeholder_pressure"):
             lines.append(f"  Pressure: {project['stakeholder_pressure']}")
+        conflict = _project_conflict(project)
+        if conflict:
+            lines.append(
+                f"  Conflict: {conflict.get('status', 'unknown')} -> "
+                f"{conflict.get('final_launch_mode') or conflict.get('resolution') or 'unresolved'}"
+            )
+            inputs = conflict.get("inputs", {})
+            if inputs:
+                ready = [key for key, value in inputs.items() if value]
+                missing = [key for key, value in inputs.items() if not value]
+                lines.append(f"  Inputs:   {_short(', '.join(ready) if ready else 'none', 120)}")
+                if missing:
+                    lines.append(f"  Missing:  {_short(', '.join(missing), 120)}")
 
     lines.append("")
     lines.append("Known Blockers")
@@ -130,6 +144,18 @@ def _format_doc(value: dict[str, Any]) -> str:
             doc["body"],
         ]
     )
+
+
+def _project_conflict(project: dict[str, Any]) -> dict[str, Any] | None:
+    metadata_json = project.get("metadata_json")
+    if not metadata_json:
+        return None
+    try:
+        metadata = json.loads(metadata_json)
+    except (TypeError, ValueError):
+        return None
+    conflict = metadata.get("launch_conflict")
+    return conflict if isinstance(conflict, dict) else None
 
 
 def _format_action_result(value: dict[str, Any]) -> str:
@@ -313,10 +339,12 @@ def _format_evaluate_explain(value: dict[str, Any]) -> str:
             f"({component['status']}, max {component['points']})"
         )
         missing = component.get("missing_evidence", [])
-        if component.get("note") and not missing:
+        evidence = component.get("evidence", [])
+        harms = component.get("detected_harms", [])
+        has_detail = bool(evidence or missing or harms)
+        if component.get("note") and not missing and has_detail:
             lines.append(f"    {component['note']}")
 
-        evidence = component.get("evidence", [])
         if evidence:
             lines.append("    Evidence:")
             for item in evidence:
@@ -329,14 +357,14 @@ def _format_evaluate_explain(value: dict[str, Any]) -> str:
         if missing:
             lines.append(f"    Missing: {', '.join(missing)}")
 
-        harms = component.get("detected_harms", [])
         if harms:
             lines.append("    Harms:")
             for harm in harms:
                 lines.append(f"      - {harm}")
 
-        if not evidence and not missing and not harms:
-            lines.append("    Missing: none")
+        if not has_detail:
+            lines.append("    Evidence:")
+            lines.append(f"      - {component.get('note', 'No missing evidence.')}")
 
         lines.append("")
 

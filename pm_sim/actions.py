@@ -19,6 +19,7 @@ EMAIL_DRAFT_TERMS = frozenset(
     {"fallback", "draft", "draft-mode", "reliable", "de-scope", "descope", "human approval"}
 )
 EMAIL_CUSTOMER_TERMS = frozenset({"nimbus", "friday", "beta", "pilot", "customer", "confidence"})
+EMAIL_APPROVAL_TERMS = frozenset({"human approval", "approve", "approval", "review before posting"})
 COMPLETED_STATUSES = {"complete", "completed", "done", "resolved"}
 UNRESOLVED_BLOCKER_STATUSES = {"open", "surfaced", "blocked"}
 
@@ -240,6 +241,8 @@ def _validate_task_update(conn: sqlite3.Connection, task_id: str, new_status: st
         missing = []
         if not _daisy_aligned(conn):
             missing.append("Daisy alignment")
+        if not _evidence_exists(conn, "customer_message_ready"):
+            missing.append("customer-ready Daisy email")
         if not _launch_mode_decided(conn):
             missing.append("launch mode decision")
         if missing:
@@ -439,16 +442,37 @@ def _effects_for_email(person_id: str, subject: str, body: str) -> list[dict[str
     has_risk = _mentions_any(normalized, EMAIL_RISK_TERMS)
     has_draft_plan = _mentions_any(normalized, EMAIL_DRAFT_TERMS)
     has_customer_context = _mentions_any(normalized, EMAIL_CUSTOMER_TERMS)
+    has_human_approval = _mentions_any(normalized, EMAIL_APPROVAL_TERMS)
     if not (has_risk and has_draft_plan and has_customer_context):
         return []
 
-    return [
+    effects = [
         {
             "type": "add_evaluation_evidence",
             "key": "stakeholder_alignment",
             "note": "Agent sent Daisy a concrete Nimbus repo-sync risk and draft-mode status update.",
+        },
+        {
+            "type": "update_project",
+            "project_id": "project_pr_review_agent",
+            "launch_conflict": {
+                "status": "investigated",
+                "inputs": {"customer_constraint_known": True},
+            },
         }
     ]
+    if has_human_approval:
+        effects.append(
+            {
+                "type": "add_evaluation_evidence",
+                "key": "customer_message_ready",
+                "note": (
+                    "Agent gave Daisy a Nimbus-ready Friday update: repo-sync risk, "
+                    "draft mode, and human approval before posting."
+                ),
+            }
+        )
+    return effects
 
 
 def _schedule_meeting_occurs(

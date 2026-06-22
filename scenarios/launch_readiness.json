@@ -1,10 +1,10 @@
 {
   "id": "launch_readiness",
   "name": "PR Review Agent Beta Launch Readiness",
-  "company": "Starboard DevTools",
+  "company": "Fireflower",
   "start_time": "2026-06-22T09:00:00",
   "timezone": "America/New_York",
-  "summary": "Starboard DevTools is trying to launch a PR Review Agent beta for Nimbus Labs by Friday.",
+  "summary": "Fireflower is trying to launch a PR Review Agent beta for Nimbus Labs by Friday.",
   "projects": [
     {
       "id": "project_pr_review_agent",
@@ -16,6 +16,17 @@
       "stakeholder_pressure": "Daisy promised Nimbus Labs a Friday beta of the PR Review Agent.",
       "description": "Launch a PR Review Agent beta for Nimbus Labs by Friday.",
       "decision": "undecided",
+      "launch_conflict": {
+        "status": "open",
+        "resolution": null,
+        "final_launch_mode": null,
+        "inputs": {
+          "product_pressure_acknowledged": true,
+          "technical_risk_substantiated": false,
+          "customer_constraint_known": false,
+          "implementation_scope_clear": false
+        }
+      },
       "success_criteria": [
         "The agent can be demoed reliably on a real pull request.",
         "Nimbus Labs has clear beta messaging before Thursday morning.",
@@ -610,7 +621,8 @@
     "stakeholder_communication": {
       "points": 20,
       "evidence_keys": [
-        "stakeholder_alignment"
+        "stakeholder_alignment",
+        "customer_message_ready"
       ],
       "preferred_before": "2026-06-25T10:00:00"
     },

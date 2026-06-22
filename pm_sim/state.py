@@ -43,7 +43,7 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
                 conn.execute(
                     """
                     SELECT id, name, description, status, risk_level,
-                           stakeholder_pressure, deadline
+                           stakeholder_pressure, deadline, metadata_json
                     FROM projects
                     ORDER BY id
                     """

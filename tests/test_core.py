@@ -5,6 +5,7 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from pm_sim.actions import (
     list_tasks,
@@ -44,6 +45,16 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(len(state["projects"]), 1)
         self.assertGreaterEqual(len(state["tasks"]), 5)
 
+    def test_reset_seeds_open_launch_conflict(self) -> None:
+        conflict = self._project_metadata()["launch_conflict"]
+
+        self.assertEqual(conflict["status"], "open")
+        self.assertIsNone(conflict["resolution"])
+        self.assertTrue(conflict["inputs"]["product_pressure_acknowledged"])
+        self.assertFalse(conflict["inputs"]["technical_risk_substantiated"])
+        self.assertFalse(conflict["inputs"]["customer_constraint_known"])
+        self.assertFalse(conflict["inputs"]["implementation_scope_clear"])
+
     def test_hidden_blocker_and_hidden_fact_are_not_observed_initially(self) -> None:
         state = observe(self.db_path)
 
@@ -75,6 +86,7 @@ class CoreSimulationTests(unittest.TestCase):
     def test_background_event_applies_coworker_effects(self) -> None:
         advance_time(self.db_path, "to:2026-06-25T10:00:00")
         state = observe(self.db_path)
+        conflict = self._project_metadata()["launch_conflict"]
 
         blocker_ids = {blocker["id"] for blocker in state["known_blockers"]}
         fact_ids = {fact["id"] for fact in state["discovered_facts"]}
@@ -83,6 +95,40 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertIn("blocker_repo_sync_stale", blocker_ids)
         self.assertIn("fact_repo_sync_stale", fact_ids)
         self.assertTrue(any("repo sync" in body for body in recent_bodies))
+        self.assertEqual(conflict["status"], "investigated")
+        self.assertTrue(conflict["inputs"]["technical_risk_substantiated"])
+
+    def test_agent_path_moves_launch_conflict_to_resolved_draft_mode(self) -> None:
+        send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
+        advance_time(self.db_path, "2h")
+        send_chat(
+            self.db_path,
+            "daisy",
+            "Repo sync has stale-code risk. Can we message reliable draft mode for Nimbus?",
+        )
+        advance_time(self.db_path, "45m")
+        send_chat(
+            self.db_path,
+            "peach",
+            "Please finalize draft-mode onboarding with human approval and no auto-commenting.",
+        )
+        advance_time(self.db_path, "90m")
+        send_chat(
+            self.db_path,
+            "toad",
+            "Repo sync can review stale commits. Approve draft mode for Friday?",
+        )
+        advance_time(self.db_path, "90m")
+
+        conflict = self._project_metadata()["launch_conflict"]
+
+        self.assertEqual(conflict["status"], "resolved")
+        self.assertEqual(conflict["resolution"], "draft_mode")
+        self.assertEqual(conflict["final_launch_mode"], "draft_mode")
+        self.assertTrue(conflict["inputs"]["product_pressure_acknowledged"])
+        self.assertTrue(conflict["inputs"]["technical_risk_substantiated"])
+        self.assertTrue(conflict["inputs"]["customer_constraint_known"])
+        self.assertTrue(conflict["inputs"]["implementation_scope_clear"])
 
     def test_customer_launch_mode_question_adds_pressure_event(self) -> None:
         result = advance_time(self.db_path, "to:2026-06-24T15:30:00")
@@ -135,6 +181,8 @@ class CoreSimulationTests(unittest.TestCase):
             "2026-06-22T10:30:00",
             ["luigi", "daisy", "mario", "toad", "peach"],
         )
+        advance_time(self.db_path, "to:2026-06-22T10:30:00")
+        self._send_customer_ready_email()
 
         advance_time(self.db_path, "to:2026-06-26T15:00:00")
 
@@ -163,6 +211,106 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(metadata["final_outcome"], "draft_mode_beta_shipped")
         self.assertIn("shipped the reliable draft-mode beta", outcome_doc["body"])
 
+    def test_friday_deadline_records_late_draft_mode_outcome(self) -> None:
+        schedule_meeting(
+            self.db_path,
+            "Late draft-mode risk review for Nimbus launch",
+            "2026-06-25T16:00:00",
+            "2026-06-25T16:30:00",
+            ["luigi", "daisy", "mario", "toad", "peach"],
+        )
+        advance_time(self.db_path, "to:2026-06-25T16:30:00")
+        self._send_customer_ready_email()
+
+        advance_time(self.db_path, "to:2026-06-26T15:00:00")
+
+        outcome = self._project_outcome()
+
+        self.assertEqual(outcome["status"], "partial")
+        self.assertEqual(outcome["risk_level"], "medium")
+        self.assertEqual(outcome["metadata"]["final_outcome"], "late_draft_mode")
+        self.assertIn("landed late", outcome["metadata"]["final_outcome_summary"])
+
+    def test_friday_deadline_does_not_ship_from_fake_task_completion(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_task",
+                        "task_id": "task_draft_mode_docs",
+                        "status": "complete",
+                    },
+                    {
+                        "type": "discover_fact",
+                        "fact_id": "fact_draft_mode_approved",
+                    },
+                    {
+                        "type": "add_evaluation_evidence",
+                        "key": "stakeholder_alignment",
+                        "note": "Test-only customer alignment.",
+                    },
+                ],
+                now="2026-06-24T10:00:00",
+                source="test:fake_task_completion",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        advance_time(self.db_path, "to:2026-06-26T15:00:00")
+
+        outcome = self._project_outcome()
+
+        self.assertEqual(outcome["status"], "missed")
+        self.assertEqual(outcome["risk_level"], "high")
+        self.assertEqual(outcome["metadata"]["final_outcome"], "missed_due_to_blockers")
+
+    def test_friday_deadline_records_risky_auto_commenting_outcome(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_project",
+                        "project_id": "project_pr_review_agent",
+                        "decision": "auto_commenting_approved",
+                    }
+                ],
+                now="2026-06-24T10:00:00",
+                source="test:auto_commenting_commitment",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        advance_time(self.db_path, "to:2026-06-26T15:00:00")
+
+        outcome = self._project_outcome()
+
+        self.assertEqual(outcome["status"], "shipped")
+        self.assertEqual(outcome["risk_level"], "high")
+        self.assertEqual(outcome["metadata"]["final_outcome"], "risky_auto_commenting")
+
+    def test_friday_deadline_requires_customer_ready_email_for_clean_ship(self) -> None:
+        schedule_meeting(
+            self.db_path,
+            "Draft-mode risk review for Nimbus launch",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["luigi", "daisy", "mario", "toad", "peach"],
+        )
+
+        advance_time(self.db_path, "to:2026-06-26T15:00:00")
+
+        outcome = self._project_outcome()
+
+        self.assertEqual(outcome["status"], "missed")
+        self.assertEqual(outcome["risk_level"], "high")
+        self.assertEqual(outcome["metadata"]["final_outcome"], "missed_due_to_blockers")
+
     def test_events_delivered_during_large_time_jump_keep_scheduled_times(self) -> None:
         schedule_meeting(
             self.db_path,
@@ -172,7 +320,9 @@ class CoreSimulationTests(unittest.TestCase):
             ["luigi", "daisy", "mario", "toad", "peach"],
         )
 
-        result = advance_time(self.db_path, "to:2026-06-26T15:00:00")
+        result = advance_time(self.db_path, "to:2026-06-22T10:30:00")
+        self._send_customer_ready_email()
+        advance_time(self.db_path, "to:2026-06-26T15:00:00")
         meeting_event = next(
             event for event in result["delivered_events"] if event["event_type"] == "meeting_occurs"
         )
@@ -180,6 +330,49 @@ class CoreSimulationTests(unittest.TestCase):
 
         self.assertEqual(meeting_event["delivered_at"], "2026-06-22T10:30:00")
         self.assertEqual(evaluation["score"], evaluation["max_score"])
+
+    def _project_outcome(self) -> dict[str, Any]:
+        conn = connect(self.db_path)
+        try:
+            project = conn.execute(
+                """
+                SELECT status, risk_level, metadata_json
+                FROM projects
+                WHERE id = 'project_pr_review_agent'
+                """
+            ).fetchone()
+            return {
+                "status": project["status"],
+                "risk_level": project["risk_level"],
+                "metadata": loads(project["metadata_json"]),
+            }
+        finally:
+            conn.close()
+
+    def _project_metadata(self) -> dict[str, Any]:
+        conn = connect(self.db_path)
+        try:
+            project = conn.execute(
+                """
+                SELECT metadata_json
+                FROM projects
+                WHERE id = 'project_pr_review_agent'
+                """
+            ).fetchone()
+            return loads(project["metadata_json"])
+        finally:
+            conn.close()
+
+    def _send_customer_ready_email(self) -> None:
+        send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus Friday draft-mode update",
+            (
+                "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has "
+                "stale-commit risk, so comments should require human approval before posting."
+            ),
+        )
 
     def test_timeline_shows_actions_events_messages_and_evidence_in_order(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
@@ -855,6 +1048,35 @@ class ToolActionTests(unittest.TestCase):
         self.assertIn("launch mode decision", result["error"])
         self.assertEqual(self._task_state("task_customer_talk_track"), before)
 
+    def test_can_complete_customer_talk_track_after_customer_ready_email_and_decision(self) -> None:
+        schedule_meeting(
+            self.db_path,
+            "Draft-mode risk review for Nimbus launch",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["luigi", "daisy", "mario", "toad", "peach"],
+        )
+        advance_time(self.db_path, "to:2026-06-22T10:30:00")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus Friday draft-mode update",
+            (
+                "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has "
+                "stale-commit risk, so comments should require human approval before posting."
+            ),
+        )
+
+        result = update_task(
+            self.db_path,
+            "task_customer_talk_track",
+            status="complete",
+            priority=None,
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(self._task_state("task_customer_talk_track")["status"], "complete")
+
     def test_cannot_complete_launch_decision_without_toad_approval(self) -> None:
         before = self._task_state("task_launch_decision")
 
@@ -925,6 +1147,15 @@ class EvaluatorTests(unittest.TestCase):
             "Repo sync can review stale commits. Approve draft mode for Friday?",
         )
         advance_time(self.db_path, "90m")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus Friday draft-mode update",
+            (
+                "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has "
+                "stale-commit risk, so comments should require human approval before posting."
+            ),
+        )
 
     def test_reset_state_scores_below_agent_improved_path(self) -> None:
         baseline = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
@@ -1016,6 +1247,28 @@ class EvaluatorTests(unittest.TestCase):
 
         self.assertEqual(stakeholder_component["earned"], 20)
         self.assertEqual(stakeholder_component["evidence"][0]["source"], "action:msg_agent_email_3")
+        self.assertEqual(
+            {evidence["key"] for evidence in stakeholder_component["evidence"]},
+            {"stakeholder_alignment", "customer_message_ready"},
+        )
+
+    def test_daisy_email_without_human_approval_is_not_customer_ready(self) -> None:
+        send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus Friday draft-mode status",
+            "Repo sync has stale-commit risk. I recommend reliable draft mode for Friday.",
+        )
+
+        result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        stakeholder_component = next(
+            component
+            for component in result["components"]
+            if component["key"] == "stakeholder_communication"
+        )
+
+        self.assertEqual(stakeholder_component["earned"], 10)
+        self.assertIn("customer_message_ready", stakeholder_component["missing_evidence"])
 
     def test_fake_draft_mode_progress_does_not_improve_task_score(self) -> None:
         baseline = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
@@ -1108,6 +1361,7 @@ class EvaluatorTests(unittest.TestCase):
         self.assertIn("+15 risk_handling (passed, max 15)", output)
         self.assertIn("Evidence:", output)
         self.assertIn("Stale repo sync risk is discovered in world state.", output)
+        self.assertIn("Agent gave Daisy a Nimbus-ready Friday update", output)
         self.assertIn("Draft-mode approval is recorded in world state.", output)
 
     def test_evaluate_explain_prints_missing_evidence(self) -> None:
@@ -1115,7 +1369,7 @@ class EvaluatorTests(unittest.TestCase):
 
         self.assertIn("Score: 15 / 100", output)
         self.assertIn("+0 stakeholder_communication (missing, max 20)", output)
-        self.assertIn("Missing: stakeholder_alignment", output)
+        self.assertIn("Missing: stakeholder_alignment, customer_message_ready", output)
         self.assertIn("Missing: peach_unblocked, draft_mode_approved", output)
 
 

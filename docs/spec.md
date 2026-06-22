@@ -258,7 +258,8 @@ Possible CLI shape:
 ```text
 pm-sim reset
 pm-sim observe
-pm-sim act send-chat --to luigi --body "Any launch blockers?"
+pm-sim read-doc doc_project_brief
+pm-sim send-chat luigi "Any repo sync blockers for launch?"
 pm-sim advance-time 2h
 pm-sim log
 pm-sim evaluate
@@ -270,11 +271,11 @@ A UI is optional. If added, it should stay lightweight and should not hide the s
 
 Working scenario: launch readiness week.
 
-Company: Starboard DevTools, a small B2B SaaS company that sells developer workflow tools.
+Company: Fireflower, a small B2B SaaS company that sells developer workflow tools.
 
 Product context:
 
-Customers use Starboard to review pull requests faster, catch common issues earlier, and reduce review backlogs.
+Customers use Fireflower to review pull requests faster, catch common issues earlier, and reduce review backlogs.
 
 Project: launch a PR Review Agent beta for a pilot customer by Friday.
 
