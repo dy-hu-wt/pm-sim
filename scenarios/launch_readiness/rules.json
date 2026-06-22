@@ -1663,7 +1663,13 @@
           "not post comments automatically",
           "will not post comments automatically",
           "not post automatically",
-          "comments automatically"
+          "comments automatically",
+          "automatic pr commenting is not part",
+          "automatic pr commenting is not part of the friday beta",
+          "will not automatically post pr comments",
+          "not automatically post pr comments",
+          "will not automatically post",
+          "automatic posting"
         ],
         [
           "repo sync",

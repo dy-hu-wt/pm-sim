@@ -1491,6 +1491,35 @@ Luigi surfaced a repo-sync stale-commit risk: webhook events can arrive out of o
             any(effect.get("key") == "decision_record_written" for effect in result["applied_effects"])
         )
 
+    def test_decision_record_accepts_automatic_pr_commenting_wording(self) -> None:
+        self._drive_to_draft_approval()
+
+        result = update_doc(
+            self.db_path,
+            "doc_launch_decision_record",
+            """
+# Friday Launch Decision Record
+
+Decision: PR Review Agent beta will launch for Nimbus Labs on Friday in **draft mode only**.
+
+Approval: Toad approved de-scoping auto-commenting for Friday and approved draft mode after reviewing Daisy's customer input and Luigi's engineering risk assessment.
+
+Implementation / onboarding scope: Peach should finish the draft-mode flow only. The onboarding must state that the PR Review Agent prepares review suggestions as drafts, and a human must review and approve those suggestions before anything is posted to a pull request.
+
+Customer-visible behavior: Nimbus will see draft review suggestions for a real PR. The system will not automatically post PR comments during Friday's beta.
+
+Friday scope: draft-mode beta, onboarding and talk track that explain human approval before posting, and continued repo-sync hardening.
+
+Out of Friday scope / follow-up: automatic PR commenting is not part of the Friday beta. Auto-commenting remains a follow-up after repo sync is proven reliable enough.
+
+Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is solid, but repo-sync webhooks can arrive out of order, so the agent may review a stale commit. Auto-commenting could make that customer-visible by posting against an older diff.
+""",
+        )
+
+        self.assertTrue(
+            any(effect.get("key") == "decision_record_written" for effect in result["applied_effects"])
+        )
+
     def test_private_repo_security_doc_is_hidden_until_luigi_reveals_it(self) -> None:
         hidden = read_doc(self.db_path, "doc_private_repo_security_baseline")
 
