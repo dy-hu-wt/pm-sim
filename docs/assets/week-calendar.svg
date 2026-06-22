@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="760" viewBox="0 0 1180 760" role="img" aria-labelledby="title desc">
+  <title id="title">Launch Readiness Week Calendar</title>
+  <desc id="desc">A Google Calendar style week view from Monday June 22 through Friday June 26, showing scheduled simulation events and deadlines.</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.18"/>
+    </filter>
+    <style>
+      .bg { fill: #ffffff; }
+      .chrome { fill: #f8fafd; }
+      .grid { stroke: #e8eaed; stroke-width: 1; }
+      .major { stroke: #dadce0; stroke-width: 1; }
+      .text { font-family: Arial, Helvetica, sans-serif; fill: #3c4043; }
+      .muted { fill: #5f6368; }
+      .tiny { font-size: 11px; }
+      .small { font-size: 12px; }
+      .body { font-size: 13px; }
+      .label { font-size: 14px; font-weight: 700; }
+      .date { font-size: 28px; font-weight: 400; }
+      .event-title { font-size: 12px; font-weight: 700; fill: #ffffff; }
+      .event-meta { font-size: 11px; fill: #ffffff; opacity: 0.95; }
+      .event-dark { font-size: 12px; font-weight: 700; fill: #202124; }
+      .event-dark-meta { font-size: 11px; fill: #3c4043; }
+    </style>
+  </defs>
+
+  <rect width="1180" height="760" rx="18" class="bg"/>
+  <rect x="0" y="0" width="1180" height="78" class="chrome"/>
+  <line x1="0" y1="78" x2="1180" y2="78" class="major"/>
+
+  <text x="32" y="34" class="text label">Launch readiness week</text>
+  <text x="32" y="56" class="text small muted">Simulated calendar: June 22-26, 2026</text>
+
+  <g transform="translate(782 24)">
+    <rect x="0" y="0" width="18" height="10" rx="5" fill="#1a73e8"/>
+    <text x="26" y="10" class="text tiny muted">Daisy / customer</text>
+    <rect x="126" y="0" width="18" height="10" rx="5" fill="#188038"/>
+    <text x="152" y="10" class="text tiny muted">Luigi / backend</text>
+    <rect x="252" y="0" width="18" height="10" rx="5" fill="#d93025"/>
+    <text x="278" y="10" class="text tiny muted">Deadline</text>
+    <rect x="0" y="22" width="18" height="10" rx="5" fill="#f9ab00"/>
+    <text x="26" y="32" class="text tiny muted">Mario / product</text>
+    <rect x="126" y="22" width="18" height="10" rx="5" fill="#a142f4"/>
+    <text x="152" y="32" class="text tiny muted">Koopa thread</text>
+    <rect x="252" y="22" width="18" height="10" rx="5" fill="#e8710a"/>
+    <text x="278" y="32" class="text tiny muted">Peach / unblock</text>
+  </g>
+
+  <g id="calendar" transform="translate(24 92)">
+    <rect x="0" y="0" width="1132" height="638" rx="16" fill="#ffffff" stroke="#dadce0"/>
+    <rect x="0" y="0" width="1132" height="82" rx="16" fill="#ffffff"/>
+    <line x1="0" y1="82" x2="1132" y2="82" class="major"/>
+
+    <g transform="translate(70 0)">
+      <g>
+        <text x="103" y="24" text-anchor="middle" class="text small muted">MON</text>
+        <text x="103" y="58" text-anchor="middle" class="text date">22</text>
+      </g>
+      <g transform="translate(206 0)">
+        <text x="103" y="24" text-anchor="middle" class="text small muted">TUE</text>
+        <text x="103" y="58" text-anchor="middle" class="text date">23</text>
+      </g>
+      <g transform="translate(412 0)">
+        <text x="103" y="24" text-anchor="middle" class="text small muted">WED</text>
+        <text x="103" y="58" text-anchor="middle" class="text date">24</text>
+      </g>
+      <g transform="translate(618 0)">
+        <text x="103" y="24" text-anchor="middle" class="text small muted">THU</text>
+        <text x="103" y="58" text-anchor="middle" class="text date">25</text>
+      </g>
+      <g transform="translate(824 0)">
+        <text x="103" y="24" text-anchor="middle" class="text small muted">FRI</text>
+        <text x="103" y="58" text-anchor="middle" class="text date">26</text>
+      </g>
+    </g>
+
+    <g transform="translate(0 82)">
+      <rect x="0" y="0" width="1132" height="556" fill="#ffffff"/>
+      <line x1="70" y1="0" x2="70" y2="556" class="major"/>
+      <line x1="276" y1="0" x2="276" y2="556" class="grid"/>
+      <line x1="482" y1="0" x2="482" y2="556" class="grid"/>
+      <line x1="688" y1="0" x2="688" y2="556" class="grid"/>
+      <line x1="894" y1="0" x2="894" y2="556" class="grid"/>
+      <line x1="1100" y1="0" x2="1100" y2="556" class="grid"/>
+
+      <g class="text tiny muted" text-anchor="end">
+        <text x="58" y="5">9 AM</text>
+        <text x="58" y="75">10 AM</text>
+        <text x="58" y="144">11 AM</text>
+        <text x="58" y="214">12 PM</text>
+        <text x="58" y="283">1 PM</text>
+        <text x="58" y="353">2 PM</text>
+        <text x="58" y="422">3 PM</text>
+        <text x="58" y="492">4 PM</text>
+        <text x="58" y="561">5 PM</text>
+      </g>
+
+      <g class="grid">
+        <line x1="70" y1="0" x2="1132" y2="0"/>
+        <line x1="70" y1="70" x2="1132" y2="70"/>
+        <line x1="70" y1="139" x2="1132" y2="139"/>
+        <line x1="70" y1="209" x2="1132" y2="209"/>
+        <line x1="70" y1="278" x2="1132" y2="278"/>
+        <line x1="70" y1="348" x2="1132" y2="348"/>
+        <line x1="70" y1="417" x2="1132" y2="417"/>
+        <line x1="70" y1="487" x2="1132" y2="487"/>
+        <line x1="70" y1="556" x2="1132" y2="556"/>
+      </g>
+
+      <g filter="url(#shadow)">
+        <rect x="82" y="8" width="182" height="58" rx="8" fill="#1a73e8"/>
+        <text x="94" y="29" class="event-title">Agent starts</text>
+        <text x="94" y="47" class="event-meta">Briefs, tasks, blockers</text>
+
+        <rect x="82" y="80" width="182" height="58" rx="8" fill="#e8f0fe" stroke="#1a73e8"/>
+        <text x="94" y="101" class="event-dark">Launch mode unclear</text>
+        <text x="94" y="119" class="event-dark-meta">Peach + Toad blockers</text>
+
+        <rect x="288" y="78" width="182" height="58" rx="8" fill="#f9ab00"/>
+        <text x="300" y="99" class="event-title">Mario push</text>
+        <text x="300" y="117" class="event-meta">Auto-commenting pressure</text>
+
+        <rect x="494" y="78" width="182" height="50" rx="8" fill="#a142f4"/>
+        <text x="506" y="98" class="event-title">Koopa request</text>
+        <text x="506" y="115" class="event-meta">Audit-log export scope</text>
+
+        <rect x="494" y="147" width="182" height="50" rx="8" fill="#e8710a"/>
+        <text x="506" y="167" class="event-title">Peach blocked</text>
+        <text x="506" y="184" class="event-meta">Onboarding needs scope</text>
+
+        <rect x="494" y="286" width="182" height="42" rx="8" fill="#1a73e8"/>
+        <text x="506" y="304" class="event-title">Daisy confidence</text>
+        <text x="506" y="320" class="event-meta">Customer-ready update</text>
+
+        <rect x="494" y="356" width="182" height="42" rx="8" fill="#1a73e8"/>
+        <text x="506" y="374" class="event-title">Security question</text>
+        <text x="506" y="390" class="event-meta">Private repo handling</text>
+
+        <rect x="494" y="460" width="182" height="42" rx="8" fill="#1a73e8"/>
+        <text x="506" y="478" class="event-title">Nimbus asks mode</text>
+        <text x="506" y="494" class="event-meta">Auto-post vs drafts</text>
+
+        <rect x="700" y="78" width="182" height="58" rx="8" fill="#188038"/>
+        <text x="712" y="99" class="event-title">Luigi escalation</text>
+        <text x="712" y="117" class="event-meta">Stale repo-sync risk</text>
+
+        <rect x="700" y="492" width="182" height="50" rx="8" fill="#d93025"/>
+        <text x="712" y="512" class="event-title">Koopa deadline</text>
+        <text x="712" y="529" class="event-meta">Security review answer</text>
+
+        <rect x="906" y="422" width="182" height="58" rx="8" fill="#d93025"/>
+        <text x="918" y="443" class="event-title">Nimbus beta deadline</text>
+        <text x="918" y="461" class="event-meta">Final outcome classified</text>
+      </g>
+    </g>
+  </g>
+</svg>
