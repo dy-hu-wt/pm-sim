@@ -80,6 +80,18 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertIn("fact_repo_sync_stale", fact_ids)
         self.assertTrue(any("repo sync" in body for body in recent_bodies))
 
+    def test_customer_launch_mode_question_adds_pressure_event(self) -> None:
+        result = advance_time(self.db_path, "to:2026-06-24T15:30:00")
+        state = observe(self.db_path)
+
+        event_types = {event["event_type"] for event in result["delivered_events"]}
+        recent = state["recent_messages"][0]
+
+        self.assertIn("nimbus_launch_mode_question", event_types)
+        self.assertEqual(recent["sender_id"], "daisy")
+        self.assertEqual(recent["channel"], "email")
+        self.assertIn("post comments automatically", recent["body"])
+
     def test_can_deliver_all_seeded_events_through_friday_deadline(self) -> None:
         result = advance_time(self.db_path, "to:2026-06-26T15:00:00")
 
@@ -175,6 +187,11 @@ class CoworkerRuleTests(unittest.TestCase):
         effect_types = {effect["type"] for effect in replies[0].effects}
         self.assertIn("discover_fact", effect_types)
         self.assertIn("update_blocker", effect_types)
+        discovered_facts = {
+            effect["fact_id"] for effect in replies[0].effects if effect["type"] == "discover_fact"
+        }
+        self.assertIn("fact_repo_sync_stale", discovered_facts)
+        self.assertIn("fact_draft_mode_limits_customer_visible_risk", discovered_facts)
 
     def test_luigi_repeat_risk_reply_does_not_duplicate_discovery_effects(self) -> None:
         replies = replies_for_chat(
@@ -456,6 +473,12 @@ class ToolActionTests(unittest.TestCase):
 
         self.assertTrue(result["ok"])
         self.assertIn("review pull requests faster", result["doc"]["body"])
+
+    def test_read_doc_returns_rollout_template(self) -> None:
+        result = read_doc(self.db_path, "doc_beta_rollout_template")
+
+        self.assertTrue(result["ok"])
+        self.assertIn("human approval", result["doc"]["body"])
 
     def test_read_doc_blocks_invisible_doc(self) -> None:
         result = read_doc(self.db_path, "doc_repo_sync_notes")

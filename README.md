@@ -8,7 +8,7 @@ The first scenario is Starboard DevTools launching a PR Review Agent beta for Ni
 
 The included scenario is `launch_readiness`.
 
-Starboard DevTools is a B2B SaaS company preparing a PR Review Agent beta for Nimbus Labs. The full beta would auto-post review comments on pull requests, but that depends on repo sync always using the latest commit. A safer draft mode prepares suggestions for human approval before comments are posted.
+Starboard DevTools is a B2B SaaS company preparing a PR Review Agent beta for Nimbus Labs. The full beta would auto-post review comments on pull requests, but that depends on repo sync always using the latest commit. A safer draft mode prepares suggestions for human approval before comments are posted. During the week, Nimbus asks whether comments will auto-post, and Daisy needs rollout language before she updates them.
 
 The agent's job is to discover the stale-code risk, align Mario, Luigi, Peach, Daisy, and Toad, clarify scope, and improve the Friday launch outcome.
 
@@ -44,6 +44,7 @@ This is the shortest successful path through the scenario. It demonstrates disco
 python3 -m pm_sim.cli reset
 python3 -m pm_sim.cli observe
 python3 -m pm_sim.cli read-doc doc_project_brief
+python3 -m pm_sim.cli read-doc doc_beta_rollout_template
 
 python3 -m pm_sim.cli send-chat luigi "Any repo sync blockers or launch risks for Nimbus?"
 python3 -m pm_sim.cli advance-time 2h
@@ -81,6 +82,7 @@ Read tasks and docs:
 ```bash
 python3 -m pm_sim.cli list-tasks
 python3 -m pm_sim.cli read-doc doc_project_brief
+python3 -m pm_sim.cli read-doc doc_beta_rollout_template
 ```
 
 Send messages and update work:

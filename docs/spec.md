@@ -282,6 +282,8 @@ The agent is meant to read pull request diffs and prepare useful review suggesti
 
 The pilot customer, Nimbus Labs, expects a Friday beta demo. Daisy promised they would see something useful and reliable.
 
+Nimbus also asks mid-week whether the beta will post comments automatically or queue draft suggestions for approval. That creates stakeholder pressure if the launch mode is still unclear.
+
 Core risk:
 
 Auto-commenting depends on repo sync always reviewing the latest commit. That sync path is flaky because webhook events can arrive out of order. Draft suggestions with human approval are reliable.
@@ -295,6 +297,8 @@ Auto-commenting beta:
 Draft-mode beta:
   suggestions require human approval before posting, less flashy but safer for Friday
 ```
+
+The scenario includes a rollout-note template and a separate rollout-notes task so the agent can inspect written guidance, not only chat with coworkers.
 
 The PM starts on Monday. There is stakeholder pressure, a hidden backend blocker, unclear task ownership, and a Friday decision point.
 

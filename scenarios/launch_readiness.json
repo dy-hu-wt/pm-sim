@@ -112,14 +112,16 @@
       "response_delay_minutes": 120,
       "private_knowledge": {
         "fact_ids": [
-          "fact_repo_sync_stale"
+          "fact_repo_sync_stale",
+          "fact_draft_mode_limits_customer_visible_risk"
         ]
       },
       "behavior": {
         "rule": "luigi"
       },
       "private_fact_ids": [
-        "fact_repo_sync_stale"
+        "fact_repo_sync_stale",
+        "fact_draft_mode_limits_customer_visible_risk"
       ]
     },
     {
@@ -285,6 +287,16 @@
       ]
     },
     {
+      "id": "fact_draft_mode_limits_customer_visible_risk",
+      "visibility": "hidden",
+      "owner_id": "luigi",
+      "summary": "Draft mode may still prepare an imperfect suggestion, but no customer-visible comment is posted until a human approves it.",
+      "revealed_by": [
+        "Ask Luigi why draft mode is safer than auto-commenting.",
+        "Include Luigi in a launch-mode risk meeting."
+      ]
+    },
+    {
       "id": "fact_design_blocked_by_scope",
       "visibility": "private",
       "owner_id": "peach",
@@ -369,6 +381,22 @@
       "blocked_by": "blocker_launch_scope_decision"
     },
     {
+      "id": "task_beta_rollout_notes",
+      "project_id": "project_pr_review_agent",
+      "title": "Prepare Nimbus beta rollout notes",
+      "owner_id": "daisy",
+      "status": "not_started",
+      "priority": "medium",
+      "due_at": "2026-06-25T14:00:00",
+      "metadata": {
+        "blocked_by": [
+          "blocker_launch_scope_decision"
+        ]
+      },
+      "visible": true,
+      "blocked_by": "blocker_launch_scope_decision"
+    },
+    {
       "id": "task_launch_decision",
       "project_id": "project_pr_review_agent",
       "title": "Decide auto-commenting versus draft mode",
@@ -399,6 +427,13 @@
       "upstream_task_id": "task_launch_decision",
       "downstream_task_id": "task_customer_talk_track",
       "description": "Customer beta talk track depends on the launch mode decision."
+    },
+    {
+      "id": "dep_rollout_notes_need_decision",
+      "project_id": "project_pr_review_agent",
+      "upstream_task_id": "task_launch_decision",
+      "downstream_task_id": "task_beta_rollout_notes",
+      "description": "Nimbus rollout notes need the final launch mode and safety language."
     },
     {
       "id": "dep_auto_commenting_needs_repo_sync",
@@ -462,6 +497,13 @@
       "body": "Mario wants auto-commenting if possible. Peach needs launch-mode confirmation before final onboarding. Daisy needs confidence language before she updates Nimbus. Luigi said he is still hardening repo sync ordering."
     },
     {
+      "id": "doc_beta_rollout_template",
+      "title": "Nimbus Beta Rollout Template",
+      "kind": "customer_note_template",
+      "visible": true,
+      "body": "Rollout note must answer three questions: whether the agent posts comments automatically, what human approval means in draft mode, and what known limitation remains after Friday. Avoid promising auto-commenting until repo sync is proven reliable."
+    },
+    {
       "id": "doc_repo_sync_notes",
       "title": "Repo Sync Notes",
       "kind": "engineering_notes",
@@ -519,6 +561,16 @@
       "id": "event_daisy_confidence_check",
       "event_type": "daisy_confidence_check",
       "scheduled_at": "2026-06-24T13:00:00",
+      "status": "pending",
+      "priority": 100,
+      "payload": {
+        "project_id": "project_pr_review_agent"
+      }
+    },
+    {
+      "id": "event_nimbus_launch_mode_question",
+      "event_type": "nimbus_launch_mode_question",
+      "scheduled_at": "2026-06-24T15:30:00",
       "status": "pending",
       "priority": 100,
       "payload": {

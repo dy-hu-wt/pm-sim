@@ -120,6 +120,20 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
             _update_pressure("stakeholder_pressure", 1),
         ]
 
+    if event_type == "nimbus_launch_mode_question":
+        return [
+            _message_with_subject(
+                "email",
+                "daisy",
+                "agent",
+                "Nimbus asked whether the beta agent will post comments "
+                "automatically or queue draft suggestions for approval. I need "
+                "a clear answer before I update them Thursday morning.",
+                "Nimbus launch mode question",
+            ),
+            _update_pressure("stakeholder_pressure", 1),
+        ]
+
     if event_type == "mario_auto_comment_push":
         return [
             _message(
@@ -187,6 +201,7 @@ def effects_for_meeting(payload: dict[str, Any]) -> list[Effect]:
         effects.extend(
             [
                 _discover_fact("fact_repo_sync_stale", "meeting_occurs"),
+                _discover_fact("fact_draft_mode_limits_customer_visible_risk", "meeting_occurs"),
                 _update_blocker("blocker_repo_sync_stale", "surfaced"),
                 _add_evidence("blocker_discovered", "Meeting surfaced Luigi's stale repo sync risk."),
             ]
@@ -253,6 +268,7 @@ def _luigi_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
             ),
             effects=(
                 _discover_fact("fact_repo_sync_stale", "luigi_chat_reply"),
+                _discover_fact("fact_draft_mode_limits_customer_visible_risk", "luigi_chat_reply"),
                 _update_blocker("blocker_repo_sync_stale", "surfaced"),
                 _add_evidence("blocker_discovered", "Luigi disclosed stale repo sync risk."),
             ),
@@ -409,13 +425,26 @@ def _state_has_fact(state: dict[str, Any], fact_id: str) -> bool:
 
 
 def _message(channel: str, sender_id: str, recipient_id: str, body: str) -> Effect:
-    return {
+    return _message_with_subject(channel, sender_id, recipient_id, body, None)
+
+
+def _message_with_subject(
+    channel: str,
+    sender_id: str,
+    recipient_id: str,
+    body: str,
+    subject: str | None,
+) -> Effect:
+    effect = {
         "type": "create_message",
         "channel": channel,
         "sender_id": sender_id,
         "recipient_id": recipient_id,
         "body": body,
     }
+    if subject:
+        effect["subject"] = subject
+    return effect
 
 
 def _discover_fact(fact_id: str, source: str) -> Effect:
@@ -454,6 +483,7 @@ def _meeting_transcript_body(title: str, attendees: set[str], normalized_topic: 
     ]
     if "luigi" in attendees and _mentions_any(normalized_topic, RISK_TERMS):
         lines.append("- Luigi stated that repo sync can still make the agent review stale commits.")
+        lines.append("- Luigi noted that draft mode keeps suggestions behind human approval.")
     if "daisy" in attendees:
         lines.append("- Daisy asked for reliable Friday beta messaging for Nimbus Labs.")
     if "mario" in attendees:
