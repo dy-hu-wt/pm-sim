@@ -1148,7 +1148,7 @@ class ToolActionTests(unittest.TestCase):
         self.assertEqual(evidence["evidence_key"], "stakeholder_alignment")
         self.assertIn("Nimbus repo-sync risk and draft-mode", evidence["note"])
 
-    def test_security_answer_email_records_security_question_evidence(self) -> None:
+    def test_security_answer_email_before_daisy_question_does_not_score(self) -> None:
         result = send_email(
             self.db_path,
             "daisy",
@@ -1172,13 +1172,38 @@ class ToolActionTests(unittest.TestCase):
             conn.close()
 
         self.assertTrue(result["ok"])
-        self.assertTrue(
-            any(
-                effect["type"] == "add_evaluation_evidence"
-                and effect["key"] == "security_question_answered"
-                for effect in result["applied_effects"]
-            )
+        self.assertFalse(
+            any(effect.get("key") == "security_question_answered" for effect in result["applied_effects"])
         )
+        self.assertIsNone(evidence)
+
+    def test_security_answer_email_records_security_question_evidence_after_daisy_asks(self) -> None:
+        advance_time(self.db_path, "to:2026-06-24T14:00:00")
+
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus private repo security answer",
+            (
+                "Nimbus can tell their reviewer that private repo source code is "
+                "processed transiently. Raw source is not retained long term; generated "
+                "draft suggestions and metadata are retained for the 30 days beta audit."
+            ),
+        )
+        conn = connect(self.db_path)
+        try:
+            evidence = conn.execute(
+                """
+                SELECT evidence_key, note
+                FROM evaluation_evidence
+                WHERE evidence_key = 'security_question_answered'
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(any(effect.get("key") == "security_question_answered" for effect in result["applied_effects"]))
         self.assertEqual(evidence["evidence_key"], "security_question_answered")
         self.assertIn("private repo source handling", evidence["note"])
 
@@ -1774,6 +1799,30 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertIn("Finish: not called", output)
         self.assertIn("Missing Evaluation", output)
         self.assertIn("security_interruption: security_doc_found, security_question_answered", output)
+
+    def test_long_run_agent_summary_compacts_steps(self) -> None:
+        reset(self.db_path, DEFAULT_SCENARIO_PATH)
+        evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        steps = [{"name": "send_chat", "ok": True} for _ in range(30)]
+
+        output = format_output(
+            "run-agent",
+            {
+                "ok": False,
+                "policy": "llm",
+                "model": "test-model",
+                "turns": 30,
+                "finished": False,
+                "stop_reason": "max_turns",
+                "steps": steps,
+                "evaluation": evaluation,
+            },
+        )
+
+        self.assertIn("Step Counts", output)
+        self.assertIn("send_chat: 30", output)
+        self.assertIn("Recent Steps", output)
+        self.assertNotIn("  1. send_chat", output)
 
 
 class LlmAgentTests(unittest.TestCase):

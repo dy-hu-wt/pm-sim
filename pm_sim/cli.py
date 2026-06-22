@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -215,7 +217,82 @@ def _run_agent_command(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _agent_progress(message: str) -> None:
-    print(f"[agent] {message}", file=sys.stderr, flush=True)
+    if "waiting for model" in message:
+        if _stderr_supports_color():
+            print(f"\r{_dim('[agent] ' + message)}", end="", file=sys.stderr, flush=True)
+            _set_waiting_line_active(True)
+        return
+
+    if _waiting_line_active():
+        print("\r\033[K", end="", file=sys.stderr)
+        _set_waiting_line_active(False)
+
+    print(_color_agent_message(message), file=sys.stderr, flush=True)
+
+
+def _color_agent_message(message: str) -> str:
+    prefix = _dim("[agent]")
+    if not _stderr_supports_color():
+        return f"[agent] {message}"
+
+    message = re.sub(r"^\[([^\]]+)\]", lambda match: _cyan(match.group(0)), message)
+    if "model requested" in message:
+        return f"{prefix} {_dim(message)}"
+    if "full score reached" in message or "evaluation complete" in message:
+        return f"{prefix} {_green(message)}"
+    for tool, color in {
+        "read_doc": _blue,
+        "send_chat": _magenta,
+        "send_email": _cyan,
+        "schedule_meeting": _yellow,
+        "update_task": _yellow,
+        "advance_time": _green,
+        "observe": _dim,
+        "list_tasks": _dim,
+        "finish": _green,
+    }.items():
+        message = re.sub(rf"\b{tool}\b", lambda match, color=color: color(match.group(0)), message, count=1)
+    return f"{prefix} {message}"
+
+
+def _stderr_supports_color() -> bool:
+    return sys.stderr.isatty() and not os.environ.get("NO_COLOR")
+
+
+def _waiting_line_active() -> bool:
+    return bool(getattr(_agent_progress, "_waiting_line_active", False))
+
+
+def _set_waiting_line_active(value: bool) -> None:
+    setattr(_agent_progress, "_waiting_line_active", value)
+
+
+def _ansi(code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m"
+
+
+def _dim(text: str) -> str:
+    return _ansi("2", text)
+
+
+def _green(text: str) -> str:
+    return _ansi("32", text)
+
+
+def _cyan(text: str) -> str:
+    return _ansi("36", text)
+
+
+def _blue(text: str) -> str:
+    return _ansi("34", text)
+
+
+def _magenta(text: str) -> str:
+    return _ansi("35", text)
+
+
+def _yellow(text: str) -> str:
+    return _ansi("33", text)
 
 
 def sqlite_missing_reset_error() -> tuple[type[Exception], ...]:

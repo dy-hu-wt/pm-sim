@@ -51,7 +51,7 @@ ACTION_TIME_COST_MINUTES = {
 }
 
 
-# Read-only tool: returns visible task state without mutating time, logs, or events.
+# Read-only tool: returns visible task state without mutating time, logs, or events. Cost: 0m.
 def list_tasks(db_path: Path | str = DEFAULT_DB_PATH) -> list[dict[str, Any]]:
     conn = connect(db_path)
     try:
@@ -69,7 +69,7 @@ def list_tasks(db_path: Path | str = DEFAULT_DB_PATH) -> list[dict[str, Any]]:
         conn.close()
 
 
-# Doc tool: returns a visible doc body and consumes reading time.
+# Doc tool: returns a visible doc body. Cost: 15m reading time.
 def read_doc(db_path: Path | str, doc_id: str) -> dict[str, Any]:
     conn = connect(db_path)
     try:
@@ -108,7 +108,7 @@ def read_doc(db_path: Path | str, doc_id: str) -> dict[str, Any]:
         conn.close()
 
 
-# Chat tool: records the agent message and schedules deterministic coworker replies.
+# Chat tool: records an agent message and schedules deterministic coworker replies. Cost: 5m.
 def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
     body = body.strip()
     if not body:
@@ -166,7 +166,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
         conn.close()
 
 
-# Email tool: records outreach and applies deterministic communication evidence when matched.
+# Email tool: records outreach and applies deterministic communication evidence when matched. Cost: 10m.
 def send_email(
     db_path: Path | str,
     person_id: str,
@@ -196,7 +196,7 @@ def send_email(
             """,
             (message_id, AGENT_ID, person_id, subject, body, current_time),
         )
-        email_effects = _effects_for_email(person_id, subject, body)
+        email_effects = _effects_for_email(conn, person_id, subject, body)
         applied_effects = apply_effects(
             conn,
             email_effects,
@@ -233,7 +233,7 @@ def send_email(
         conn.close()
 
 
-# Task tool: updates explicit task fields only when required world state supports completion.
+# Task tool: updates explicit task fields when world state supports completion. Cost: 1m.
 def update_task(
     db_path: Path | str,
     task_id: str,
@@ -420,7 +420,7 @@ def _project_decision(conn: sqlite3.Connection) -> str | None:
     return decision if isinstance(decision, str) else None
 
 
-# Calendar tool: records the meeting and schedules an async meeting_occurs event.
+# Calendar tool: records a meeting and schedules meeting_occurs at its end time. Cost: 5m to schedule.
 def schedule_meeting(
     db_path: Path | str,
     title: str,
@@ -527,7 +527,12 @@ def _schedule_coworker_reply(
     return event_id
 
 
-def _effects_for_email(person_id: str, subject: str, body: str) -> list[dict[str, Any]]:
+def _effects_for_email(
+    conn: sqlite3.Connection,
+    person_id: str,
+    subject: str,
+    body: str,
+) -> list[dict[str, Any]]:
     if person_id.lower() != "daisy":
         return []
 
@@ -570,7 +575,13 @@ def _effects_for_email(person_id: str, subject: str, body: str) -> list[dict[str
     has_security_question = _mentions_any(normalized, EMAIL_SECURITY_TERMS)
     has_transient_answer = _mentions_any(normalized, EMAIL_TRANSIENT_TERMS)
     has_audit_limits = _mentions_any(normalized, EMAIL_AUDIT_TERMS)
-    if has_customer_context and has_security_question and has_transient_answer and has_audit_limits:
+    if (
+        has_customer_context
+        and has_security_question
+        and has_transient_answer
+        and has_audit_limits
+        and _daisy_security_question_visible(conn)
+    ):
         effects.append(
             {
                 "type": "add_evaluation_evidence",
@@ -582,6 +593,27 @@ def _effects_for_email(person_id: str, subject: str, body: str) -> list[dict[str
             }
         )
     return effects
+
+
+def _daisy_security_question_visible(conn: sqlite3.Connection) -> bool:
+    return (
+        conn.execute(
+            """
+            SELECT 1
+            FROM messages
+            WHERE sender_id = 'daisy'
+              AND recipient_id = 'agent'
+              AND (
+                lower(coalesce(subject, '')) LIKE '%security%'
+                OR lower(body) LIKE '%security%'
+                OR lower(body) LIKE '%source code%'
+                OR lower(body) LIKE '%private repo%'
+              )
+            LIMIT 1
+            """
+        ).fetchone()
+        is not None
+    )
 
 
 def _schedule_meeting_occurs(

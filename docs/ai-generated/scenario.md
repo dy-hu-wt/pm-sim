@@ -90,11 +90,14 @@ The doc says private-repo source snippets are processed transiently, raw source 
 The good behavior is:
 
 ```text
+wait until Daisy asks the security question
 ask Luigi about the security question
 advance time for his reply
 read doc_private_repo_security_baseline
 send Daisy a doc-backed answer
 ```
+
+The security doc can be found early, but `security_question_answered` only scores after Daisy's question is visible.
 
 This records:
 

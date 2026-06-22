@@ -421,12 +421,31 @@ def _format_run_agent(value: dict[str, Any]) -> str:
                 lines.append(f"  {component['key']}: {', '.join(evidence)}")
             else:
                 lines.append(f"  {component['key']}: {component.get('note', 'not passed')}")
-    lines.extend(["", "Steps"])
-    for index, step in enumerate(steps, start=1):
-        status = "ok" if step.get("ok") else "failed"
-        lines.append(f"  {index}. {step.get('name')} [{status}]")
+    if len(steps) > 25:
+        lines.extend(["", "Step Counts"])
+        for name, count in _step_counts(steps).items():
+            lines.append(f"  {name}: {count}")
+
+        lines.extend(["", "Recent Steps"])
+        start = max(1, len(steps) - 9)
+        for index, step in enumerate(steps[-10:], start=start):
+            status = "ok" if step.get("ok") else "failed"
+            lines.append(f"  {index}. {step.get('name')} [{status}]")
+    else:
+        lines.extend(["", "Steps"])
+        for index, step in enumerate(steps, start=1):
+            status = "ok" if step.get("ok") else "failed"
+            lines.append(f"  {index}. {step.get('name')} [{status}]")
 
     return "\n".join(lines)
+
+
+def _step_counts(steps: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for step in steps:
+        name = str(step.get("name"))
+        counts[name] = counts.get(name, 0) + 1
+    return counts
 
 
 def _agent_missing_components(evaluation: dict[str, Any]) -> list[dict[str, Any]]:
