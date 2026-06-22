@@ -10,17 +10,17 @@
       .chrome { fill: #f8fafd; }
       .grid { stroke: #e8eaed; stroke-width: 1; }
       .major { stroke: #dadce0; stroke-width: 1; }
-      .text { font-family: Arial, Helvetica, sans-serif; fill: #3c4043; }
+      .text { font-family: Arial, Helvetica, sans-serif; fill: #3c4043; text-rendering: optimizeLegibility; }
       .muted { fill: #5f6368; }
-      .tiny { font-size: 11px; }
-      .small { font-size: 12px; }
-      .body { font-size: 13px; }
-      .label { font-size: 14px; font-weight: 700; }
-      .date { font-size: 28px; font-weight: 400; }
-      .event-title { font-size: 12px; font-weight: 700; fill: #ffffff; }
-      .event-meta { font-size: 11px; fill: #ffffff; opacity: 0.95; }
-      .event-dark { font-size: 12px; font-weight: 700; fill: #202124; }
-      .event-dark-meta { font-size: 11px; fill: #3c4043; }
+      .tiny { font-size: 13px; }
+      .small { font-size: 14px; }
+      .body { font-size: 14px; }
+      .label { font-size: 18px; font-weight: 700; }
+      .date { font-size: 34px; font-weight: 400; }
+      .event-title { font-family: Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700; fill: #ffffff; text-rendering: optimizeLegibility; }
+      .event-meta { font-family: Arial, Helvetica, sans-serif; font-size: 13px; fill: #ffffff; opacity: 0.95; text-rendering: optimizeLegibility; }
+      .event-dark { font-family: Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700; fill: #202124; text-rendering: optimizeLegibility; }
+      .event-dark-meta { font-family: Arial, Helvetica, sans-serif; font-size: 13px; fill: #3c4043; text-rendering: optimizeLegibility; }
     </style>
   </defs>
 
@@ -33,17 +33,17 @@
 
   <g transform="translate(782 24)">
     <rect x="0" y="0" width="18" height="10" rx="5" fill="#1a73e8"/>
-    <text x="26" y="10" class="text tiny muted">Daisy / customer</text>
+    <text x="26" y="10" class="text tiny muted">Daisy</text>
     <rect x="126" y="0" width="18" height="10" rx="5" fill="#188038"/>
-    <text x="152" y="10" class="text tiny muted">Luigi / backend</text>
+    <text x="152" y="10" class="text tiny muted">Luigi</text>
     <rect x="252" y="0" width="18" height="10" rx="5" fill="#d93025"/>
     <text x="278" y="10" class="text tiny muted">Deadline</text>
     <rect x="0" y="22" width="18" height="10" rx="5" fill="#f9ab00"/>
-    <text x="26" y="32" class="text tiny muted">Mario / product</text>
+    <text x="26" y="32" class="text tiny muted">Mario</text>
     <rect x="126" y="22" width="18" height="10" rx="5" fill="#a142f4"/>
-    <text x="152" y="32" class="text tiny muted">Koopa thread</text>
+    <text x="152" y="32" class="text tiny muted">Koopa</text>
     <rect x="252" y="22" width="18" height="10" rx="5" fill="#e8710a"/>
-    <text x="278" y="32" class="text tiny muted">Peach / unblock</text>
+    <text x="278" y="32" class="text tiny muted">Peach</text>
   </g>
 
   <g id="calendar" transform="translate(24 92)">
@@ -107,7 +107,7 @@
         <line x1="70" y1="556" x2="1132" y2="556"/>
       </g>
 
-      <g filter="url(#shadow)">
+      <g>
         <rect x="82" y="8" width="182" height="58" rx="8" fill="#1a73e8"/>
         <text x="94" y="29" class="event-title">Agent starts</text>
         <text x="94" y="47" class="event-meta">Briefs, tasks, blockers</text>
