@@ -147,7 +147,13 @@ def _format_action_result(value: dict[str, Any]) -> str:
         return "\n".join(lines)
 
     if "message_id" in value:
-        return "\n".join(["Message sent", f"  Message ID: {value.get('message_id')}"])
+        lines = ["Message sent", f"  Message ID: {value.get('message_id')}"]
+        effects = value.get("applied_effects", [])
+        if effects:
+            lines.append("  Effects:")
+            for effect in effects:
+                lines.append(f"    - {_format_effect(effect)}")
+        return "\n".join(lines)
 
     if "task_id" in value:
         return "\n".join(

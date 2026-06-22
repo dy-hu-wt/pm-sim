@@ -87,7 +87,7 @@ Send messages and update work:
 
 ```bash
 python3 -m pm_sim.cli send-chat luigi "Any CRM sync blockers for launch?"
-python3 -m pm_sim.cli send-email daisy "Friday confidence" "I am checking launch risk and will follow up."
+python3 -m pm_sim.cli send-email daisy "Fireflower Friday fallback status" "CRM sync has vendor timeout risk. I recommend a reliable fallback for Friday using usage and support data."
 python3 -m pm_sim.cli update-task task_launch_decision --status in_progress
 python3 -m pm_sim.cli schedule-meeting "Fallback decision" 2026-06-24T10:00:00 2026-06-24T10:30:00 mario luigi daisy toad
 ```

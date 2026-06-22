@@ -7,9 +7,14 @@ from typing import Any
 
 from .coworkers import CoworkerReply, replies_for_chat
 from .db import connect, row_to_dict, rows_to_dicts
+from .effects import apply_effects
 from .jsonutil import dumps
 from .paths import DEFAULT_DB_PATH
 from .state import AGENT_ID, get_current_time, log_action
+
+EMAIL_RISK_TERMS = frozenset({"risk", "blocker", "blocked", "crm", "sync", "timeout", "vendor"})
+EMAIL_FALLBACK_TERMS = frozenset({"fallback", "reliable", "de-scope", "descope", "usage", "support"})
+EMAIL_CUSTOMER_TERMS = frozenset({"fireflower", "friday", "renewal", "customer", "confidence"})
 
 
 def list_tasks(db_path: Path | str = DEFAULT_DB_PATH) -> list[dict[str, Any]]:
@@ -127,6 +132,13 @@ def send_email(
             """,
             (message_id, AGENT_ID, person_id, subject, body, current_time),
         )
+        email_effects = _effects_for_email(person_id, subject, body)
+        applied_effects = apply_effects(
+            conn,
+            email_effects,
+            now=current_time,
+            source=f"action:{message_id}",
+        )
         log_action(
             conn,
             action_id=_next_id(conn, "action_log", "action_send_email"),
@@ -134,11 +146,11 @@ def send_email(
             action_type="send_email",
             created_at=current_time,
             payload={"person_id": person_id, "subject": subject, "body": body},
-            result={"message_id": message_id},
+            result={"message_id": message_id, "applied_effects": applied_effects},
         )
         conn.commit()
 
-        return {"ok": True, "message_id": message_id}
+        return {"ok": True, "message_id": message_id, "applied_effects": applied_effects}
     finally:
         conn.close()
 
@@ -280,6 +292,26 @@ def _schedule_coworker_reply(
     return event_id
 
 
+def _effects_for_email(person_id: str, subject: str, body: str) -> list[dict[str, Any]]:
+    if person_id.lower() != "daisy":
+        return []
+
+    normalized = _normalize(f"{subject} {body}")
+    has_risk = _mentions_any(normalized, EMAIL_RISK_TERMS)
+    has_fallback = _mentions_any(normalized, EMAIL_FALLBACK_TERMS)
+    has_customer_context = _mentions_any(normalized, EMAIL_CUSTOMER_TERMS)
+    if not (has_risk and has_fallback and has_customer_context):
+        return []
+
+    return [
+        {
+            "type": "add_evaluation_evidence",
+            "key": "stakeholder_alignment",
+            "note": "Agent sent Daisy a concrete Fireflower risk and fallback status update.",
+        }
+    ]
+
+
 def _schedule_meeting_occurs(
     conn: sqlite3.Connection,
     *,
@@ -344,3 +376,11 @@ def _parse_time(value: str) -> datetime:
 
 def _format_time(value: datetime) -> str:
     return value.isoformat(timespec="seconds")
+
+
+def _normalize(value: str) -> str:
+    return " ".join(value.lower().split())
+
+
+def _mentions_any(value: str, terms: frozenset[str]) -> bool:
+    return any(term in value for term in terms)
