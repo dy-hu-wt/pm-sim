@@ -66,6 +66,8 @@ python3 -m pm_sim.cli read-doc doc_friday_outcome
 
 Expected evaluation result before the Friday deadline: `100 / 100`. The important evidence is recorded through delivered coworker reply events: `blocker_discovered`, `stakeholder_alignment`, `peach_unblocked`, and `draft_mode_approved`. Advancing to Friday then records the final project outcome.
 
+The path demonstrates good PM behavior by turning a hidden technical risk into a clear launch tradeoff, aligning the customer-facing owner, unblocking implementation work, and getting an explicit decision before the deadline.
+
 ## Commands
 
 Commands print human-readable output by default. Add `--json` before the command for machine-readable output.
