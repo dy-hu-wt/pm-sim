@@ -93,7 +93,7 @@ The agent should not see everything upfront. Some facts should live in docs, tas
 
 ### 5. The System Evaluates Improved Outcomes
 
-The evaluator should score outcomes and decisions, not activity volume.
+The evaluator should score outcomes and decisions, not activity volume. It can apply a small capped penalty for excessive outreach, because spraying messages is different from targeted coordination.
 
 The main comparison is:
 
@@ -110,7 +110,7 @@ Possible score components:
 20% stakeholder communication
 20% task/project state improvement
 15% risk handling
-15% avoiding harmful or superficial actions
+15% avoiding harmful or superficial actions, including excessive direct outreach
 ```
 
 This is RL-adjacent because the simulator has state, actions, transitions, observations, and rewards. The goal is not to train an RL policy for v1. The goal is an agent evaluation environment with defensible grading.
@@ -190,7 +190,7 @@ The evaluator should point to concrete evidence:
 - risk increased or decreased
 - harmful actions taken or avoided
 
-The score should not depend on vague style judgments.
+The score should not depend on vague style judgments. Any communication penalty should be tied to observable counts or state, and should be small compared with outcome evidence.
 
 I do not plan to use model-based verification in the first version. The evaluator should inspect the database, event log, and final project state directly.
 

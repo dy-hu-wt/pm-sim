@@ -18,6 +18,7 @@ ToolFn = Callable[[dict[str, Any]], ToolResult]
 ProgressFn = Callable[[str], None]
 
 DEFAULT_MODEL = "gpt-5.5"
+FULL_SCORE_STOP_REASON = "full_score"
 
 
 class LlmAgentError(RuntimeError):
@@ -57,6 +58,7 @@ def run_llm_agent(
 
     finished = False
     final_message = ""
+    stop_reason = "max_turns"
     for turn in range(1, max_turns + 1):
         _progress(progress, f"{_sim_time_label(db_path)} turn {turn}/{max_turns}: waiting for model")
         response = client.responses.create(
@@ -70,18 +72,24 @@ def run_llm_agent(
         input_items.extend(output)
         final_message = getattr(response, "output_text", "") or final_message
         tool_calls = [item for item in output if getattr(item, "type", None) == "function_call"]
-        _progress(progress, f"{_sim_time_label(db_path)} turn {turn}/{max_turns}: model returned {len(tool_calls)} tool call(s)")
+        if tool_calls:
+            _progress(
+                progress,
+                f"{_sim_time_label(db_path)} turn {turn}/{max_turns}: "
+                f"{_tool_call_summary(tool_calls)}",
+            )
 
         if not tool_calls:
+            stop_reason = "no_tool_calls"
             break
 
         for call in tool_calls:
             name = getattr(call, "name", "")
             args = _parse_arguments(getattr(call, "arguments", "{}"))
-            _progress(progress, f"{_sim_time_label(db_path)} running {name}{_args_summary(name, args)}")
             if name == "finish":
                 finished = True
                 result: dict[str, Any] = {"ok": True, "reason": args.get("reason", "")}
+                stop_reason = "agent_finish"
             else:
                 handler = tool_handlers.get(name)
                 if handler is None:
@@ -90,9 +98,7 @@ def run_llm_agent(
                     result = handler(args)
 
             steps.append(_step(name, result))
-            result_summary = _result_summary(name, result)
-            if result_summary:
-                _progress(progress, f"{_sim_time_label(db_path)} {result_summary}")
+            _progress(progress, f"{_sim_time_label(db_path)} {_tool_progress_line(name, args, result)}")
             input_items.append(
                 {
                     "type": "function_call_output",
@@ -102,6 +108,15 @@ def run_llm_agent(
             )
 
         if finished:
+            break
+
+        turn_evaluation = evaluate(db_path, scenario_path)
+        if turn_evaluation.get("score") == turn_evaluation.get("max_score"):
+            stop_reason = FULL_SCORE_STOP_REASON
+            _progress(
+                progress,
+                f"{_sim_time_label(db_path)} full score reached; stopping operator run",
+            )
             break
 
     evaluation = evaluate(db_path, scenario_path)
@@ -114,6 +129,7 @@ def run_llm_agent(
         "policy": "llm",
         "model": model,
         "finished": finished,
+        "stop_reason": stop_reason,
         "turns": turn if "turn" in locals() else 0,
         "steps": steps,
         "final_message": final_message,
@@ -337,32 +353,50 @@ def _args_summary(name: str, args: dict[str, Any]) -> str:
     return ""
 
 
+def _tool_call_summary(tool_calls: list[Any]) -> str:
+    names = [str(getattr(call, "name", "unknown")) for call in tool_calls]
+    counts: dict[str, int] = {}
+    for name in names:
+        counts[name] = counts.get(name, 0) + 1
+    summary = ", ".join(
+        f"{name} x{count}" if count > 1 else name for name, count in counts.items()
+    )
+    return f"model requested {len(names)} tool call(s): {summary}"
+
+
+def _tool_progress_line(name: str, args: dict[str, Any], result: ToolResult) -> str:
+    summary = _result_summary(name, result)
+    if summary:
+        return f"{name}{_args_summary(name, args)} -> {summary}"
+    return f"{name}{_args_summary(name, args)}"
+
+
 def _result_summary(name: str, result: ToolResult) -> str:
     if not isinstance(result, dict):
-        return f"{name} returned {len(result)} row(s)"
+        return f"{len(result)} row(s)"
     if not result.get("ok", True):
-        return f"{name} failed: {result.get('error')}"
+        return f"failed: {result.get('error')}"
     if name == "observe":
-        return f"observe returned current time {_pretty_time(result.get('current_time'))}"
+        return f"current time {_pretty_time(result.get('current_time'))}"
     if name == "advance_time":
         delivered = result.get("delivered_events", [])
         if delivered:
             event_types = ", ".join(event.get("event_type", "event") for event in delivered)
-            return f"advanced to {_pretty_time(result.get('to'))}; delivered {event_types}"
-        return f"advanced to {_pretty_time(result.get('to'))}; delivered no events"
+            return f"{_pretty_time(result.get('to'))}; delivered {event_types}"
+        return f"{_pretty_time(result.get('to'))}; delivered no events"
     if name == "send_chat":
         replies = result.get("scheduled_reply_ids", [])
-        return f"chat scheduled {len(replies)} reply event(s)"
+        return f"scheduled {len(replies)} reply event(s)"
     if name == "send_email":
         effects = result.get("applied_effects", [])
-        return f"email applied {len(effects)} effect(s)"
+        return f"applied {len(effects)} effect(s)"
     if name == "read_doc":
         doc = result.get("doc", {})
-        return f"read doc: {doc.get('title', 'unknown doc')}"
+        return doc.get("title", "unknown doc")
     if name == "schedule_meeting":
-        return f"meeting scheduled: {result.get('meeting_id')}"
+        return f"scheduled {result.get('meeting_id')}"
     if name == "update_task":
-        return f"task updated: {result.get('task_id')}"
+        return "updated"
     return ""
 
 

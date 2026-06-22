@@ -383,6 +383,10 @@ def _format_run_agent(value: dict[str, Any]) -> str:
         f"  Score:  {evaluation.get('score')} / {evaluation.get('max_score')}",
         f"  Steps:  {len(steps)}",
     ]
+    if value.get("stop_reason"):
+        lines.append(f"  Stop:   {_agent_stop_reason(value.get('stop_reason'))}")
+    if value.get("finished") is not None:
+        lines.append(f"  Finish: {'agent called finish' if value.get('finished') else 'not called'}")
     if value.get("model"):
         lines.append(f"  Model:  {value.get('model')}")
     if value.get("turns") is not None:
@@ -410,6 +414,16 @@ def _agent_missing_components(evaluation: dict[str, Any]) -> list[dict[str, Any]
         for component in evaluation.get("components", [])
         if component.get("status") != "passed"
     ]
+
+
+def _agent_stop_reason(reason: str) -> str:
+    labels = {
+        "agent_finish": "agent called finish",
+        "full_score": "operator stopped after full score",
+        "max_turns": "max turns reached",
+        "no_tool_calls": "model returned no tool calls",
+    }
+    return labels.get(reason, reason)
 
 
 def _format_effect(effect: dict[str, Any]) -> str:

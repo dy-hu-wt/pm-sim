@@ -95,7 +95,7 @@ The scripted policy uses the normal tool functions. It does not mutate database 
 
 ## Bad-Path Sanity Check
 
-The evaluator is not counting messages or task updates. A busywork path that sends vague chats, moves tasks to `in_progress`, and sends Daisy a generic status email will still miss evidence such as `customer_message_ready`, `draft_mode_approved`, and the security interruption. The test suite covers this as `test_busywork_does_not_score_like_good_pm_work`.
+The evaluator is not counting messages or task updates. A busywork path that sends vague chats, moves tasks to `in_progress`, and sends Daisy a generic status email will still miss evidence such as `customer_message_ready`, `draft_mode_approved`, and the security interruption. Excessive direct outreach also loses a small number of points under `avoid_harmful_actions`, so a noisy agent cannot get a perfect score just by messaging everyone. The test suite covers this as `test_busywork_does_not_score_like_good_pm_work`.
 
 ## Commands
 
@@ -168,7 +168,7 @@ pm-sim run-agent --policy llm --reset --max-turns 40
 
 The flag is `--policy`, not `--polciy`. The LLM policy uses the OpenAI API to choose workplace tool calls, then the simulator executes those calls locally. The model does not get the evaluator as a tool during the episode; grading runs after the agent stops.
 
-An LLM turn means one model decision round: the runner sends the current conversation/tool results to the model, waits for tool calls, runs those tools, and feeds the tool outputs back. A single model turn may contain more than one tool call. LLM runs print progress lines with simulated time and tool details, such as `[agent] [Wed 2026-06-24 14:00] running send_chat -> luigi ...`. Add `--quiet` to suppress those logs.
+An LLM turn means one model decision round: the runner sends the current conversation/tool results to the model, waits for tool calls, runs those tools, and feeds the tool outputs back. A single model turn may contain more than one tool call. LLM runs print concise progress lines with simulated time, tool details, and short results, such as `[agent] [Wed 2026-06-24 14:00] send_chat -> luigi: ... -> scheduled 1 reply event(s)`. Add `--quiet` to suppress those logs. The operator runner stops early if the current state reaches full score, and the final summary prints whether the model actually called `finish` or stopped for another reason.
 
 If an LLM run stops below full score, the operator summary prints the missing evaluator evidence. For example, `security_doc_found` and `security_question_answered` mean the model did not advance to Daisy's Wednesday security question, ask Luigi about the security doc, read it, and answer Daisy.
 
@@ -182,7 +182,7 @@ pm-sim evaluate --explain
 pm-sim --json evaluate
 ```
 
-The score comes from the rubric in `scenarios/launch_readiness.json`. It rewards outcomes and state improvements, not raw tool usage or activity volume. Evidence must show that the agent improved the project: discovering blockers, aligning stakeholders, unblocking real work, approving a defensible draft-mode launch, and avoiding harmful state.
+The score comes from the rubric in `scenarios/launch_readiness.json`. It rewards outcomes and state improvements, not raw tool usage or activity volume. Evidence must show that the agent improved the project: discovering blockers, aligning stakeholders, unblocking real work, approving a defensible draft-mode launch, and avoiding harmful state. `avoid_harmful_actions` includes a light, capped penalty for excessive direct outreach.
 
 Task updates are checked against the surrounding world state to resist reward hacking. For example, marking repo sync complete while the stale-code blocker is unresolved is penalized, and draft-mode onboarding progress only counts when draft-mode scope is confirmed and the scope blocker is resolved.
 

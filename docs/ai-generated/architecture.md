@@ -106,6 +106,7 @@ The current rubric rewards:
 - getting Toad's draft-mode approval
 - answering the async security interruption from the hidden doc
 - avoiding harmful or fake progress
+- keeping direct outreach targeted instead of spraying check-ins
 
 Evidence rows act as score-relevant receipts. Some evidence is written directly by tool/event effects. Other evidence is derived from consistent world state, such as draft-mode approval being present in project metadata.
 
@@ -128,7 +129,7 @@ pm-sim evaluate --explain
 
 `run-agent --policy scripted --reset` runs the golden path through the same public tool functions used by the CLI. It is a deterministic policy, not an LLM and not a training loop.
 
-`run-agent --policy llm --reset --max-turns 40` uses the OpenAI API to choose simulator tool calls. The local runner exposes observation, docs, chat, email, tasks, meetings, and time as callable tools. The evaluator is not exposed as an agent tool during the episode; final scoring is operator-side after the agent stops. A model turn is one model decision round, not one tool call, and a single model turn may request multiple tools. The CLI prints progress logs with simulated time, tool arguments, and short result summaries because model calls can otherwise look idle until the final result is returned. If the run ends below full score, the operator summary prints missing evaluator evidence so the operator can see what the model failed to resolve.
+`run-agent --policy llm --reset --max-turns 40` uses the OpenAI API to choose simulator tool calls. The local runner exposes observation, docs, chat, email, tasks, meetings, and time as callable tools. The evaluator is not exposed as an agent tool during the episode; final scoring is operator-side after the agent stops. A model turn is one model decision round, not one tool call, and a single model turn may request multiple tools. The CLI prints concise progress logs with simulated time, tool arguments, and short result summaries because model calls can otherwise look idle until the final result is returned. The operator runner can stop early once the current state reaches full score, and the final summary records the stop reason. If the run ends below full score, the operator summary prints missing evaluator evidence so the operator can see what the model failed to resolve.
 
 ## Scaling Path
 
