@@ -1460,6 +1460,37 @@ class ToolActionTests(unittest.TestCase):
             any(effect.get("key") == "decision_record_written" for effect in result["applied_effects"])
         )
 
+    def test_decision_record_accepts_llm_markdown_record(self) -> None:
+        self._drive_to_draft_approval()
+
+        result = update_doc(
+            self.db_path,
+            "doc_launch_decision_record",
+            """
+# Friday Launch Decision Record - PR Review Agent Beta
+
+Decision owner/approval: Toad approved the Friday launch mode.
+
+## Approved Friday launch mode
+Ship the Nimbus Labs beta in **draft mode**.
+
+## Customer-visible behavior
+- The PR Review Agent may generate review suggestions for a real pull request.
+- The agent must **not post comments automatically** in the Friday beta.
+- A human must review and approve suggestions before anything is posted to a PR.
+
+## Scope decision
+Auto-commenting is **out of Friday scope** and remains a follow-up after repo-sync hardening.
+
+## Rationale
+Luigi surfaced a repo-sync stale-commit risk: webhook events can arrive out of order, so auto-commenting could review or post against a stale commit on Friday. Draft mode keeps the beta useful while preventing incorrect comments from being posted directly.
+""",
+        )
+
+        self.assertTrue(
+            any(effect.get("key") == "decision_record_written" for effect in result["applied_effects"])
+        )
+
     def test_private_repo_security_doc_is_hidden_until_luigi_reveals_it(self) -> None:
         hidden = read_doc(self.db_path, "doc_private_repo_security_baseline")
 

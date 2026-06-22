@@ -1639,7 +1639,12 @@
         [
           "human approval",
           "approval before posting",
-          "review before posting"
+          "review before posting",
+          "human approves",
+          "human must review",
+          "human must review and approve",
+          "human reviews and approves",
+          "human review"
         ],
         [
           "auto-commenting out",
@@ -1653,7 +1658,12 @@
           "auto-commenting is out of scope",
           "auto-commenting out of scope",
           "no auto-commenting",
-          "do not ship auto-commenting"
+          "do not ship auto-commenting",
+          "must not post comments automatically",
+          "not post comments automatically",
+          "will not post comments automatically",
+          "not post automatically",
+          "comments automatically"
         ],
         [
           "repo sync",
