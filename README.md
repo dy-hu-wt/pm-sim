@@ -14,10 +14,18 @@ The agent's job is to discover the stale-code risk, align Mario, Luigi, Peach, D
 
 ## Setup
 
-Use Python 3.9 or newer. No package install is required for the current backend.
+Use Python 3.9 or newer. Create a virtualenv and install the repo in editable mode so the `pm-sim` command is available:
 
 ```bash
-python3 -m unittest discover -s tests
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+```
+
+Then run the tests:
+
+```bash
+python -m unittest discover -s tests
 ```
 
 Optional LLM settings can be copied later if model-driven wording or rollout support is added:
@@ -31,7 +39,7 @@ cp .env.example .env
 Reset the local SQLite state from the scenario:
 
 ```bash
-python3 -m pm_sim.cli reset --scenario scenarios/launch_readiness.json
+pm-sim reset --scenario scenarios/launch_readiness.json
 ```
 
 This creates `data/current.db`, which is ignored by git.
@@ -41,27 +49,27 @@ This creates `data/current.db`, which is ignored by git.
 This is the shortest successful path through the scenario. It demonstrates discovery, stakeholder alignment, draft-mode approval, evaluation, and the Friday deadline outcome; it is not meant to exhaust the whole simulated week.
 
 ```bash
-python3 -m pm_sim.cli reset
-python3 -m pm_sim.cli observe
-python3 -m pm_sim.cli read-doc doc_project_brief
-python3 -m pm_sim.cli read-doc doc_beta_rollout_template
+pm-sim reset
+pm-sim observe
+pm-sim read-doc doc_project_brief
+pm-sim read-doc doc_beta_rollout_template
 
-python3 -m pm_sim.cli send-chat luigi "Any repo sync blockers or launch risks for Nimbus?"
-python3 -m pm_sim.cli advance-time 2h
+pm-sim send-chat luigi "Any repo sync blockers or launch risks for Nimbus?"
+pm-sim advance-time 2h
 
-python3 -m pm_sim.cli send-chat daisy "Repo sync has stale-code risk. Can we message reliable draft mode for Nimbus?"
-python3 -m pm_sim.cli advance-time 45m
+pm-sim send-chat daisy "Repo sync has stale-code risk. Can we message reliable draft mode for Nimbus?"
+pm-sim advance-time 45m
 
-python3 -m pm_sim.cli send-chat peach "Please finalize draft-mode onboarding with human approval and no auto-commenting."
-python3 -m pm_sim.cli advance-time 90m
+pm-sim send-chat peach "Please finalize draft-mode onboarding with human approval and no auto-commenting."
+pm-sim advance-time 90m
 
-python3 -m pm_sim.cli send-chat toad "Repo sync can review stale commits. Approve draft mode for Friday?"
-python3 -m pm_sim.cli advance-time 90m
+pm-sim send-chat toad "Repo sync can review stale commits. Approve draft mode for Friday?"
+pm-sim advance-time 90m
 
-python3 -m pm_sim.cli evaluate
+pm-sim evaluate
 
-python3 -m pm_sim.cli advance-time to:2026-06-26T15:00:00
-python3 -m pm_sim.cli read-doc doc_friday_outcome
+pm-sim advance-time to:2026-06-26T15:00:00
+pm-sim read-doc doc_friday_outcome
 ```
 
 Expected evaluation result before the Friday deadline: `100 / 100`. The important evidence is recorded through delivered coworker reply events: `blocker_discovered`, `stakeholder_alignment`, `peach_unblocked`, and `draft_mode_approved`. Advancing to Friday then records the final project outcome.
@@ -75,51 +83,51 @@ Commands print human-readable output by default. Add `--json` before the command
 Inspect the current visible state:
 
 ```bash
-python3 -m pm_sim.cli observe
-python3 -m pm_sim.cli --json observe
+pm-sim observe
+pm-sim --json observe
 ```
 
 Read tasks and docs:
 
 ```bash
-python3 -m pm_sim.cli list-tasks
-python3 -m pm_sim.cli read-doc doc_project_brief
-python3 -m pm_sim.cli read-doc doc_beta_rollout_template
+pm-sim list-tasks
+pm-sim read-doc doc_project_brief
+pm-sim read-doc doc_beta_rollout_template
 ```
 
 Send messages and update work:
 
 ```bash
-python3 -m pm_sim.cli send-chat luigi "Any repo sync blockers for launch?"
-python3 -m pm_sim.cli send-email daisy "Nimbus Friday draft-mode status" "Repo sync has stale-commit risk. I recommend reliable draft mode for Friday with human approval."
-python3 -m pm_sim.cli update-task task_launch_decision --status in_progress
-python3 -m pm_sim.cli schedule-meeting "Draft-mode decision" 2026-06-24T10:00:00 2026-06-24T10:30:00 mario luigi daisy toad
+pm-sim send-chat luigi "Any repo sync blockers for launch?"
+pm-sim send-email daisy "Nimbus Friday draft-mode status" "Repo sync has stale-commit risk. I recommend reliable draft mode for Friday with human approval."
+pm-sim update-task task_launch_decision --status in_progress
+pm-sim schedule-meeting "Draft-mode decision" 2026-06-24T10:00:00 2026-06-24T10:30:00 mario luigi daisy toad
 ```
 
 Inspect scheduled and delivered background events:
 
 ```bash
-python3 -m pm_sim.cli events
+pm-sim events
 ```
 
 Advance simulated time without using wall-clock time:
 
 ```bash
-python3 -m pm_sim.cli advance-time 2h
-python3 -m pm_sim.cli advance-time until_next_event
+pm-sim advance-time 2h
+pm-sim advance-time until_next_event
 ```
 
 Inspect the action log:
 
 ```bash
-python3 -m pm_sim.cli log
+pm-sim log
 ```
 
 Inspect the combined action, event, message, and evidence timeline:
 
 ```bash
-python3 -m pm_sim.cli timeline
-python3 -m pm_sim.cli timeline --limit 20
+pm-sim timeline
+pm-sim timeline --limit 20
 ```
 
 ## Evaluation
@@ -127,9 +135,9 @@ python3 -m pm_sim.cli timeline --limit 20
 Run the deterministic evaluator against the current SQLite state:
 
 ```bash
-python3 -m pm_sim.cli evaluate
-python3 -m pm_sim.cli evaluate --explain
-python3 -m pm_sim.cli --json evaluate
+pm-sim evaluate
+pm-sim evaluate --explain
+pm-sim --json evaluate
 ```
 
 The score comes from the rubric in `scenarios/launch_readiness.json`. It rewards outcomes and state improvements, not raw tool usage or activity volume. Evidence must show that the agent improved the project: discovering blockers, aligning stakeholders, unblocking real work, approving a defensible draft-mode launch, and avoiding harmful state.
@@ -139,5 +147,5 @@ Task updates are checked against the surrounding world state to resist reward ha
 The backend is covered by:
 
 ```bash
-python3 -m unittest discover -s tests
+python -m unittest discover -s tests
 ```
