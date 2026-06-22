@@ -229,7 +229,7 @@ Task updates are checked against the surrounding world state to resist reward ha
 
 After the Friday deadline event is delivered, `evaluate` also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
-This v1 is intentionally honest about its boundary: common storage, tool actions, event delivery, timelines, coworker rule matching, and evidence scoring are reusable engine pieces, but the launch-readiness scenario still has scenario-specific Python checks for some task gates, state-derived evidence, and Friday outcome classification. That is acceptable for one fully-authored scenario. The next scaling step is to move more of those outcome rules and state checks into scenario data before adding a second scenario.
+Most scenario semantics now live in `scenarios/launch_readiness.json`: task gates, state-derived evidence, harmful-action rules, coworker chat rules, and Friday outcome rules are evaluated by reusable engine code. The remaining v1 boundary is meeting/event behavior that still contains some scenario-specific Python for the authored PR Review Agent scenario. That is acceptable for one complete scenario; the next scaling step is to make meeting/event effects use the same declarative rule style before adding a second scenario.
 
 The backend is covered by:
 

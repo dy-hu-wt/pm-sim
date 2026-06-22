@@ -154,10 +154,14 @@ The engine should stay scenario-agnostic where possible. A new scenario should m
 - scheduled events
 - evaluation targets
 - coworker rules
+- state evidence rules
+- task gate rules
+- harmful-action rules
+- outcome rules
 - optional agent policies
 
 Direct coworker chat uses a structured rule interpreter. Rules can match on trigger terms, term groups, required facts, absent facts, and priority. The rule then emits fixed reply text, delay, and effects. For example, Luigi's security-doc reveal and Toad's draft-mode approval are authored in scenario JSON instead of hardcoded as Python branches.
 
 This is the main answer to the scaling concern: scenario files should describe the world, while engine code should define common simulation semantics.
 
-The current v1 still has scenario-specific Python for some task gates, state-derived evidence rows, and Friday outcome classification. That is intentional for one fully-authored scenario, but it is the main scaling boundary. The common engine pieces are storage, tool actions, event delivery, timelines, effect application, coworker rule matching, action logs, and evaluator component scoring. A second scenario should push more outcome rules and state checks into scenario data instead of adding custom branches for every project.
+The common engine pieces are storage, tool actions, event delivery, timelines, effect application, condition evaluation, coworker rule matching, action logs, task gates, state-derived evidence, harm checks, outcome rules, and evaluator component scoring. The current v1 still has some scenario-specific Python in meeting/event behavior. A second scenario should push those remaining effects into the same declarative rule style instead of adding custom branches for every project.

@@ -227,6 +227,9 @@ def _load_scenario(conn: sqlite3.Connection, scenario: dict[str, Any]) -> None:
     set_state_value(conn, "scenario_id", scenario["id"])
     set_state_value(conn, "current_time", scenario["start_time"])
     set_state_value(conn, "coworker_rules_json", dumps(scenario.get("coworker_rules", [])))
+    set_state_value(conn, "state_evidence_rules_json", dumps(scenario.get("state_evidence_rules", [])))
+    set_state_value(conn, "task_gate_rules_json", dumps(scenario.get("task_gate_rules", [])))
+    set_state_value(conn, "outcome_rules_json", dumps(scenario.get("outcome_rules", [])))
 
     _insert_people(conn, scenario.get("people", []))
     _insert_facts(conn, scenario.get("facts", []))

@@ -256,22 +256,32 @@ Scenario data should define most of the setup:
 - initial messages
 - scheduled events
 - evaluation targets
+- state evidence rules
+- task gate rules
+- harmful-action rules
+- outcome rules
 
-Python behavior rules can handle logic that data alone cannot express. The v1 launch-readiness scenario still has scenario-specific Python checks for a few task gates, state-derived evidence rows, and Friday outcome classification. We should not pretend this is fully generic.
+Python behavior rules can handle logic that data alone cannot express, but scenario-specific scoring and outcome semantics should be data-authored where possible. The current implementation uses a small reusable condition language for task gates, state-derived evidence rows, harmful-action rules, and Friday outcome classification.
 
 The defensible split is:
 
 ```text
 Reusable engine:
   storage, tool actions, event delivery, timelines, effect application,
-  coworker rule matching, action logs, and evaluator component scoring
+  condition evaluation, coworker rule matching, action logs, task gates,
+  state-derived evidence, harm checks, outcome rules, and evaluator scoring
 
-Scenario-specific v1 logic:
-  some task-gate checks, some state-derived evidence, and the Friday
-  outcome classifier for the PR Review Agent launch
+Scenario-specific v1 data:
+  people, facts, docs, tasks, blockers, events, coworker rules, task gates,
+  state evidence rules, harm rules, and outcome rules
+
+Remaining boundary:
+  meeting/event behavior still has some PR Review Agent-specific Python.
+  The next scaling step is making those effects use the same declarative
+  rule style before adding a second scenario.
 ```
 
-The next scaling step is not a giant prompt. It is moving more outcome rules and state checks into scenario data so a second scenario can reuse the same engine without custom Python branches for every project.
+The next scaling step is not a giant prompt. It is reducing the remaining meeting/event special cases so a second scenario can reuse the same engine without custom Python branches for every project.
 
 ### Operator Workflow
 
