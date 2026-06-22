@@ -162,6 +162,18 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
 
 def _luigi_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
     if _mentions_any(normalized, RISK_TERMS):
+        if _state_has_fact(state, "fact_crm_sync_flaky"):
+            return CoworkerReply(
+                person_id="luigi",
+                delay_minutes=RESPONSE_DELAYS_MINUTES["luigi"],
+                body=(
+                    "Same CRM enrichment risk as before: usage and support data "
+                    "are solid, but the vendor CRM endpoint is still too flaky "
+                    "for renewal date and account tier. I still recommend the "
+                    "fallback report unless Toad accepts the demo risk."
+                ),
+            )
+
         return CoworkerReply(
             person_id="luigi",
             delay_minutes=RESPONSE_DELAYS_MINUTES["luigi"],

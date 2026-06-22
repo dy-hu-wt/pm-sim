@@ -83,6 +83,17 @@ class CoworkerRuleTests(unittest.TestCase):
         self.assertIn("discover_fact", effect_types)
         self.assertIn("update_blocker", effect_types)
 
+    def test_luigi_repeat_risk_reply_does_not_duplicate_discovery_effects(self) -> None:
+        replies = replies_for_chat(
+            "luigi",
+            "Any CRM sync blockers for launch?",
+            {"discovered_facts": ["fact_crm_sync_flaky"]},
+        )
+
+        self.assertEqual(len(replies), 1)
+        self.assertIn("Same CRM enrichment risk", replies[0].body)
+        self.assertEqual(replies[0].effects, ())
+
     def test_background_event_has_deterministic_effects(self) -> None:
         effects = effects_for_event(
             "luigi_proactive_crm_risk",
@@ -171,6 +182,51 @@ class EffectApplicationTests(unittest.TestCase):
             self.assertEqual(task["status"], "in_progress")
             self.assertEqual(loads(project["metadata_json"])["decision"], "fallback_report_approved")
             self.assertEqual(evidence["evidence_key"], "blocker_discovered")
+        finally:
+            conn.close()
+
+    def test_duplicate_evaluation_evidence_is_idempotent(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            first = apply_effects(
+                conn,
+                [
+                    {
+                        "type": "add_evaluation_evidence",
+                        "key": "blocker_discovered",
+                        "note": "Luigi disclosed CRM risk.",
+                    }
+                ],
+                now="2026-06-22T11:00:00",
+                source="test:first",
+            )
+            second = apply_effects(
+                conn,
+                [
+                    {
+                        "type": "add_evaluation_evidence",
+                        "key": "blocker_discovered",
+                        "note": "Luigi disclosed CRM risk.",
+                    }
+                ],
+                now="2026-06-22T13:00:00",
+                source="test:second",
+            )
+            conn.commit()
+
+            count = conn.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM evaluation_evidence
+                WHERE evidence_key = 'blocker_discovered'
+                  AND note = 'Luigi disclosed CRM risk.'
+                """
+            ).fetchone()["count"]
+
+            self.assertEqual(count, 1)
+            self.assertFalse(first[0]["deduped"])
+            self.assertTrue(second[0]["deduped"])
+            self.assertEqual(first[0]["id"], second[0]["id"])
         finally:
             conn.close()
 

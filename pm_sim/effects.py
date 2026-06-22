@@ -198,6 +198,20 @@ def _apply_add_evaluation_evidence(
     source: str,
     index: int,
 ) -> dict[str, Any]:
+    evidence_key = _required(effect, "key")
+    note = effect.get("note", "")
+    existing = conn.execute(
+        """
+        SELECT id
+        FROM evaluation_evidence
+        WHERE evidence_key = ? AND note = ?
+        LIMIT 1
+        """,
+        (evidence_key, note),
+    ).fetchone()
+    if existing is not None:
+        return {"id": existing["id"], "key": evidence_key, "deduped": True}
+
     evidence_id = effect.get("id") or _generated_id(
         conn, "evaluation_evidence", f"evidence_{_source_slug(source)}", index
     )
@@ -209,14 +223,14 @@ def _apply_add_evaluation_evidence(
         """,
         (
             evidence_id,
-            _required(effect, "key"),
-            effect.get("note", ""),
+            evidence_key,
+            note,
             effect.get("created_at", now),
             source,
             dumps(effect.get("metadata", {})),
         ),
     )
-    return {"id": evidence_id, "key": effect["key"]}
+    return {"id": evidence_id, "key": evidence_key, "deduped": False}
 
 
 def _required(effect: dict[str, Any], key: str) -> Any:
