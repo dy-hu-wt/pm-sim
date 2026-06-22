@@ -4,9 +4,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pm_sim.actions import list_tasks, read_doc, send_chat, send_email, update_task
+from pm_sim.actions import (
+    list_tasks,
+    read_doc,
+    schedule_meeting,
+    send_chat,
+    send_email,
+    update_task,
+)
 from pm_sim.coworkers import effects_for_event, replies_for_chat
 from pm_sim.db import connect
+from pm_sim.evaluator import evaluate
 from pm_sim.effects import apply_effects
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
@@ -241,6 +249,62 @@ class EffectApplicationTests(unittest.TestCase):
         self.assertEqual(state["recent_messages"][0]["sender_id"], "luigi")
         self.assertIn("fact_crm_sync_flaky", {fact["id"] for fact in state["discovered_facts"]})
 
+    def test_meeting_event_creates_transcript_and_applies_coordination_effects(self) -> None:
+        meeting = schedule_meeting(
+            self.db_path,
+            "Fallback risk review for Fireflower launch",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["luigi", "daisy", "mario", "toad"],
+        )
+
+        result = advance_time(self.db_path, "to:2026-06-22T10:30:00")
+        state = observe(self.db_path)
+        conn = connect(self.db_path)
+        try:
+            calendar_event = conn.execute(
+                """
+                SELECT status, transcript_doc_id
+                FROM calendar_events
+                WHERE id = ?
+                """,
+                (meeting["meeting_id"],),
+            ).fetchone()
+            transcript = conn.execute(
+                """
+                SELECT title, kind, body, visible
+                FROM docs
+                WHERE id = ?
+                """,
+                (calendar_event["transcript_doc_id"],),
+            ).fetchone()
+            evidence_keys = {
+                row["evidence_key"]
+                for row in conn.execute(
+                    "SELECT evidence_key FROM evaluation_evidence"
+                ).fetchall()
+            }
+
+            delivered = result["delivered_events"][0]
+            blocker_ids = {blocker["id"] for blocker in state["known_blockers"]}
+            fact_ids = {fact["id"] for fact in state["discovered_facts"]}
+
+            self.assertEqual(delivered["event_type"], "meeting_occurs")
+            self.assertTrue(delivered["result"]["handled"])
+            self.assertEqual(calendar_event["status"], "completed")
+            self.assertEqual(calendar_event["transcript_doc_id"], "doc_transcript_cal_1")
+            self.assertEqual(transcript["kind"], "meeting_transcript")
+            self.assertEqual(transcript["visible"], 1)
+            self.assertIn("CRM enrichment", transcript["body"])
+            self.assertIn("blocker_crm_sync_flaky", blocker_ids)
+            self.assertIn("fact_crm_sync_flaky", fact_ids)
+            self.assertIn("fact_fallback_approved", fact_ids)
+            self.assertIn("blocker_discovered", evidence_keys)
+            self.assertIn("stakeholder_alignment", evidence_keys)
+            self.assertIn("fallback_approved", evidence_keys)
+        finally:
+            conn.close()
+
 
 class ToolActionTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -296,6 +360,22 @@ class ToolActionTests(unittest.TestCase):
         self.assertEqual(message["channel"], "email")
         self.assertEqual(message["recipient_id"], "daisy")
 
+    def test_schedule_meeting_creates_future_meeting_event(self) -> None:
+        result = schedule_meeting(
+            self.db_path,
+            "Fallback risk review",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["luigi", "daisy", "mario", "toad"],
+        )
+        events = event_log(self.db_path, limit=20)
+
+        self.assertTrue(result["ok"])
+        meeting_events = [event for event in events if event["event_type"] == "meeting_occurs"]
+        self.assertEqual(len(meeting_events), 1)
+        self.assertEqual(meeting_events[0]["scheduled_at"], "2026-06-22T10:30:00")
+        self.assertIn(result["meeting_id"], meeting_events[0]["payload_json"])
+
     def test_update_task_changes_status_and_priority(self) -> None:
         result = update_task(
             self.db_path,
@@ -309,6 +389,76 @@ class ToolActionTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(task["status"], "in_progress")
         self.assertEqual(task["priority"], "critical")
+
+
+class EvaluatorTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.tmpdir.name) / "test.db"
+        reset(self.db_path, DEFAULT_SCENARIO_PATH)
+
+    def tearDown(self) -> None:
+        self.tmpdir.cleanup()
+
+    def test_reset_state_scores_below_agent_improved_path(self) -> None:
+        baseline = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+
+        send_chat(self.db_path, "luigi", "Any CRM sync blockers for launch?")
+        advance_time(self.db_path, "2h")
+        send_chat(
+            self.db_path,
+            "daisy",
+            "CRM sync is risky. Can we message a reliable fallback for Fireflower?",
+        )
+        advance_time(self.db_path, "45m")
+        send_chat(
+            self.db_path,
+            "peach",
+            "Please finalize the fallback using usage and support data without CRM fields.",
+        )
+        advance_time(self.db_path, "90m")
+        send_chat(
+            self.db_path,
+            "toad",
+            "CRM vendor sync is timing out. Approve fallback report for Friday?",
+        )
+        advance_time(self.db_path, "90m")
+
+        improved = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+
+        self.assertLess(baseline["score"], improved["score"])
+        self.assertEqual(improved["score"], improved["max_score"])
+        component_scores = {
+            component["key"]: component["earned"] for component in improved["components"]
+        }
+        self.assertEqual(component_scores["blocker_discovery"], 30)
+        self.assertEqual(component_scores["risk_handling"], 15)
+
+    def test_late_evidence_gets_partial_timing_credit(self) -> None:
+        advance_time(self.db_path, "to:2026-06-25T10:00:00")
+
+        result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        blocker_component = next(
+            component
+            for component in result["components"]
+            if component["key"] == "blocker_discovery"
+        )
+
+        self.assertEqual(blocker_component["earned"], 15)
+        self.assertEqual(blocker_component["status"], "partial")
+
+    def test_harmful_task_completion_is_penalized(self) -> None:
+        update_task(self.db_path, "task_crm_enrichment", status="complete", priority=None)
+
+        result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        harmful_component = next(
+            component
+            for component in result["components"]
+            if component["key"] == "avoid_harmful_actions"
+        )
+
+        self.assertEqual(harmful_component["earned"], 0)
+        self.assertTrue(harmful_component["detected_harms"])
 
 
 if __name__ == "__main__":

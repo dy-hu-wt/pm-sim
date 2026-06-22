@@ -19,6 +19,8 @@ def format_output(command: str | None, value: Any) -> str:
         return _format_events(value)
     if command == "advance-time":
         return _format_advance_time(value)
+    if command == "evaluate":
+        return _format_evaluate(value)
     if command == "log":
         return _format_log(value)
     return str(value)
@@ -213,6 +215,46 @@ def _format_log(entries: list[dict[str, Any]]) -> str:
             f"  {_pretty_time(entry['created_at'])}  "
             f"{entry['actor']}  {entry['action_type']}  ({entry['id']})"
         )
+    return "\n".join(lines)
+
+
+def _format_evaluate(value: dict[str, Any]) -> str:
+    if not value.get("ok"):
+        return f"Error: {value.get('error')}"
+
+    lines = [
+        "Evaluation",
+        f"  Scenario: {value.get('scenario_id')}",
+        f"  Score:    {value.get('score')} / {value.get('max_score')}",
+        f"  Evidence: {value.get('evidence_count')}",
+        "",
+        "Components",
+    ]
+    for component in value.get("components", []):
+        lines.append(
+            f"  {component['key']}: {component['earned']} / {component['points']} "
+            f"[{component['status']}]"
+        )
+        lines.append(f"    {component.get('note')}")
+        for evidence in component.get("evidence", []):
+            lines.append(
+                f"    - {evidence['key']} at {_pretty_time(evidence['created_at'])}: "
+                f"{evidence['note']}"
+            )
+        for harm in component.get("detected_harms", []):
+            lines.append(f"    - {harm}")
+
+    baseline = value.get("baseline") or {}
+    if baseline:
+        lines.extend(
+            [
+                "",
+                "Baseline",
+                f"  {baseline.get('description')}",
+                f"  {baseline.get('expected_outcome')}",
+            ]
+        )
+
     return "\n".join(lines)
 
 

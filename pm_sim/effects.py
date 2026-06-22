@@ -18,6 +18,10 @@ def apply_effects(
         effect_type = effect.get("type")
         if effect_type == "create_message":
             result = _apply_create_message(conn, effect, now=now, source=source, index=index)
+        elif effect_type == "create_doc":
+            result = _apply_create_doc(conn, effect, now=now, source=source, index=index)
+        elif effect_type == "update_calendar_event":
+            result = _apply_update_calendar_event(conn, effect)
         elif effect_type == "discover_fact":
             result = _apply_discover_fact(conn, effect, now=now, source=source)
         elif effect_type == "update_blocker":
@@ -68,6 +72,56 @@ def _apply_create_message(
         ),
     )
     return {"id": message_id}
+
+
+def _apply_create_doc(
+    conn: sqlite3.Connection,
+    effect: dict[str, Any],
+    *,
+    now: str,
+    source: str,
+    index: int,
+) -> dict[str, Any]:
+    doc_id = effect.get("id") or _generated_id(conn, "docs", f"doc_{_source_slug(source)}", index)
+    conn.execute(
+        """
+        INSERT INTO docs
+          (id, title, kind, body, visible, updated_at, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            doc_id,
+            _required(effect, "title"),
+            effect.get("kind", "doc"),
+            effect.get("body", ""),
+            0 if effect.get("visible") is False else 1,
+            effect.get("updated_at", now),
+            dumps({"source": source, **effect.get("metadata", {})}),
+        ),
+    )
+    return {"id": doc_id}
+
+
+def _apply_update_calendar_event(conn: sqlite3.Connection, effect: dict[str, Any]) -> dict[str, Any]:
+    event_id = _required(effect, "calendar_event_id")
+    updates = []
+    values: list[Any] = []
+    for key in ("status", "transcript_doc_id"):
+        if key in effect:
+            updates.append(f"{key} = ?")
+            values.append(effect[key])
+
+    if not updates:
+        raise ValueError("update_calendar_event effect must include a mutable field.")
+
+    values.append(event_id)
+    cursor = conn.execute(
+        f"UPDATE calendar_events SET {', '.join(updates)} WHERE id = ?",
+        values,
+    )
+    if cursor.rowcount == 0:
+        raise ValueError(f"Cannot update unknown calendar event: {event_id}")
+    return {"calendar_event_id": event_id}
 
 
 def _apply_discover_fact(

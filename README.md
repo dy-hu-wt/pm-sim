@@ -84,15 +84,16 @@ python3 -m pm_sim.cli log
 
 ## Evaluation
 
-The deterministic evaluator is the next backend step. It will score the final state and event/action history against the scenario targets in `scenarios/launch_readiness.json`.
-
-The intended command is:
+Run the deterministic evaluator against the current SQLite state:
 
 ```bash
 python3 -m pm_sim.cli evaluate
+python3 -m pm_sim.cli --json evaluate
 ```
 
-Until that lands, the core reset, observation, time, event delivery, and coworker-rule behavior are covered by:
+The score comes from the rubric in `scenarios/launch_readiness.json`. It rewards recorded evidence for early blocker discovery, stakeholder alignment, task improvement, and risk handling. It also checks for harmful state, such as marking CRM enrichment complete while the CRM blocker is still open.
+
+The backend is covered by:
 
 ```bash
 python3 -m unittest discover -s tests

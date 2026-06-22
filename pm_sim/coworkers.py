@@ -109,6 +109,7 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
             ),
             _discover_fact("fact_crm_sync_flaky", "luigi_proactive_crm_risk"),
             _update_blocker("blocker_crm_sync_flaky", "surfaced"),
+            _add_evidence("blocker_discovered", "Luigi proactively disclosed CRM sync risk."),
         ]
 
     if event_type == "daisy_confidence_check":
@@ -158,6 +159,83 @@ def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
         ]
 
     return []
+
+
+def effects_for_meeting(payload: dict[str, Any]) -> list[Effect]:
+    """Return transcript and deterministic coordination effects for a meeting."""
+
+    attendees = {attendee.lower() for attendee in payload.get("attendees", [])}
+    title = payload.get("title", "Meeting")
+    normalized_topic = _normalize(title)
+    transcript_doc_id = payload["transcript_doc_id"]
+    calendar_event_id = payload["calendar_event_id"]
+
+    effects: list[Effect] = [
+        {
+            "type": "create_doc",
+            "id": transcript_doc_id,
+            "title": f"Transcript: {title}",
+            "kind": "meeting_transcript",
+            "visible": True,
+            "body": _meeting_transcript_body(title, attendees, normalized_topic),
+            "metadata": {
+                "calendar_event_id": calendar_event_id,
+                "attendees": sorted(attendees),
+            },
+        },
+        {
+            "type": "update_calendar_event",
+            "calendar_event_id": calendar_event_id,
+            "status": "completed",
+            "transcript_doc_id": transcript_doc_id,
+        },
+    ]
+
+    risk_topic = _mentions_any(normalized_topic, RISK_TERMS)
+    fallback_topic = _mentions_any(normalized_topic, {"fallback", "de-scope", "descope", "scope"})
+    launch_topic = _mentions_any(normalized_topic, {"launch", "readiness", "friday", "fireflower"})
+
+    if "luigi" in attendees and (risk_topic or fallback_topic or launch_topic):
+        effects.extend(
+            [
+                _discover_fact("fact_crm_sync_flaky", "meeting_occurs"),
+                _update_blocker("blocker_crm_sync_flaky", "surfaced"),
+                _add_evidence("blocker_discovered", "Meeting surfaced Luigi's CRM sync risk."),
+            ]
+        )
+
+    if {"mario", "daisy"} & attendees and (risk_topic or fallback_topic):
+        effects.append(
+            _add_evidence(
+                "stakeholder_alignment",
+                "Meeting aligned stakeholders around CRM risk and fallback messaging.",
+            )
+        )
+
+    if {"luigi", "toad"}.issubset(attendees) and (risk_topic or fallback_topic):
+        effects.extend(
+            [
+                _discover_fact("fact_fallback_approved", "meeting_occurs"),
+                _update_project_decision("fallback_report_approved"),
+                _update_blocker("blocker_launch_scope_decision", "resolved"),
+                _add_evidence(
+                    "fallback_approved",
+                    "Toad approved fallback in a meeting with technical risk context.",
+                ),
+            ]
+        )
+
+    if "peach" in attendees and fallback_topic:
+        effects.extend(
+            [
+                _discover_fact("fact_fallback_scope_confirmed", "meeting_occurs"),
+                _update_task("task_fallback_design", "in_progress"),
+                _update_blocker("blocker_scope_unclear", "resolved"),
+                _add_evidence("peach_unblocked", "Meeting clarified fallback scope for Peach."),
+            ]
+        )
+
+    return effects
 
 
 def _luigi_reply(normalized: str, state: dict[str, Any]) -> CoworkerReply:
@@ -376,3 +454,26 @@ def _update_pressure(metric: str, delta: int) -> Effect:
 
 def _add_evidence(key: str, note: str) -> Effect:
     return {"type": "add_evaluation_evidence", "key": key, "note": note}
+
+
+def _meeting_transcript_body(title: str, attendees: set[str], normalized_topic: str) -> str:
+    lines = [
+        f"Meeting: {title}",
+        f"Attendees: {', '.join(sorted(attendees))}",
+        "Summary:",
+    ]
+    if "luigi" in attendees and _mentions_any(normalized_topic, RISK_TERMS):
+        lines.append(
+            "- Luigi stated that CRM enrichment for renewal date and account tier remains risky."
+        )
+    if "daisy" in attendees:
+        lines.append("- Daisy asked for reliable Friday messaging for Fireflower CRM.")
+    if "mario" in attendees:
+        lines.append("- Mario agreed the full report is valuable but should not create demo failure risk.")
+    if "toad" in attendees and _mentions_any(normalized_topic, {"fallback", "risk", "crm", "sync"}):
+        lines.append("- Toad approved fallback scope if CRM enrichment is unsafe for Friday.")
+    if "peach" in attendees and "fallback" in normalized_topic:
+        lines.append("- Peach can proceed once fallback fields are confirmed.")
+    if len(lines) == 3:
+        lines.append("- No launch-critical decisions were made.")
+    return "\n".join(lines)

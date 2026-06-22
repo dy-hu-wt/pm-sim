@@ -14,6 +14,7 @@ from .actions import (
     send_email,
     update_task,
 )
+from .evaluator import evaluate
 from .formatters import format_output
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .scenario import ScenarioError
@@ -115,6 +116,15 @@ def _build_parser() -> argparse.ArgumentParser:
     events_parser = subparsers.add_parser("events", help="Print scheduled/delivered events.")
     events_parser.add_argument("--limit", type=int, default=20)
     events_parser.set_defaults(func=lambda args: event_log(args.db, args.limit))
+
+    evaluate_parser = subparsers.add_parser("evaluate", help="Score the current simulation state.")
+    evaluate_parser.add_argument(
+        "--scenario",
+        type=Path,
+        default=DEFAULT_SCENARIO_PATH,
+        help=f"Scenario JSON path. Default: {DEFAULT_SCENARIO_PATH}",
+    )
+    evaluate_parser.set_defaults(func=lambda args: evaluate(args.db, args.scenario))
 
     advance_parser = subparsers.add_parser("advance-time", help="Advance simulated time.")
     advance_parser.add_argument(

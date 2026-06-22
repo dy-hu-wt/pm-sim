@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from .coworkers import effects_for_event
+from .coworkers import effects_for_event, effects_for_meeting
 from .db import connect, rows_to_dicts
 from .effects import apply_effects
 from .jsonutil import dumps, loads
@@ -143,6 +143,9 @@ def _effects_for_delivery(event_type: str, payload: dict[str, Any]) -> list[dict
             },
             *payload.get("effects", []),
         ]
+
+    if event_type == "meeting_occurs":
+        return effects_for_meeting(payload)
 
     return effects_for_event(event_type, payload)
 

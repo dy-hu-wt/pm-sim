@@ -209,6 +209,7 @@ def schedule_meeting(
             return {"ok": False, "error": f"Unknown attendees: {', '.join(missing)}"}
 
         meeting_id = _next_id(conn, "calendar_events", "cal")
+        transcript_doc_id = f"doc_transcript_{meeting_id}"
         conn.execute(
             """
             INSERT INTO calendar_events
@@ -217,6 +218,16 @@ def schedule_meeting(
             VALUES (?, ?, ?, ?, ?, 'scheduled', NULL, '{}')
             """,
             (meeting_id, title, start_at, end_at, dumps(attendees)),
+        )
+        meeting_event_id = _schedule_meeting_occurs(
+            conn,
+            meeting_id=meeting_id,
+            transcript_doc_id=transcript_doc_id,
+            title=title,
+            start_at=start_at,
+            end_at=end_at,
+            attendees=attendees,
+            current_time=current_time,
         )
         log_action(
             conn,
@@ -230,11 +241,11 @@ def schedule_meeting(
                 "end_at": end_at,
                 "attendees": attendees,
             },
-            result={"meeting_id": meeting_id},
+            result={"meeting_id": meeting_id, "event_id": meeting_event_id},
         )
         conn.commit()
 
-        return {"ok": True, "meeting_id": meeting_id}
+        return {"ok": True, "meeting_id": meeting_id, "event_id": meeting_event_id}
     finally:
         conn.close()
 
@@ -262,6 +273,44 @@ def _schedule_coworker_reply(
                     "person_id": reply.person_id,
                     "body": reply.body,
                     "effects": list(reply.effects),
+                }
+            ),
+        ),
+    )
+    return event_id
+
+
+def _schedule_meeting_occurs(
+    conn: sqlite3.Connection,
+    *,
+    meeting_id: str,
+    transcript_doc_id: str,
+    title: str,
+    start_at: str,
+    end_at: str,
+    attendees: list[str],
+    current_time: str,
+) -> str:
+    event_id = _next_id(conn, "events", "event_meeting_occurs")
+    conn.execute(
+        """
+        INSERT INTO events
+          (id, event_type, scheduled_at, created_at, delivered_at,
+           status, priority, payload_json, result_json)
+        VALUES (?, 'meeting_occurs', ?, ?, NULL, 'pending', 75, ?, '{}')
+        """,
+        (
+            event_id,
+            end_at,
+            current_time,
+            dumps(
+                {
+                    "calendar_event_id": meeting_id,
+                    "transcript_doc_id": transcript_doc_id,
+                    "title": title,
+                    "start_at": start_at,
+                    "end_at": end_at,
+                    "attendees": attendees,
                 }
             ),
         ),
