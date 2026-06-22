@@ -20,6 +20,25 @@ EMAIL_DRAFT_TERMS = frozenset(
 )
 EMAIL_CUSTOMER_TERMS = frozenset({"nimbus", "friday", "beta", "pilot", "customer", "confidence"})
 EMAIL_APPROVAL_TERMS = frozenset({"human approval", "approve", "approval", "review before posting"})
+EMAIL_SECURITY_TERMS = frozenset(
+    {
+        "security",
+        "private repo",
+        "private repos",
+        "source code",
+        "raw source",
+        "stores source",
+        "stored",
+        "retained",
+        "retention",
+    }
+)
+EMAIL_TRANSIENT_TERMS = frozenset(
+    {"transient", "transiently", "not stored", "not retained", "no long-term", "raw source is not"}
+)
+EMAIL_AUDIT_TERMS = frozenset(
+    {"metadata", "draft suggestions", "generated suggestions", "audit", "30 days", "beta audit"}
+)
 COMPLETED_STATUSES = {"complete", "completed", "done", "resolved"}
 UNRESOLVED_BLOCKER_STATUSES = {"open", "surfaced", "blocked"}
 
@@ -439,36 +458,52 @@ def _effects_for_email(person_id: str, subject: str, body: str) -> list[dict[str
         return []
 
     normalized = _normalize(f"{subject} {body}")
+    effects = []
     has_risk = _mentions_any(normalized, EMAIL_RISK_TERMS)
     has_draft_plan = _mentions_any(normalized, EMAIL_DRAFT_TERMS)
     has_customer_context = _mentions_any(normalized, EMAIL_CUSTOMER_TERMS)
     has_human_approval = _mentions_any(normalized, EMAIL_APPROVAL_TERMS)
-    if not (has_risk and has_draft_plan and has_customer_context):
-        return []
+    if has_risk and has_draft_plan and has_customer_context:
+        effects.extend(
+            [
+                {
+                    "type": "add_evaluation_evidence",
+                    "key": "stakeholder_alignment",
+                    "note": "Agent sent Daisy a concrete Nimbus repo-sync risk and draft-mode status update.",
+                },
+                {
+                    "type": "update_project",
+                    "project_id": "project_pr_review_agent",
+                    "launch_conflict": {
+                        "status": "investigated",
+                        "inputs": {"customer_constraint_known": True},
+                    },
+                },
+            ]
+        )
+        if has_human_approval:
+            effects.append(
+                {
+                    "type": "add_evaluation_evidence",
+                    "key": "customer_message_ready",
+                    "note": (
+                        "Agent gave Daisy a Nimbus-ready Friday update: repo-sync risk, "
+                        "draft mode, and human approval before posting."
+                    ),
+                }
+            )
 
-    effects = [
-        {
-            "type": "add_evaluation_evidence",
-            "key": "stakeholder_alignment",
-            "note": "Agent sent Daisy a concrete Nimbus repo-sync risk and draft-mode status update.",
-        },
-        {
-            "type": "update_project",
-            "project_id": "project_pr_review_agent",
-            "launch_conflict": {
-                "status": "investigated",
-                "inputs": {"customer_constraint_known": True},
-            },
-        }
-    ]
-    if has_human_approval:
+    has_security_question = _mentions_any(normalized, EMAIL_SECURITY_TERMS)
+    has_transient_answer = _mentions_any(normalized, EMAIL_TRANSIENT_TERMS)
+    has_audit_limits = _mentions_any(normalized, EMAIL_AUDIT_TERMS)
+    if has_customer_context and has_security_question and has_transient_answer and has_audit_limits:
         effects.append(
             {
                 "type": "add_evaluation_evidence",
-                "key": "customer_message_ready",
+                "key": "security_question_answered",
                 "note": (
-                    "Agent gave Daisy a Nimbus-ready Friday update: repo-sync risk, "
-                    "draft mode, and human approval before posting."
+                    "Agent sent Daisy a doc-backed answer on private repo source handling "
+                    "and beta retention limits."
                 ),
             }
         )

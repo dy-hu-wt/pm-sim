@@ -142,6 +142,18 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(recent["channel"], "email")
         self.assertIn("post comments automatically", recent["body"])
 
+    def test_private_repo_security_question_arrives_as_background_event(self) -> None:
+        result = advance_time(self.db_path, "to:2026-06-24T14:00:00")
+        state = observe(self.db_path)
+
+        event_types = {event["event_type"] for event in result["delivered_events"]}
+        recent = state["recent_messages"][0]
+
+        self.assertIn("daisy_private_repo_security_question", event_types)
+        self.assertEqual(recent["sender_id"], "daisy")
+        self.assertEqual(recent["channel"], "email")
+        self.assertIn("stores source code", recent["body"])
+
     def test_can_deliver_all_seeded_events_through_friday_deadline(self) -> None:
         result = advance_time(self.db_path, "to:2026-06-26T15:00:00")
 
@@ -322,6 +334,7 @@ class CoreSimulationTests(unittest.TestCase):
 
         result = advance_time(self.db_path, "to:2026-06-22T10:30:00")
         self._send_customer_ready_email()
+        self._answer_security_question()
         advance_time(self.db_path, "to:2026-06-26T15:00:00")
         meeting_event = next(
             event for event in result["delivered_events"] if event["event_type"] == "meeting_occurs"
@@ -371,6 +384,26 @@ class CoreSimulationTests(unittest.TestCase):
             (
                 "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has "
                 "stale-commit risk, so comments should require human approval before posting."
+            ),
+        )
+
+    def _answer_security_question(self) -> None:
+        advance_time(self.db_path, "to:2026-06-24T14:00:00")
+        send_chat(
+            self.db_path,
+            "luigi",
+            "Nimbus asked if we store source code from private repos. Is there a security doc?",
+        )
+        advance_time(self.db_path, "2h")
+        read_doc(self.db_path, "doc_private_repo_security_baseline")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus private repo security answer",
+            (
+                "Nimbus can tell their reviewer that private repo source code is processed "
+                "transiently. Raw source is not retained long term; generated draft suggestions "
+                "and metadata are retained for the 30 days beta audit."
             ),
         )
 
@@ -888,6 +921,33 @@ class ToolActionTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("not visible", result["error"])
 
+    def test_private_repo_security_doc_is_hidden_until_luigi_reveals_it(self) -> None:
+        hidden = read_doc(self.db_path, "doc_private_repo_security_baseline")
+
+        send_chat(
+            self.db_path,
+            "luigi",
+            "Nimbus asked if we store source code from private repos. Is there a security doc?",
+        )
+        advance_time(self.db_path, "2h")
+        revealed = read_doc(self.db_path, "doc_private_repo_security_baseline")
+        conn = connect(self.db_path)
+        try:
+            evidence = conn.execute(
+                """
+                SELECT evidence_key
+                FROM evaluation_evidence
+                WHERE evidence_key = 'security_doc_found'
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertFalse(hidden["ok"])
+        self.assertTrue(revealed["ok"])
+        self.assertIn("Raw source code is not stored long term", revealed["doc"]["body"])
+        self.assertIsNotNone(evidence)
+
     def test_send_chat_schedules_coworker_reply(self) -> None:
         result = send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
         events = event_log(self.db_path, limit=20)
@@ -953,6 +1013,40 @@ class ToolActionTests(unittest.TestCase):
         self.assertEqual(result["applied_effects"][0]["type"], "add_evaluation_evidence")
         self.assertEqual(evidence["evidence_key"], "stakeholder_alignment")
         self.assertIn("Nimbus repo-sync risk and draft-mode", evidence["note"])
+
+    def test_security_answer_email_records_security_question_evidence(self) -> None:
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus private repo security answer",
+            (
+                "Nimbus can tell their reviewer that private repo source code is "
+                "processed transiently. Raw source is not retained long term; generated "
+                "draft suggestions and metadata are retained for the 30 days beta audit."
+            ),
+        )
+        conn = connect(self.db_path)
+        try:
+            evidence = conn.execute(
+                """
+                SELECT evidence_key, note
+                FROM evaluation_evidence
+                WHERE evidence_key = 'security_question_answered'
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(
+            any(
+                effect["type"] == "add_evaluation_evidence"
+                and effect["key"] == "security_question_answered"
+                for effect in result["applied_effects"]
+            )
+        )
+        self.assertEqual(evidence["evidence_key"], "security_question_answered")
+        self.assertIn("private repo source handling", evidence["note"])
 
     def test_schedule_meeting_creates_future_meeting_event(self) -> None:
         result = schedule_meeting(
@@ -1156,6 +1250,24 @@ class EvaluatorTests(unittest.TestCase):
                 "stale-commit risk, so comments should require human approval before posting."
             ),
         )
+        advance_time(self.db_path, "to:2026-06-24T14:00:00")
+        send_chat(
+            self.db_path,
+            "luigi",
+            "Nimbus asked if we store source code from private repos. Is there a security doc?",
+        )
+        advance_time(self.db_path, "2h")
+        read_doc(self.db_path, "doc_private_repo_security_baseline")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus private repo security answer",
+            (
+                "Nimbus can tell their reviewer that private repo source code is processed "
+                "transiently. Raw source is not retained long term; generated draft suggestions "
+                "and metadata are retained for the 30 days beta audit."
+            ),
+        )
 
     def test_reset_state_scores_below_agent_improved_path(self) -> None:
         baseline = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
@@ -1354,23 +1466,26 @@ class EvaluatorTests(unittest.TestCase):
         output = self._run_cli("evaluate", "--explain")
 
         self.assertIn("Evaluation Explanation", output)
-        self.assertIn("Score: 100 / 100", output)
+        self.assertIn("Score: 110 / 110", output)
         self.assertIn("+30 blocker_discovery (passed, max 30)", output)
         self.assertIn("+20 stakeholder_communication (passed, max 20)", output)
         self.assertIn("+20 task_state_improvement (passed, max 20)", output)
         self.assertIn("+15 risk_handling (passed, max 15)", output)
+        self.assertIn("+10 security_interruption (passed, max 10)", output)
         self.assertIn("Evidence:", output)
         self.assertIn("Stale repo sync risk is discovered in world state.", output)
         self.assertIn("Agent gave Daisy a Nimbus-ready Friday update", output)
         self.assertIn("Draft-mode approval is recorded in world state.", output)
+        self.assertIn("Luigi pointed the agent to the private repo security baseline.", output)
 
     def test_evaluate_explain_prints_missing_evidence(self) -> None:
         output = self._run_cli("evaluate", "--explain")
 
-        self.assertIn("Score: 15 / 100", output)
+        self.assertIn("Score: 15 / 110", output)
         self.assertIn("+0 stakeholder_communication (missing, max 20)", output)
         self.assertIn("Missing: stakeholder_alignment, customer_message_ready", output)
         self.assertIn("Missing: peach_unblocked, draft_mode_approved", output)
+        self.assertIn("Missing: security_doc_found, security_question_answered", output)
 
 
 if __name__ == "__main__":

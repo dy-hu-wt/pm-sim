@@ -24,6 +24,8 @@ def apply_effects(
             result = _apply_update_calendar_event(conn, effect)
         elif effect_type == "discover_fact":
             result = _apply_discover_fact(conn, effect, now=now, source=source)
+        elif effect_type == "reveal_doc":
+            result = _apply_reveal_doc(conn, effect, now=now)
         elif effect_type == "update_blocker":
             result = _apply_update_blocker(conn, effect, now=now)
         elif effect_type == "update_task":
@@ -145,6 +147,27 @@ def _apply_discover_fact(
     if cursor.rowcount == 0:
         raise ValueError(f"Cannot discover unknown fact: {fact_id}")
     return {"fact_id": fact_id}
+
+
+def _apply_reveal_doc(
+    conn: sqlite3.Connection,
+    effect: dict[str, Any],
+    *,
+    now: str,
+) -> dict[str, Any]:
+    doc_id = _required(effect, "doc_id")
+    cursor = conn.execute(
+        """
+        UPDATE docs
+        SET visible = 1,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (now, doc_id),
+    )
+    if cursor.rowcount == 0:
+        raise ValueError(f"Cannot reveal unknown doc: {doc_id}")
+    return {"doc_id": doc_id}
 
 
 def _apply_update_blocker(

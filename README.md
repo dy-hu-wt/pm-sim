@@ -68,13 +68,19 @@ pm-sim advance-time 90m
 
 pm-sim send-email daisy "Nimbus Friday draft-mode update" "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has stale-commit risk, so comments should require human approval before posting."
 
+pm-sim advance-time to:2026-06-24T14:00:00
+pm-sim send-chat luigi "Nimbus asked if we store source code from private repos. Is there a security doc?"
+pm-sim advance-time 2h
+pm-sim read-doc doc_private_repo_security_baseline
+pm-sim send-email daisy "Nimbus private repo security answer" "Nimbus can tell their reviewer that private repo source code is processed transiently. Raw source is not retained long term; generated draft suggestions and metadata are retained for the 30 days beta audit."
+
 pm-sim evaluate
 
 pm-sim advance-time to:2026-06-26T15:00:00
 pm-sim read-doc doc_friday_outcome
 ```
 
-Expected evaluation result before the Friday deadline: `100 / 100`. The important evidence is recorded through delivered coworker reply events plus the final Daisy email: `blocker_discovered`, `stakeholder_alignment`, `customer_message_ready`, `peach_unblocked`, and `draft_mode_approved`. Advancing to Friday then records the final project outcome.
+Expected evaluation result before the Friday deadline: `110 / 110`. The important evidence is recorded through delivered coworker reply events, the Daisy launch email, and the security interruption: `blocker_discovered`, `stakeholder_alignment`, `customer_message_ready`, `peach_unblocked`, `draft_mode_approved`, `security_doc_found`, and `security_question_answered`. Advancing to Friday then records the final project outcome.
 
 The path demonstrates good PM behavior by turning a hidden technical risk into a clear launch tradeoff, aligning the customer-facing owner, unblocking implementation work, and getting an explicit decision before the deadline.
 
@@ -96,6 +102,8 @@ pm-sim list-tasks
 pm-sim read-doc doc_project_brief
 pm-sim read-doc doc_beta_rollout_template
 ```
+
+`doc_private_repo_security_baseline` is hidden until Luigi points the agent to it.
 
 Send messages and update work:
 

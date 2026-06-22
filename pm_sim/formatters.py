@@ -381,6 +381,8 @@ def _format_effect(effect: dict[str, Any]) -> str:
         return f"updated calendar event {effect.get('calendar_event_id')}"
     if effect_type == "discover_fact":
         return f"discovered fact {effect.get('fact_id')}"
+    if effect_type == "reveal_doc":
+        return f"revealed doc {effect.get('doc_id')}"
     if effect_type == "update_blocker":
         if effect.get("skipped"):
             return f"kept blocker {effect.get('blocker_id')} -> {effect.get('status')}"
