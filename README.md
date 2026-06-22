@@ -140,6 +140,8 @@ pm-sim advance-time 2h
 pm-sim advance-time until_next_event
 ```
 
+Workplace actions also consume deterministic simulated effort: chat costs 5 minutes, email costs 10 minutes, reading a doc costs 15 minutes, scheduling a meeting costs 5 minutes, and task updates cost 1 minute. Meetings themselves resolve at their scheduled end time. Model latency never advances the clock.
+
 Inspect the action log:
 
 ```bash
@@ -168,7 +170,7 @@ pm-sim run-agent --policy llm --reset --max-turns 40
 
 The flag is `--policy`, not `--polciy`. The LLM policy uses the OpenAI API to choose workplace tool calls, then the simulator executes those calls locally. The model does not get the evaluator as a tool during the episode; grading runs after the agent stops.
 
-An LLM turn means one model decision round: the runner sends the current conversation/tool results to the model, waits for tool calls, runs those tools, and feeds the tool outputs back. A single model turn may contain more than one tool call. LLM runs print concise progress lines with simulated time, tool details, and short results, such as `[agent] [Wed 2026-06-24 14:00] send_chat -> luigi: ... -> scheduled 1 reply event(s)`. Add `--quiet` to suppress those logs. The LLM instructions ask for targeted coordination rather than broad check-ins, and the operator runner stops early if the current state reaches full score. The final summary prints whether the model actually called `finish` or stopped for another reason.
+An LLM turn means one model decision round: the runner sends the current conversation/tool results to the model, waits for tool calls, runs those tools, and feeds the tool outputs back. A single model turn may contain more than one tool call. LLM runs print concise progress lines with simulated time, tool details, logical time cost, and short results, such as `[agent] [Wed 2026-06-24 14:00] send_chat -> luigi: ... -> scheduled 1 reply event(s); +5m to Wed 2026-06-24 14:05`. Add `--quiet` to suppress those logs. The LLM instructions ask for targeted coordination rather than broad check-ins, and the operator runner stops early if the current state reaches full score. The final summary prints whether the model actually called `finish` or stopped for another reason.
 
 If an LLM run stops below full score, the operator summary prints the missing evaluator evidence. For example, `security_doc_found` and `security_question_answered` mean the model did not advance to Daisy's Wednesday security question, ask Luigi about the security doc, read it, and answer Daisy.
 

@@ -993,6 +993,10 @@ class ToolActionTests(unittest.TestCase):
 
         self.assertTrue(result["ok"])
         self.assertIn("review pull requests faster", result["doc"]["body"])
+        self.assertEqual(result["time_cost"]["minutes"], 15)
+        self.assertEqual(result["time_cost"]["from"], "2026-06-22T09:00:00")
+        self.assertEqual(result["time_cost"]["to"], "2026-06-22T09:15:00")
+        self.assertEqual(observe(self.db_path)["current_time"], "2026-06-22T09:15:00")
 
     def test_read_doc_returns_rollout_template(self) -> None:
         result = read_doc(self.db_path, "doc_beta_rollout_template")
@@ -1065,11 +1069,24 @@ class ToolActionTests(unittest.TestCase):
     def test_send_chat_schedules_coworker_reply(self) -> None:
         result = send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
         events = event_log(self.db_path, limit=20)
+        conn = connect(self.db_path)
+        try:
+            message = conn.execute(
+                "SELECT sent_at FROM messages WHERE id = ?",
+                (result["message_id"],),
+            ).fetchone()
+        finally:
+            conn.close()
 
         self.assertTrue(result["ok"])
+        self.assertEqual(result["time_cost"]["minutes"], 5)
+        self.assertEqual(result["time_cost"]["to"], "2026-06-22T09:05:00")
+        self.assertEqual(observe(self.db_path)["current_time"], "2026-06-22T09:05:00")
+        self.assertEqual(message["sent_at"], "2026-06-22T09:00:00")
         self.assertEqual(len(result["scheduled_reply_ids"]), 1)
         reply_events = [event for event in events if event["event_type"] == "coworker_reply"]
         self.assertEqual(len(reply_events), 1)
+        self.assertEqual(reply_events[0]["scheduled_at"], "2026-06-22T11:00:00")
         self.assertIn("repo sync", reply_events[0]["payload_json"])
 
     def test_send_email_records_message_without_scheduling_reply(self) -> None:
@@ -1093,6 +1110,9 @@ class ToolActionTests(unittest.TestCase):
             conn.close()
 
         self.assertTrue(result["ok"])
+        self.assertEqual(result["time_cost"]["minutes"], 10)
+        self.assertEqual(result["time_cost"]["to"], "2026-06-22T09:10:00")
+        self.assertEqual(observe(self.db_path)["current_time"], "2026-06-22T09:10:00")
         self.assertEqual(result["applied_effects"], [])
         self.assertEqual(evidence_count, 0)
         message = next(
@@ -1173,10 +1193,26 @@ class ToolActionTests(unittest.TestCase):
         events = event_log(self.db_path, limit=20)
 
         self.assertTrue(result["ok"])
+        self.assertEqual(result["time_cost"]["minutes"], 5)
+        self.assertEqual(result["time_cost"]["to"], "2026-06-22T09:05:00")
+        self.assertEqual(observe(self.db_path)["current_time"], "2026-06-22T09:05:00")
         meeting_events = [event for event in events if event["event_type"] == "meeting_occurs"]
         self.assertEqual(len(meeting_events), 1)
         self.assertEqual(meeting_events[0]["scheduled_at"], "2026-06-22T10:30:00")
         self.assertIn(result["meeting_id"], meeting_events[0]["payload_json"])
+
+    def test_action_time_cost_delivers_events_crossed_during_work(self) -> None:
+        advance_time(self.db_path, "to:2026-06-24T13:55:00")
+
+        result = read_doc(self.db_path, "doc_project_brief")
+        state = observe(self.db_path)
+
+        delivered_event_types = [
+            event["event_type"] for event in result["time_cost"]["delivered_events"]
+        ]
+        self.assertEqual(result["time_cost"]["to"], "2026-06-24T14:10:00")
+        self.assertIn("daisy_private_repo_security_question", delivered_event_types)
+        self.assertEqual(state["current_time"], "2026-06-24T14:10:00")
 
     def test_update_task_changes_status_and_priority(self) -> None:
         result = update_task(
@@ -1191,6 +1227,8 @@ class ToolActionTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(task["status"], "in_progress")
         self.assertEqual(task["priority"], "critical")
+        self.assertEqual(result["time_cost"]["minutes"], 1)
+        self.assertEqual(result["time_cost"]["to"], "2026-06-22T09:01:00")
 
     def test_cannot_complete_repo_sync_with_stale_blocker_unresolved(self) -> None:
         before = self._task_state("task_repo_sync")

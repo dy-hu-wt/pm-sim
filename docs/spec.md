@@ -8,9 +8,19 @@ This is the design baseline for the implementation. The goal is to build the bac
 
 The environment has its own clock. It is not tied to real time.
 
-If an LLM takes 5 seconds or 5 minutes to choose an action, the simulated week does not move forward during that wait. Time only moves through an explicit `advance_time` action.
+If an LLM takes 5 seconds or 5 minutes to choose an action, the simulated week does not move forward during that wait. Time moves because simulated work takes time, not because inference was slow.
 
 The agent can advance time because waiting is a real project-management action. The operator can also advance time during a manual demo.
+
+Tool actions have deterministic logical costs:
+
+```text
+send_chat: 5 minutes
+send_email: 10 minutes
+read_doc: 15 minutes
+schedule_meeting: 5 minutes to schedule; the meeting resolves at its scheduled end time
+update_task: 1 minute
+```
 
 Examples:
 
@@ -21,7 +31,7 @@ advance_time until_next_event
 advance_time to "Tuesday 09:00"
 ```
 
-The week should jump between meaningful events: replies, meetings, deadlines, escalations, and the final evaluation. It does not need minute-by-minute ticks.
+The week should jump between meaningful events and action costs: replies, meetings, deadlines, escalations, reading, communication, and final evaluation. It does not need minute-by-minute ticks.
 
 ### 2. The Agent Interacts Through Internal Tools
 
@@ -134,7 +144,7 @@ The simulator owns state mutation. Tool actions and event handlers should go thr
 
 The simulator should use an event queue.
 
-Agent actions happen synchronously first. Background activity happens later through scheduled events.
+Agent actions happen synchronously first and consume their deterministic action cost. Background activity happens through scheduled events, including events that become due during an action's time cost.
 
 Synchronous examples:
 

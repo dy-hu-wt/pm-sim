@@ -11,6 +11,7 @@ from .effects import apply_effects
 from .jsonutil import dumps, loads
 from .paths import DEFAULT_DB_PATH
 from .state import AGENT_ID, get_current_time, get_state_value, log_action
+from .time import consume_action_time
 
 EMAIL_RISK_TERMS = frozenset(
     {"risk", "blocker", "blocked", "repo", "sync", "stale", "commit", "webhook"}
@@ -41,6 +42,13 @@ EMAIL_AUDIT_TERMS = frozenset(
 )
 COMPLETED_STATUSES = {"complete", "completed", "done", "resolved"}
 UNRESOLVED_BLOCKER_STATUSES = {"open", "surfaced", "blocked"}
+ACTION_TIME_COST_MINUTES = {
+    "read_doc": 15,
+    "send_chat": 5,
+    "send_email": 10,
+    "schedule_meeting": 5,
+    "update_task": 1,
+}
 
 
 # Read-only tool: returns visible task state without mutating time, logs, or events.
@@ -61,10 +69,11 @@ def list_tasks(db_path: Path | str = DEFAULT_DB_PATH) -> list[dict[str, Any]]:
         conn.close()
 
 
-# Read-only tool: returns a visible doc body; private docs stay inaccessible.
+# Doc tool: returns a visible doc body and consumes reading time.
 def read_doc(db_path: Path | str, doc_id: str) -> dict[str, Any]:
     conn = connect(db_path)
     try:
+        current_time = get_current_time(conn)
         doc = row_to_dict(
             conn.execute(
                 """
@@ -79,7 +88,22 @@ def read_doc(db_path: Path | str, doc_id: str) -> dict[str, Any]:
             return {"ok": False, "error": f"Doc not found: {doc_id}"}
         if doc["visible"] != 1:
             return {"ok": False, "error": f"Doc is not visible: {doc_id}"}
-        return {"ok": True, "doc": doc}
+        time_cost = consume_action_time(
+            conn,
+            current_time=current_time,
+            minutes=ACTION_TIME_COST_MINUTES["read_doc"],
+        )
+        log_action(
+            conn,
+            action_id=_next_id(conn, "action_log", "action_read_doc"),
+            actor=AGENT_ID,
+            action_type="read_doc",
+            created_at=current_time,
+            payload={"doc_id": doc_id},
+            result={"doc_id": doc_id, "time_cost": time_cost},
+        )
+        conn.commit()
+        return {"ok": True, "doc": doc, "time_cost": time_cost}
     finally:
         conn.close()
 
@@ -111,6 +135,11 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
         scheduled_reply_ids = [
             _schedule_coworker_reply(conn, reply, current_time) for reply in replies
         ]
+        time_cost = consume_action_time(
+            conn,
+            current_time=current_time,
+            minutes=ACTION_TIME_COST_MINUTES["send_chat"],
+        )
 
         log_action(
             conn,
@@ -119,7 +148,11 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
             action_type="send_chat",
             created_at=current_time,
             payload={"person_id": person_id, "body": body},
-            result={"message_id": message_id, "scheduled_reply_ids": scheduled_reply_ids},
+            result={
+                "message_id": message_id,
+                "scheduled_reply_ids": scheduled_reply_ids,
+                "time_cost": time_cost,
+            },
         )
         conn.commit()
 
@@ -127,6 +160,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
             "ok": True,
             "message_id": message_id,
             "scheduled_reply_ids": scheduled_reply_ids,
+            "time_cost": time_cost,
         }
     finally:
         conn.close()
@@ -169,6 +203,11 @@ def send_email(
             now=current_time,
             source=f"action:{message_id}",
         )
+        time_cost = consume_action_time(
+            conn,
+            current_time=current_time,
+            minutes=ACTION_TIME_COST_MINUTES["send_email"],
+        )
         log_action(
             conn,
             action_id=_next_id(conn, "action_log", "action_send_email"),
@@ -176,11 +215,20 @@ def send_email(
             action_type="send_email",
             created_at=current_time,
             payload={"person_id": person_id, "subject": subject, "body": body},
-            result={"message_id": message_id, "applied_effects": applied_effects},
+            result={
+                "message_id": message_id,
+                "applied_effects": applied_effects,
+                "time_cost": time_cost,
+            },
         )
         conn.commit()
 
-        return {"ok": True, "message_id": message_id, "applied_effects": applied_effects}
+        return {
+            "ok": True,
+            "message_id": message_id,
+            "applied_effects": applied_effects,
+            "time_cost": time_cost,
+        }
     finally:
         conn.close()
 
@@ -216,6 +264,11 @@ def update_task(
             """,
             (new_status, new_priority, task_id),
         )
+        time_cost = consume_action_time(
+            conn,
+            current_time=current_time,
+            minutes=ACTION_TIME_COST_MINUTES["update_task"],
+        )
         log_action(
             conn,
             action_id=_next_id(conn, "action_log", "action_update_task"),
@@ -226,11 +279,18 @@ def update_task(
             result={
                 "previous": {"status": task["status"], "priority": task["priority"]},
                 "current": {"status": new_status, "priority": new_priority},
+                "time_cost": time_cost,
             },
         )
         conn.commit()
 
-        return {"ok": True, "task_id": task_id, "status": new_status, "priority": new_priority}
+        return {
+            "ok": True,
+            "task_id": task_id,
+            "status": new_status,
+            "priority": new_priority,
+            "time_cost": time_cost,
+        }
     finally:
         conn.close()
 
@@ -402,6 +462,11 @@ def schedule_meeting(
             attendees=attendees,
             current_time=current_time,
         )
+        time_cost = consume_action_time(
+            conn,
+            current_time=current_time,
+            minutes=ACTION_TIME_COST_MINUTES["schedule_meeting"],
+        )
         log_action(
             conn,
             action_id=_next_id(conn, "action_log", "action_schedule_meeting"),
@@ -414,11 +479,20 @@ def schedule_meeting(
                 "end_at": end_at,
                 "attendees": attendees,
             },
-            result={"meeting_id": meeting_id, "event_id": meeting_event_id},
+            result={
+                "meeting_id": meeting_id,
+                "event_id": meeting_event_id,
+                "time_cost": time_cost,
+            },
         )
         conn.commit()
 
-        return {"ok": True, "meeting_id": meeting_id, "event_id": meeting_event_id}
+        return {
+            "ok": True,
+            "meeting_id": meeting_id,
+            "event_id": meeting_event_id,
+            "time_cost": time_cost,
+        }
     finally:
         conn.close()
 

@@ -392,18 +392,30 @@ def _result_summary(name: str, result: ToolResult) -> str:
         return f"{_pretty_time(result.get('to'))}; delivered no events"
     if name == "send_chat":
         replies = result.get("scheduled_reply_ids", [])
-        return f"scheduled {len(replies)} reply event(s)"
+        return f"scheduled {len(replies)} reply event(s){_time_cost_summary(result)}"
     if name == "send_email":
         effects = result.get("applied_effects", [])
-        return f"applied {len(effects)} effect(s)"
+        return f"applied {len(effects)} effect(s){_time_cost_summary(result)}"
     if name == "read_doc":
         doc = result.get("doc", {})
-        return doc.get("title", "unknown doc")
+        return f"{doc.get('title', 'unknown doc')}{_time_cost_summary(result)}"
     if name == "schedule_meeting":
-        return f"scheduled {result.get('meeting_id')}"
+        return f"scheduled {result.get('meeting_id')}{_time_cost_summary(result)}"
     if name == "update_task":
-        return "updated"
+        return f"updated{_time_cost_summary(result)}"
     return ""
+
+
+def _time_cost_summary(result: dict[str, Any]) -> str:
+    time_cost = result.get("time_cost")
+    if not isinstance(time_cost, dict):
+        return ""
+    delivered = time_cost.get("delivered_events") or []
+    delivered_summary = ""
+    if delivered:
+        event_types = ", ".join(event.get("event_type", "event") for event in delivered)
+        delivered_summary = f"; delivered {event_types}"
+    return f"; +{time_cost.get('minutes')}m to {_pretty_time(time_cost.get('to'))}{delivered_summary}"
 
 
 def _short(value: str, limit: int) -> str:

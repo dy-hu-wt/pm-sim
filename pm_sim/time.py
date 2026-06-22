@@ -56,6 +56,25 @@ def advance_time(db_path: Path | str = DEFAULT_DB_PATH, target: str = "until_nex
         conn.close()
 
 
+def consume_action_time(
+    conn: sqlite3.Connection,
+    *,
+    current_time: str,
+    minutes: int,
+) -> dict[str, Any]:
+    new_time = _format_time(_parse_time(current_time) + timedelta(minutes=minutes))
+    due_events = _due_events(conn, new_time)
+    delivered = [_deliver_event(conn, event, new_time) for event in due_events]
+    set_state_value(conn, "current_time", new_time)
+    return {
+        "minutes": minutes,
+        "from": current_time,
+        "to": new_time,
+        "delivered_events": delivered,
+        "delivered_event_ids": [event["id"] for event in delivered],
+    }
+
+
 def _resolve_target_time(conn: sqlite3.Connection, current_time: str, target: str) -> str:
     if target == "until_next_event":
         row = conn.execute(

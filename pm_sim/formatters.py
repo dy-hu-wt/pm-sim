@@ -137,15 +137,14 @@ def _format_doc(value: dict[str, Any]) -> str:
     if not value.get("ok"):
         return f"Error: {value.get('error')}"
     doc = value["doc"]
-    return "\n".join(
-        [
-            f"{doc['title']}",
-            f"  Kind:    {doc['kind']}",
-            f"  Updated: {_pretty_time(doc['updated_at'])}",
-            "",
-            doc["body"],
-        ]
-    )
+    lines = [
+        f"{doc['title']}",
+        f"  Kind:    {doc['kind']}",
+        f"  Updated: {_pretty_time(doc['updated_at'])}",
+    ]
+    lines.extend(_format_time_cost_lines(value))
+    lines.extend(["", doc["body"]])
+    return "\n".join(lines)
 
 
 def _project_conflict(project: dict[str, Any]) -> dict[str, Any] | None:
@@ -167,6 +166,7 @@ def _format_action_result(value: dict[str, Any]) -> str:
     if "scheduled_reply_ids" in value:
         lines = ["Chat sent"]
         lines.append(f"  Message ID: {value.get('message_id')}")
+        lines.extend(_format_time_cost_lines(value))
         replies = value.get("scheduled_reply_ids") or []
         if replies:
             lines.append("  Scheduled replies:")
@@ -178,6 +178,7 @@ def _format_action_result(value: dict[str, Any]) -> str:
 
     if "message_id" in value:
         lines = ["Message sent", f"  Message ID: {value.get('message_id')}"]
+        lines.extend(_format_time_cost_lines(value))
         effects = value.get("applied_effects", [])
         if effects:
             lines.append("  Effects:")
@@ -186,23 +187,43 @@ def _format_action_result(value: dict[str, Any]) -> str:
         return "\n".join(lines)
 
     if "task_id" in value:
-        return "\n".join(
-            [
-                "Task updated",
-                f"  Task:     {value.get('task_id')}",
-                f"  Status:   {value.get('status')}",
-                f"  Priority: {value.get('priority')}",
-            ]
-        )
+        lines = [
+            "Task updated",
+            f"  Task:     {value.get('task_id')}",
+            f"  Status:   {value.get('status')}",
+            f"  Priority: {value.get('priority')}",
+        ]
+        lines.extend(_format_time_cost_lines(value))
+        return "\n".join(lines)
 
     if "meeting_id" in value:
-        return "\n".join(["Meeting scheduled", f"  Meeting ID: {value.get('meeting_id')}"])
+        lines = ["Meeting scheduled", f"  Meeting ID: {value.get('meeting_id')}"]
+        lines.extend(_format_time_cost_lines(value))
+        return "\n".join(lines)
 
     lines = ["OK"]
     for key, item in value.items():
         if key != "ok":
             lines.append(f"  {key}: {item}")
     return "\n".join(lines)
+
+
+def _format_time_cost_lines(value: dict[str, Any]) -> list[str]:
+    time_cost = value.get("time_cost")
+    if not isinstance(time_cost, dict):
+        return []
+    lines = [
+        (
+            f"  Time cost: {time_cost.get('minutes')}m "
+            f"({_pretty_time(time_cost.get('from'))} -> {_pretty_time(time_cost.get('to'))})"
+        )
+    ]
+    delivered = time_cost.get("delivered_events") or []
+    if delivered:
+        lines.append("  Delivered during action:")
+        for event in delivered:
+            lines.append(f"    {event['event_type']} ({event['id']})")
+    return lines
 
 
 def _format_events(events: list[dict[str, Any]]) -> str:

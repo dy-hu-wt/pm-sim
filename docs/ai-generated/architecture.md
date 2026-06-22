@@ -14,7 +14,9 @@ scenario JSON -> SQLite state -> CLI tools -> actions -> event queue -> effects 
 
 ## Simulated Time
 
-The simulator has its own clock stored in SQLite. It is not tied to wall-clock time or LLM latency. If an agent takes five seconds or five minutes to choose an action, the simulated week does not move unless `advance-time` is called.
+The simulator has its own clock stored in SQLite. It is not tied to wall-clock time or LLM latency. If an agent takes five seconds or five minutes to choose an action, that latency does not move the simulated week.
+
+Workplace actions do consume deterministic simulated effort. Chat costs 5 minutes, email costs 10 minutes, reading a doc costs 15 minutes, scheduling a meeting costs 5 minutes, and task updates cost 1 minute. Meetings resolve at their scheduled end time. This keeps project work from being free while keeping time movement inspectable.
 
 Time can move by duration, to an exact timestamp, or to the next scheduled event:
 
@@ -24,7 +26,7 @@ pm-sim advance-time to:2026-06-24T14:00:00
 pm-sim advance-time until_next_event
 ```
 
-When time advances, due events are delivered in deterministic order. Each delivered event records when it was scheduled, when it was delivered, what handler ran, and what effects were applied.
+When time advances, either through `advance-time` or action effort, due events are delivered in deterministic order. Each delivered event records when it was scheduled, when it was delivered, what handler ran, and what effects were applied.
 
 ## State Ownership
 
@@ -46,7 +48,7 @@ The agent interacts through workplace tools instead of direct database writes:
 - timeline/log inspection
 - evaluation
 
-Actions are synchronous. For example, `send-chat` immediately creates the agent's message and may schedule a coworker reply for later. It does not instantly deliver that reply.
+Actions are synchronous. For example, `send-chat` creates the agent's message at the current simulated time, schedules any coworker reply for later, then advances the clock by its 5-minute effort cost. It does not instantly deliver that reply unless the action's effort crosses the reply's scheduled time.
 
 ## Events
 

@@ -49,6 +49,8 @@ Important hidden or derived facts:
 
 The scenario is designed so the agent must ask the right people or schedule the right meeting. Waiting too long can still surface some information, but late discovery produces worse outcomes.
 
+Tool actions consume deterministic simulated effort: chat costs 5 minutes, email costs 10 minutes, reading a doc costs 15 minutes, scheduling a meeting costs 5 minutes, and task updates cost 1 minute. Meetings resolve at their scheduled end time.
+
 ## Launch Conflict
 
 The project metadata tracks the launch conflict explicitly. At reset:
@@ -175,7 +177,7 @@ The LLM policy can be run with:
 pm-sim run-agent --policy llm --reset --max-turns 40
 ```
 
-That path lets a model choose workplace tool calls. The model does not get the evaluator during the run; the simulator scores durable state and evidence after the agent stops. A model turn is one model decision round, and it may include multiple tool calls. During an LLM run, progress logs show simulated time, model wait points, tool execution, and short result summaries. The operator runner can stop early once the current state reaches full score, and the final summary records the stop reason.
+That path lets a model choose workplace tool calls. The model does not get the evaluator during the run; the simulator scores durable state and evidence after the agent stops. A model turn is one model decision round, and it may include multiple tool calls. During an LLM run, progress logs show simulated time, model wait points, tool execution, logical time cost, and short result summaries. The operator runner can stop early once the current state reaches full score, and the final summary records the stop reason.
 
 ## Bad Paths
 
