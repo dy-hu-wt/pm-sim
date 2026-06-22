@@ -579,6 +579,24 @@ class CoworkerRuleTests(unittest.TestCase):
         }
         self.assertIn("peach_unblocked", ready_effect_keys)
 
+    def test_peach_accepts_out_of_scope_auto_commenting_wording(self) -> None:
+        replies = replies_for_chat(
+            "peach",
+            (
+                "Implement only the draft-mode onboarding path for Friday with human approval. "
+                "Auto-commenting is out of Friday scope and should not be included."
+            ),
+            self._state(["fact_repo_sync_stale", "fact_nimbus_values_reliability"]),
+        )
+
+        effect_keys = {
+            effect["key"]
+            for effect in replies[0].effects
+            if effect["type"] == "add_evaluation_evidence"
+        }
+
+        self.assertIn("peach_unblocked", effect_keys)
+
     def test_toad_refuses_approval_until_risk_and_customer_context_exist(self) -> None:
         early = replies_for_chat(
             "toad",

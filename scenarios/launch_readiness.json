@@ -1002,7 +1002,14 @@
             "without auto",
             "no auto-commenting",
             "not auto-commenting",
-            "auto-commenting is follow-up"
+            "auto-commenting is follow-up",
+            "auto-commenting is out",
+            "out of Friday scope",
+            "out of scope",
+            "do not include auto-commenting",
+            "only the draft-mode",
+            "only draft-mode",
+            "do not include direct posting"
           ]
         ]
       },

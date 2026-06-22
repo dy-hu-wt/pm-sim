@@ -29,7 +29,7 @@ Mario is the product manager. He wants the strongest possible beta and initially
 
 Luigi is the backend engineer. He owns repo sync and knows the hidden stale-code risk. He reveals it if asked about launch risk, blockers, repo sync, stale commits, webhooks, or auto-commenting. If ignored, he escalates later in the week.
 
-Peach is the designer. She owns onboarding and review-flow docs. She is blocked until the launch mode is clear, especially whether Friday includes auto-commenting or draft mode.
+Peach is the designer. She owns onboarding and review-flow docs. She is blocked until the launch mode is clear, especially whether Friday includes auto-commenting or draft mode. A good unblock message should say draft mode, human approval, and that auto-commenting is not in Friday scope.
 
 Daisy is the customer success lead. She owns Nimbus communication. She cares about reliable customer messaging and needs a written update before she speaks to Nimbus.
 
