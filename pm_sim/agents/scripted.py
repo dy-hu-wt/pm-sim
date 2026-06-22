@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from ..actions import read_doc, send_chat, send_email
+from ..actions import read_doc, send_chat, send_email, update_doc
 from ..evaluator import evaluate
 from ..paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from ..state import reset
@@ -60,6 +60,19 @@ def run_scripted_agent(
             ),
         ),
         ("wait_for_toad_reply", lambda: advance_time(db_path, "90m")),
+        (
+            "record_launch_decision",
+            lambda: update_doc(
+                db_path,
+                "doc_launch_decision_record",
+                (
+                    "Friday launch decision: Toad approved draft mode for Nimbus. "
+                    "Draft suggestions require human approval before posting. "
+                    "Auto-commenting is out of Friday scope and remains follow-up work. "
+                    "Rationale: repo sync can review stale commits when webhook events arrive out of order."
+                ),
+            ),
+        ),
         (
             "send_customer_ready_update",
             lambda: send_email(

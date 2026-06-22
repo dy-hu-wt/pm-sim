@@ -249,6 +249,7 @@ def _meeting_state(conn: sqlite3.Connection) -> dict[str, Any]:
     return {
         "discovered_facts": sorted(_discovered_fact_ids(conn)),
         "evidence_keys": sorted(_evidence_keys(conn)),
+        "meeting_rules": loads(get_state_value(conn, "meeting_rules_json") or "[]", []),
     }
 
 

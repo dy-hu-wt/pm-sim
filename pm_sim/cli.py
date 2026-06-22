@@ -14,6 +14,7 @@ from .actions import (
     schedule_meeting,
     send_chat,
     send_email,
+    update_doc,
     update_task,
 )
 from .agents.llm import LlmAgentError, run_llm_agent
@@ -84,6 +85,11 @@ def _build_parser() -> argparse.ArgumentParser:
     read_doc_parser = subparsers.add_parser("read-doc", help="Read a visible document.")
     read_doc_parser.add_argument("doc_id")
     read_doc_parser.set_defaults(func=lambda args: read_doc(args.db, args.doc_id))
+
+    update_doc_parser = subparsers.add_parser("update-doc", help="Update a visible document.")
+    update_doc_parser.add_argument("doc_id")
+    update_doc_parser.add_argument("body")
+    update_doc_parser.set_defaults(func=lambda args: update_doc(args.db, args.doc_id, args.body))
 
     chat_parser = subparsers.add_parser("send-chat", help="Send a chat to a coworker.")
     chat_parser.add_argument("person_id")

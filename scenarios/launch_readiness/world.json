@@ -280,6 +280,62 @@
       "private_fact_ids": []
     }
   ],
+  "coworker_state": [
+    {
+      "id": "coworker_state_mario_product_pressure_active",
+      "person_id": "mario",
+      "key": "product_pressure_active",
+      "value": true
+    },
+    {
+      "id": "coworker_state_mario_accepted_draft_mode",
+      "person_id": "mario",
+      "key": "accepted_draft_mode",
+      "value": false
+    },
+    {
+      "id": "coworker_state_luigi_risk_surfaced",
+      "person_id": "luigi",
+      "key": "risk_surfaced",
+      "value": false
+    },
+    {
+      "id": "coworker_state_luigi_security_doc_shared",
+      "person_id": "luigi",
+      "key": "security_doc_shared",
+      "value": false
+    },
+    {
+      "id": "coworker_state_peach_scope_unblocked",
+      "person_id": "peach",
+      "key": "scope_unblocked",
+      "value": false
+    },
+    {
+      "id": "coworker_state_daisy_reliability_preference_shared",
+      "person_id": "daisy",
+      "key": "reliability_preference_shared",
+      "value": false
+    },
+    {
+      "id": "coworker_state_daisy_customer_update_received",
+      "person_id": "daisy",
+      "key": "customer_update_received",
+      "value": false
+    },
+    {
+      "id": "coworker_state_daisy_security_answer_received",
+      "person_id": "daisy",
+      "key": "security_answer_received",
+      "value": false
+    },
+    {
+      "id": "coworker_state_toad_approval_recorded",
+      "person_id": "toad",
+      "key": "approval_recorded",
+      "value": false
+    }
+  ],
   "facts": [
     {
       "id": "fact_repo_sync_stale",
@@ -507,6 +563,13 @@
       "kind": "customer_note_template",
       "visible": true,
       "body": "Rollout note must answer three questions: whether the agent posts comments automatically, what human approval means in draft mode, and what known limitation remains after Friday. Avoid promising auto-commenting until repo sync is proven reliable."
+    },
+    {
+      "id": "doc_launch_decision_record",
+      "title": "Friday Launch Decision Record",
+      "kind": "decision_record",
+      "visible": true,
+      "body": "Decision pending. Record the approved Friday launch mode, approval owner, customer-visible behavior, and any follow-up scope before Daisy updates Nimbus."
     },
     {
       "id": "doc_repo_sync_notes",

@@ -14,7 +14,7 @@ def format_output(command: str | None, value: Any) -> str:
         return _format_tasks(value)
     if command == "read-doc":
         return _format_doc(value)
-    if command in {"send-chat", "send-email", "update-task", "schedule-meeting"}:
+    if command in {"send-chat", "send-email", "update-doc", "update-task", "schedule-meeting"}:
         return _format_action_result(value)
     if command == "events":
         return _format_events(value)
@@ -83,6 +83,17 @@ def _format_observe(value: dict[str, Any]) -> str:
             )
             if blocker.get("description"):
                 lines.append(f"       {blocker['description']}")
+    else:
+        lines.append("  None")
+
+    lines.append("")
+    lines.append("Coworker State")
+    coworker_state = value.get("coworker_state", [])
+    if coworker_state:
+        for row in coworker_state:
+            lines.append(
+                f"  {row['person_id']}.{row['key']} = {_format_json_value(row.get('value_json'))}"
+            )
     else:
         lines.append("  None")
 
@@ -178,6 +189,20 @@ def _format_action_result(value: dict[str, Any]) -> str:
 
     if "message_id" in value:
         lines = ["Message sent", f"  Message ID: {value.get('message_id')}"]
+        lines.extend(_format_time_cost_lines(value))
+        effects = value.get("applied_effects", [])
+        if effects:
+            lines.append("  Effects:")
+            for effect in effects:
+                lines.append(f"    - {_format_effect(effect)}")
+        return "\n".join(lines)
+
+    if "revision_id" in value:
+        lines = [
+            "Document updated",
+            f"  Doc:      {value.get('doc_id')}",
+            f"  Revision: {value.get('revision_id')}",
+        ]
         lines.extend(_format_time_cost_lines(value))
         effects = value.get("applied_effects", [])
         if effects:
@@ -516,12 +541,31 @@ def _format_effect(effect: dict[str, Any]) -> str:
         return f"updated task {effect.get('task_id')}"
     if effect_type == "update_project":
         return f"updated project {effect.get('project_id')}"
+    if effect_type == "update_coworker_state":
+        keys = ", ".join(effect.get("keys", []))
+        return f"updated coworker state {effect.get('person_id')}: {keys}"
     if effect_type == "add_evaluation_evidence":
         deduped = " (already recorded)" if effect.get("deduped") else ""
         return f"added evidence {effect.get('key')}{deduped}"
     if effect_type == "update_metric":
         return f"updated metric {effect.get('metric')} -> {effect.get('value')}"
     return str(effect)
+
+
+def _format_json_value(value: str | None) -> str:
+    if value is None:
+        return "null"
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if isinstance(parsed, bool):
+        return "true" if parsed else "false"
+    if parsed is None:
+        return "null"
+    if isinstance(parsed, (int, float, str)):
+        return str(parsed)
+    return json.dumps(parsed, sort_keys=True)
 
 
 def _pretty_time(value: str | None) -> str:

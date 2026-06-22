@@ -6,7 +6,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Union
 
-from ..actions import list_tasks, read_doc, schedule_meeting, send_chat, send_email, update_task
+from ..actions import (
+    list_tasks,
+    read_doc,
+    schedule_meeting,
+    send_chat,
+    send_email,
+    update_doc,
+    update_task,
+)
 from ..evaluator import evaluate
 from ..paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH, REPO_ROOT
 from ..state import observe, reset
@@ -187,6 +195,7 @@ def _tool_handlers(db_path: Path | str, scenario_path: Path | str) -> dict[str, 
         "observe": lambda _args: observe(db_path),
         "list_tasks": lambda _args: list_tasks(db_path),
         "read_doc": lambda args: read_doc(db_path, args["doc_id"]),
+        "update_doc": lambda args: update_doc(db_path, args["doc_id"], args["body"]),
         "send_chat": lambda args: send_chat(db_path, args["person_id"], args["body"]),
         "send_email": lambda args: send_email(
             db_path,
@@ -220,6 +229,12 @@ def _tool_specs() -> list[dict[str, Any]]:
             "Read a visible document by id.",
             {"doc_id": {"type": "string"}},
             ["doc_id"],
+        ),
+        _tool(
+            "update_doc",
+            "Replace the body of a visible existing document.",
+            {"doc_id": {"type": "string"}, "body": {"type": "string"}},
+            ["doc_id", "body"],
         ),
         _tool(
             "send_chat",
@@ -339,6 +354,8 @@ def _args_summary(name: str, args: dict[str, Any]) -> str:
         return f"EMAIL to {args.get('person_id')} [{_short(args.get('subject', ''), 60)}]"
     if name == "read_doc":
         return f"READ {args.get('doc_id')}"
+    if name == "update_doc":
+        return f"UPDATE_DOC {args.get('doc_id')}"
     if name == "advance_time":
         return f"WAIT {args.get('target')}"
     if name == "update_task":
@@ -400,6 +417,9 @@ def _result_summary(name: str, result: ToolResult) -> str:
     if name == "read_doc":
         doc = result.get("doc", {})
         return f"{doc.get('title', 'unknown doc')}{_time_cost_summary(result)}"
+    if name == "update_doc":
+        effects = result.get("applied_effects", [])
+        return f"updated {result.get('doc_id')}; applied {len(effects)} effect(s){_time_cost_summary(result)}"
     if name == "schedule_meeting":
         return f"scheduled {result.get('meeting_id')}{_time_cost_summary(result)}"
     if name == "update_task":

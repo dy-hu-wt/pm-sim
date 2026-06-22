@@ -68,6 +68,16 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
                     """
                 ).fetchall()
             ),
+            "coworker_state": rows_to_dicts(
+                conn.execute(
+                    """
+                    SELECT cs.person_id, p.name, cs.key, cs.value_json, cs.updated_at
+                    FROM coworker_state cs
+                    JOIN people p ON p.id = cs.person_id
+                    ORDER BY cs.person_id, cs.key
+                    """
+                ).fetchall()
+            ),
             "tasks": rows_to_dicts(
                 conn.execute(
                     """
@@ -228,12 +238,14 @@ def _load_scenario(conn: sqlite3.Connection, scenario: dict[str, Any]) -> None:
     set_state_value(conn, "current_time", scenario["start_time"])
     set_state_value(conn, "coworker_rules_json", dumps(scenario.get("coworker_rules", [])))
     set_state_value(conn, "event_rules_json", dumps(scenario.get("event_rules", [])))
+    set_state_value(conn, "meeting_rules_json", dumps(scenario.get("meeting_rules", [])))
     set_state_value(conn, "response_delays_json", dumps(_response_delays(scenario)))
     set_state_value(conn, "state_evidence_rules_json", dumps(scenario.get("state_evidence_rules", [])))
     set_state_value(conn, "task_gate_rules_json", dumps(scenario.get("task_gate_rules", [])))
     set_state_value(conn, "outcome_rules_json", dumps(scenario.get("outcome_rules", [])))
 
     _insert_people(conn, scenario.get("people", []))
+    _insert_coworker_state(conn, scenario.get("coworker_state", []), scenario["start_time"])
     _insert_facts(conn, scenario.get("facts", []))
     _insert_projects(conn, scenario.get("projects", []))
     _insert_tasks(conn, scenario.get("tasks", []))
@@ -273,6 +285,26 @@ def _insert_people(conn: sqlite3.Connection, people: list[dict[str, Any]]) -> No
                 dumps(person.get("availability", {})),
                 dumps(person.get("private_knowledge", {})),
                 dumps(person.get("behavior", {})),
+            ),
+        )
+
+
+def _insert_coworker_state(
+    conn: sqlite3.Connection,
+    rows: list[dict[str, Any]],
+    start_time: str,
+) -> None:
+    for row in rows:
+        conn.execute(
+            """
+            INSERT INTO coworker_state (person_id, key, value_json, updated_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                row["person_id"],
+                row["key"],
+                dumps(row.get("value")),
+                row.get("updated_at", start_time),
             ),
         )
 

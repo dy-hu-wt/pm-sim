@@ -16,6 +16,17 @@ CREATE TABLE IF NOT EXISTS people (
   behavior_json TEXT NOT NULL DEFAULT '{}'
 );
 
+CREATE TABLE IF NOT EXISTS coworker_state (
+  person_id TEXT NOT NULL REFERENCES people(id),
+  key TEXT NOT NULL,
+  value_json TEXT NOT NULL DEFAULT 'null',
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (person_id, key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_coworker_state_person
+  ON coworker_state(person_id, key);
+
 CREATE TABLE IF NOT EXISTS projects (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -103,6 +114,19 @@ CREATE TABLE IF NOT EXISTS docs (
   updated_at TEXT NOT NULL,
   metadata_json TEXT NOT NULL DEFAULT '{}'
 );
+
+CREATE TABLE IF NOT EXISTS doc_revisions (
+  id TEXT PRIMARY KEY,
+  doc_id TEXT NOT NULL REFERENCES docs(id),
+  actor TEXT NOT NULL,
+  previous_body TEXT NOT NULL,
+  new_body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  metadata_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_doc_revisions_doc_id
+  ON doc_revisions(doc_id, created_at);
 
 CREATE TABLE IF NOT EXISTS events (
   id TEXT PRIMARY KEY,

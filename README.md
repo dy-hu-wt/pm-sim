@@ -16,7 +16,7 @@ The scenario is authored as three JSON files:
 
 ```text
 scenarios/launch_readiness/scenario.json  # manifest: id, start time, includes
-scenarios/launch_readiness/world.json     # people, project, facts, tasks, docs, events
+scenarios/launch_readiness/world.json     # people, coworker state, project, facts, tasks, docs, events
 scenarios/launch_readiness/rules.json     # coworker/event behavior, gates, scoring, outcomes
 ```
 
@@ -90,6 +90,8 @@ pm-sim advance-time 90m
 pm-sim send-chat toad "Repo sync can review stale commits. Approve draft mode for Friday?"
 pm-sim advance-time 90m
 
+pm-sim update-doc doc_launch_decision_record "Friday launch decision: Toad approved draft mode for Nimbus. Draft suggestions require human approval before posting. Auto-commenting is out of Friday scope and remains follow-up work. Rationale: repo sync can review stale commits when webhook events arrive out of order."
+
 pm-sim send-email daisy "Nimbus Friday draft-mode update" "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has stale-commit risk, so comments should require human approval before posting."
 
 pm-sim advance-time to:2026-06-24T14:00:00
@@ -104,7 +106,7 @@ pm-sim advance-time to:2026-06-26T15:00:00
 pm-sim read-doc doc_friday_outcome
 ```
 
-Expected evaluation result before the Friday deadline: `110 / 110`. The important evidence is recorded through delivered coworker reply events, the Daisy launch email, and the security interruption: `blocker_discovered`, `stakeholder_alignment`, `customer_message_ready`, `peach_unblocked`, `draft_mode_approved`, `security_doc_found`, and `security_question_answered`. The security answer only scores after Daisy's security question is visible. Advancing to Friday then records the final project outcome.
+Expected evaluation result before the Friday deadline: `110 / 110`. The important evidence is recorded through delivered coworker reply events, the decision record, the Daisy launch email, and the security interruption: `blocker_discovered`, `stakeholder_alignment`, `customer_message_ready`, `peach_unblocked`, `draft_mode_approved`, `decision_record_written`, `security_doc_found`, and `security_question_answered`. The security answer only scores after Daisy's security question is visible. Advancing to Friday then records the final project outcome.
 
 The path demonstrates good PM behavior by turning a hidden technical risk into a clear launch tradeoff, aligning the customer-facing owner, unblocking implementation work, and getting an explicit decision before the deadline.
 
@@ -128,6 +130,8 @@ pm-sim read-doc doc_beta_rollout_template
 pm-sim schedule-meeting "Draft-mode risk review for Nimbus launch" 2026-06-22T10:00:00 2026-06-22T10:30:00 luigi daisy mario peach toad
 pm-sim advance-time to:2026-06-22T10:30:00
 pm-sim read-doc doc_transcript_cal_1
+
+pm-sim update-doc doc_launch_decision_record "Friday launch decision: Toad approved draft mode for Nimbus. Draft suggestions require human approval before posting. Auto-commenting is out of Friday scope and remains follow-up work. Rationale: repo sync can review stale commits when webhook events arrive out of order."
 
 pm-sim send-email daisy "Nimbus Friday draft-mode update" "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has stale-commit risk, so comments should require human approval before posting."
 
@@ -166,6 +170,7 @@ Read tasks and docs:
 pm-sim list-tasks
 pm-sim read-doc doc_project_brief
 pm-sim read-doc doc_beta_rollout_template
+pm-sim read-doc doc_launch_decision_record
 ```
 
 `doc_private_repo_security_baseline` is hidden until Luigi points the agent to it.
@@ -175,6 +180,7 @@ Send messages and update work:
 ```bash
 pm-sim send-chat luigi "Any repo sync blockers for launch?"
 pm-sim send-email daisy "Nimbus Friday draft-mode status" "Repo sync has stale-commit risk. I recommend reliable draft mode for Friday with human approval before posting."
+pm-sim update-doc doc_launch_decision_record "Friday launch decision: Toad approved draft mode for Nimbus. Draft suggestions require human approval before posting. Auto-commenting is out of Friday scope and remains follow-up work. Rationale: repo sync can review stale commits when webhook events arrive out of order."
 pm-sim update-task task_launch_decision --status in_progress
 pm-sim schedule-meeting "Draft-mode decision" 2026-06-24T10:00:00 2026-06-24T10:30:00 mario luigi daisy toad
 ```
@@ -195,7 +201,7 @@ pm-sim advance-time 2h
 pm-sim advance-time until_next_event
 ```
 
-Workplace actions also consume deterministic simulated effort: chat costs 5 minutes, email costs 10 minutes, reading a doc costs 15 minutes, scheduling a meeting costs 5 minutes, and task updates cost 1 minute. Meetings themselves resolve at their scheduled end time. Model latency never advances the clock.
+Workplace actions also consume deterministic simulated effort: chat costs 5 minutes, email costs 10 minutes, reading a doc costs 15 minutes, updating a doc costs 20 minutes, scheduling a meeting costs 5 minutes, and task updates cost 1 minute. Meetings themselves resolve at their scheduled end time. Model latency never advances the clock.
 
 Debug lower-level internals when needed:
 
@@ -239,7 +245,7 @@ Task updates are checked against the surrounding world state to resist reward ha
 
 After the Friday deadline event is delivered, `evaluate` also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
-The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, and `rules.json`. Most scenario semantics now live in data: task gates, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, and Friday outcome rules are evaluated by reusable engine code. The remaining v1 boundary is meeting behavior, which still contains some scenario-specific Python for the authored PR Review Agent scenario. That is acceptable for one complete scenario; the next scaling step is to make meeting effects use the same declarative rule style before adding a second scenario.
+The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, and `rules.json`. Most scenario semantics now live in data: task gates, coworker memory, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, and Friday outcome rules are evaluated by reusable engine code. The remaining v1 boundary is meeting behavior, which still contains some scenario-specific Python for the authored PR Review Agent scenario. That is acceptable for one complete scenario; the next scaling step is to make meeting effects use the same declarative rule style before adding a second scenario.
 
 The backend is covered by:
 

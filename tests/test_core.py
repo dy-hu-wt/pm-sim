@@ -16,11 +16,13 @@ from pm_sim.actions import (
     schedule_meeting,
     send_chat,
     send_email,
+    update_doc,
     update_task,
 )
 from pm_sim.agents.llm import _instructions, run_llm_agent
 from pm_sim.agents.scripted import run_scripted_agent
 from pm_sim.cli import main as cli_main
+from pm_sim.conditions import condition_matches
 from pm_sim.coworkers import effects_for_event, replies_for_chat
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
@@ -80,6 +82,20 @@ class ScenarioValidationTests(unittest.TestCase):
     def test_invalid_event_rule_effect_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.base)
         scenario["event_rules"][0]["effects"][1]["project_id"] = "missing_project"
+
+        with self.assertRaises(ScenarioError):
+            load_scenario(self._write_scenario(scenario))
+
+    def test_invalid_coworker_state_effect_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        scenario["event_rules"][0]["effects"].append(
+            {
+                "type": "update_coworker_state",
+                "person_id": "missing_person",
+                "key": "accepted_draft_mode",
+                "value": True,
+            }
+        )
 
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
@@ -168,6 +184,13 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(len(state["people"]), 5)
         self.assertEqual(len(state["projects"]), 1)
         self.assertGreaterEqual(len(state["tasks"]), 5)
+        coworker_state = {
+            (row["person_id"], row["key"]): loads(row["value_json"])
+            for row in state["coworker_state"]
+        }
+        self.assertFalse(coworker_state[("luigi", "risk_surfaced")])
+        self.assertFalse(coworker_state[("peach", "scope_unblocked")])
+        self.assertFalse(coworker_state[("toad", "approval_recorded")])
 
     def test_reset_seeds_open_launch_conflict(self) -> None:
         conflict = self._project_metadata()["launch_conflict"]
@@ -221,6 +244,11 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertTrue(any("repo sync" in body for body in recent_bodies))
         self.assertEqual(conflict["status"], "investigated")
         self.assertTrue(conflict["inputs"]["technical_risk_substantiated"])
+        coworker_state = {
+            (row["person_id"], row["key"]): loads(row["value_json"])
+            for row in state["coworker_state"]
+        }
+        self.assertTrue(coworker_state[("luigi", "risk_surfaced")])
 
     def test_agent_path_moves_launch_conflict_to_resolved_draft_mode(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
@@ -462,6 +490,16 @@ class CoreSimulationTests(unittest.TestCase):
         )
 
         result = advance_time(self.db_path, "to:2026-06-22T10:30:00")
+        update_doc(
+            self.db_path,
+            "doc_launch_decision_record",
+            (
+                "Friday launch decision: Toad approved draft mode for Nimbus. "
+                "Draft suggestions require human approval before posting. "
+                "Auto-commenting is out of Friday scope and remains follow-up work. "
+                "Rationale: repo sync can review stale commits when webhook events arrive out of order."
+            ),
+        )
         self._send_customer_ready_email()
         self._answer_security_question()
         advance_time(self.db_path, "to:2026-06-26T15:00:00")
@@ -851,6 +889,55 @@ class EffectApplicationTests(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_update_coworker_state_effect_is_queryable_by_conditions(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            applied = apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "mario",
+                        "values": {
+                            "accepted_draft_mode": True,
+                            "product_pressure_active": False,
+                        },
+                    }
+                ],
+                now="2026-06-22T11:00:00",
+                source="test",
+            )
+            conn.commit()
+
+            rows = conn.execute(
+                """
+                SELECT key, value_json, updated_at
+                FROM coworker_state
+                WHERE person_id = 'mario'
+                ORDER BY key
+                """
+            ).fetchall()
+
+            self.assertEqual(applied[0]["type"], "update_coworker_state")
+            self.assertEqual(applied[0]["person_id"], "mario")
+            values = {row["key"]: loads(row["value_json"]) for row in rows}
+            self.assertTrue(values["accepted_draft_mode"])
+            self.assertFalse(values["product_pressure_active"])
+            self.assertTrue(
+                condition_matches(
+                    conn,
+                    {
+                        "coworker_state": {
+                            "person_id": "mario",
+                            "key": "accepted_draft_mode",
+                            "equals": True,
+                        }
+                    },
+                )
+            )
+        finally:
+            conn.close()
+
     def test_duplicate_evaluation_evidence_is_idempotent(self) -> None:
         conn = connect(self.db_path)
         try:
@@ -1146,6 +1233,69 @@ class ToolActionTests(unittest.TestCase):
 
         self.assertFalse(result["ok"])
         self.assertIn("not visible", result["error"])
+
+    def test_update_doc_records_revision_and_time_cost(self) -> None:
+        result = update_doc(
+            self.db_path,
+            "doc_launch_decision_record",
+            "Decision draft: waiting for Toad approval.",
+        )
+        doc = read_doc(self.db_path, "doc_launch_decision_record")
+        conn = connect(self.db_path)
+        try:
+            revision = conn.execute(
+                """
+                SELECT doc_id, actor, previous_body, new_body
+                FROM doc_revisions
+                WHERE id = ?
+                """,
+                (result["revision_id"],),
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["time_cost"]["minutes"], 20)
+        self.assertIn("waiting for Toad approval", doc["doc"]["body"])
+        self.assertEqual(revision["doc_id"], "doc_launch_decision_record")
+        self.assertEqual(revision["actor"], "agent")
+        self.assertIn("Decision pending", revision["previous_body"])
+        self.assertIn("waiting for Toad approval", revision["new_body"])
+
+    def test_update_doc_blocks_invisible_doc(self) -> None:
+        result = update_doc(self.db_path, "doc_repo_sync_notes", "Make this visible?")
+
+        self.assertFalse(result["ok"])
+        self.assertIn("not visible", result["error"])
+
+    def test_decision_record_evidence_requires_approval_and_complete_content(self) -> None:
+        early = update_doc(
+            self.db_path,
+            "doc_launch_decision_record",
+            (
+                "Friday launch decision: Toad approved draft mode for Nimbus. "
+                "Draft suggestions require human approval before posting. "
+                "Auto-commenting is out of Friday scope and remains follow-up work. "
+                "Rationale: repo sync can review stale commits."
+            ),
+        )
+        self.assertEqual(early["applied_effects"], [])
+
+        self._drive_to_draft_approval()
+        valid = update_doc(
+            self.db_path,
+            "doc_launch_decision_record",
+            (
+                "Friday launch decision: Toad approved draft mode for Nimbus. "
+                "Draft suggestions require human approval before posting. "
+                "Auto-commenting is out of Friday scope and remains follow-up work. "
+                "Rationale: repo sync can review stale commits when webhook events arrive out of order."
+            ),
+        )
+
+        self.assertTrue(
+            any(effect.get("key") == "decision_record_written" for effect in valid["applied_effects"])
+        )
 
     def test_private_repo_security_doc_is_hidden_until_luigi_reveals_it(self) -> None:
         hidden = read_doc(self.db_path, "doc_private_repo_security_baseline")
@@ -1494,6 +1644,22 @@ class ToolActionTests(unittest.TestCase):
         self.assertIn("Toad approval", result["error"])
         self.assertEqual(self._task_state("task_launch_decision"), before)
 
+    def _drive_to_draft_approval(self) -> None:
+        send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
+        advance_time(self.db_path, "2h")
+        send_chat(
+            self.db_path,
+            "daisy",
+            "Repo sync has stale-code risk. Can we message reliable draft mode for Nimbus?",
+        )
+        advance_time(self.db_path, "45m")
+        send_chat(
+            self.db_path,
+            "toad",
+            "Repo sync can review stale commits. Approve draft mode for Friday?",
+        )
+        advance_time(self.db_path, "90m")
+
     def _task_state(self, task_id: str) -> dict[str, str]:
         conn = connect(self.db_path)
         try:
@@ -1563,6 +1729,16 @@ class EvaluatorTests(unittest.TestCase):
             "Repo sync can review stale commits. Approve draft mode for Friday?",
         )
         advance_time(self.db_path, "90m")
+        update_doc(
+            self.db_path,
+            "doc_launch_decision_record",
+            (
+                "Friday launch decision: Toad approved draft mode for Nimbus. "
+                "Draft suggestions require human approval before posting. "
+                "Auto-commenting is out of Friday scope and remains follow-up work. "
+                "Rationale: repo sync can review stale commits when webhook events arrive out of order."
+            ),
+        )
         send_email(
             self.db_path,
             "daisy",
@@ -1902,6 +2078,16 @@ class EvaluatorTests(unittest.TestCase):
         )
         self._run_cli("advance-time", "to:2026-06-22T10:30:00")
         transcript = self._run_cli("read-doc", "doc_transcript_cal_1")
+        self._run_cli(
+            "update-doc",
+            "doc_launch_decision_record",
+            (
+                "Friday launch decision: Toad approved draft mode for Nimbus. "
+                "Draft suggestions require human approval before posting. "
+                "Auto-commenting is out of Friday scope and remains follow-up work. "
+                "Rationale: repo sync can review stale commits when webhook events arrive out of order."
+            ),
+        )
         self._run_cli(
             "send-email",
             "daisy",

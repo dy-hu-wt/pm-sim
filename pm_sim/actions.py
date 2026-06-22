@@ -41,9 +41,26 @@ EMAIL_TRANSIENT_TERMS = frozenset(
 EMAIL_AUDIT_TERMS = frozenset(
     {"metadata", "draft suggestions", "generated suggestions", "audit", "30 days", "beta audit"}
 )
+DOC_DRAFT_TERMS = frozenset({"draft", "draft-mode", "draft mode"})
+DOC_HUMAN_APPROVAL_TERMS = frozenset({"human approval", "approval before posting", "review before posting"})
+DOC_AUTO_FOLLOWUP_TERMS = frozenset(
+    {
+        "auto-commenting out",
+        "auto-commenting is out",
+        "auto-commenting follow-up",
+        "auto-commenting as follow-up",
+        "auto-commenting remains follow-up",
+        "auto-commenting not in friday",
+        "no auto-commenting",
+        "do not ship auto-commenting",
+    }
+)
+DOC_RISK_TERMS = frozenset({"repo sync", "stale", "stale-code", "stale code", "commit", "webhook"})
+DOC_APPROVAL_TERMS = frozenset({"toad", "approved", "approval"})
 COMPLETED_STATUSES = {"complete", "completed", "done", "resolved"}
 ACTION_TIME_COST_MINUTES = {
     "read_doc": 15,
+    "update_doc": 20,
     "send_chat": 5,
     "send_email": 10,
     "schedule_meeting": 5,
@@ -104,6 +121,85 @@ def read_doc(db_path: Path | str, doc_id: str) -> dict[str, Any]:
         )
         conn.commit()
         return {"ok": True, "doc": doc, "time_cost": time_cost}
+    finally:
+        conn.close()
+
+
+# Doc tool: updates a visible existing doc and records a revision. Cost: 20m writing time.
+def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
+    body = body.strip()
+    if not body:
+        return {"ok": False, "error": "Doc body is required."}
+
+    conn = connect(db_path)
+    try:
+        current_time = get_current_time(conn)
+        doc = row_to_dict(
+            conn.execute(
+                """
+                SELECT id, title, kind, body, visible
+                FROM docs
+                WHERE id = ?
+                """,
+                (doc_id,),
+            ).fetchone()
+        )
+        if doc is None:
+            return {"ok": False, "error": f"Doc not found: {doc_id}"}
+        if doc["visible"] != 1:
+            return {"ok": False, "error": f"Doc is not visible: {doc_id}"}
+
+        revision_id = _next_id(conn, "doc_revisions", "doc_revision")
+        conn.execute(
+            """
+            INSERT INTO doc_revisions
+              (id, doc_id, actor, previous_body, new_body, created_at, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, '{}')
+            """,
+            (revision_id, doc_id, AGENT_ID, doc["body"], body, current_time),
+        )
+        conn.execute(
+            """
+            UPDATE docs
+            SET body = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (body, current_time, doc_id),
+        )
+        doc_effects = _effects_for_doc_update(conn, doc_id, body)
+        applied_effects = apply_effects(
+            conn,
+            doc_effects,
+            now=current_time,
+            source=f"action:{revision_id}",
+        )
+        time_cost = consume_action_time(
+            conn,
+            current_time=current_time,
+            minutes=ACTION_TIME_COST_MINUTES["update_doc"],
+        )
+        log_action(
+            conn,
+            action_id=_next_id(conn, "action_log", "action_update_doc"),
+            actor=AGENT_ID,
+            action_type="update_doc",
+            created_at=current_time,
+            payload={"doc_id": doc_id, "body": body},
+            result={
+                "doc_id": doc_id,
+                "revision_id": revision_id,
+                "applied_effects": applied_effects,
+                "time_cost": time_cost,
+            },
+        )
+        conn.commit()
+        return {
+            "ok": True,
+            "doc_id": doc_id,
+            "revision_id": revision_id,
+            "applied_effects": applied_effects,
+            "time_cost": time_cost,
+        }
     finally:
         conn.close()
 
@@ -458,6 +554,14 @@ def _effects_for_email(
                         "inputs": {"customer_constraint_known": True},
                     },
                 },
+                {
+                    "type": "update_coworker_state",
+                    "person_id": "daisy",
+                    "values": {
+                        "customer_update_received": True,
+                        "draft_mode_message_aligned": True,
+                    },
+                },
             ]
         )
         if has_human_approval:
@@ -492,7 +596,40 @@ def _effects_for_email(
                 ),
             }
         )
+        effects.append(
+            {
+                "type": "update_coworker_state",
+                "person_id": "daisy",
+                "key": "security_answer_received",
+                "value": True,
+            }
+        )
     return effects
+
+
+def _effects_for_doc_update(conn: sqlite3.Connection, doc_id: str, body: str) -> list[dict[str, Any]]:
+    if doc_id != "doc_launch_decision_record":
+        return []
+    normalized = _normalize(body)
+    if not (
+        _mentions_any(normalized, DOC_DRAFT_TERMS)
+        and _mentions_any(normalized, DOC_HUMAN_APPROVAL_TERMS)
+        and _mentions_any(normalized, DOC_AUTO_FOLLOWUP_TERMS)
+        and _mentions_any(normalized, DOC_RISK_TERMS)
+        and _mentions_any(normalized, DOC_APPROVAL_TERMS)
+        and _draft_mode_approved(conn)
+    ):
+        return []
+    return [
+        {
+            "type": "add_evaluation_evidence",
+            "key": "decision_record_written",
+            "note": (
+                "Agent documented the Friday draft-mode decision with Toad approval, "
+                "repo-sync risk rationale, human approval, and auto-commenting as follow-up."
+            ),
+        }
+    ]
 
 
 def _primary_project_id(conn: sqlite3.Connection) -> str:
@@ -528,6 +665,30 @@ def _daisy_security_question_visible(conn: sqlite3.Connection) -> bool:
         ).fetchone()
         is not None
     )
+
+
+def _draft_mode_approved(conn: sqlite3.Connection) -> bool:
+    fact = conn.execute(
+        """
+        SELECT 1
+        FROM facts
+        WHERE id = 'fact_draft_mode_approved'
+          AND discovered_at IS NOT NULL
+        LIMIT 1
+        """
+    ).fetchone()
+    if fact is not None:
+        return True
+    project = conn.execute(
+        """
+        SELECT metadata_json
+        FROM projects
+        WHERE id = ?
+        """,
+        (_primary_project_id(conn),),
+    ).fetchone()
+    metadata = loads(project["metadata_json"], {}) if project is not None else {}
+    return metadata.get("decision") == "draft_mode_approved"
 
 
 def _schedule_meeting_occurs(

@@ -39,6 +39,8 @@ def condition_matches(
         return _task_status_matches(conn, condition["task_status"])
     if "project_decision" in condition:
         return _project_decision_matches(conn, condition["project_decision"], project_id)
+    if "coworker_state" in condition:
+        return _coworker_state_matches(conn, condition["coworker_state"])
     if "first_time_at_or_after" in condition:
         spec = condition["first_time_at_or_after"]
         first_time = first_fact_or_evidence_time(
@@ -165,6 +167,18 @@ def task_status(conn: sqlite3.Connection, task_id: str) -> str | None:
     return None if row is None else row["status"]
 
 
+def coworker_state(conn: sqlite3.Connection, person_id: str, key: str) -> Any:
+    row = conn.execute(
+        """
+        SELECT value_json
+        FROM coworker_state
+        WHERE person_id = ? AND key = ?
+        """,
+        (person_id, key),
+    ).fetchone()
+    return None if row is None else loads(row["value_json"], None)
+
+
 def _blocker_status_matches(conn: sqlite3.Connection, spec: dict[str, Any]) -> bool:
     blocker_id = spec["id"]
     row = conn.execute("SELECT status FROM blockers WHERE id = ?", (blocker_id,)).fetchone()
@@ -210,6 +224,21 @@ def _project_decision_matches(
     if "not_in" in spec:
         return decision not in set(spec["not_in"])
     raise ValueError(f"Unsupported project_decision condition: {spec}")
+
+
+def _coworker_state_matches(conn: sqlite3.Connection, spec: dict[str, Any]) -> bool:
+    value = coworker_state(conn, spec["person_id"], spec["key"])
+    if "exists" in spec:
+        return (value is not None) is bool(spec["exists"])
+    if "equals" in spec:
+        return value == spec["equals"]
+    if "not_equals" in spec:
+        return value != spec["not_equals"]
+    if "in" in spec:
+        return value in spec["in"]
+    if "not_in" in spec:
+        return value not in spec["not_in"]
+    raise ValueError(f"Unsupported coworker_state condition: {spec}")
 
 
 def _outreach_before(conn: sqlite3.Connection, spec: dict[str, Any]) -> bool:

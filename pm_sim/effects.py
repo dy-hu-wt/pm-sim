@@ -32,6 +32,8 @@ def apply_effects(
             result = _apply_update_task(conn, effect)
         elif effect_type == "update_project":
             result = _apply_update_project(conn, effect)
+        elif effect_type == "update_coworker_state":
+            result = _apply_update_coworker_state(conn, effect, now=now)
         elif effect_type == "update_metric":
             result = _apply_update_metric(conn, effect)
         elif effect_type == "add_evaluation_evidence":
@@ -258,6 +260,43 @@ def _apply_update_project(conn: sqlite3.Connection, effect: dict[str, Any]) -> d
         values,
     )
     return {"project_id": project_id}
+
+
+def _apply_update_coworker_state(
+    conn: sqlite3.Connection,
+    effect: dict[str, Any],
+    *,
+    now: str,
+) -> dict[str, Any]:
+    person_id = _required(effect, "person_id")
+    person = conn.execute("SELECT 1 FROM people WHERE id = ?", (person_id,)).fetchone()
+    if person is None:
+        raise ValueError(f"Cannot update state for unknown coworker: {person_id}")
+
+    updates = effect.get("values")
+    if updates is None:
+        key = _required(effect, "key")
+        updates = {key: effect.get("value")}
+    if not isinstance(updates, dict) or not updates:
+        raise ValueError("update_coworker_state effect must include key/value or values.")
+
+    changed = []
+    for key, value in updates.items():
+        if not isinstance(key, str) or not key:
+            raise ValueError("update_coworker_state keys must be non-empty strings.")
+        conn.execute(
+            """
+            INSERT INTO coworker_state (person_id, key, value_json, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(person_id, key) DO UPDATE SET
+              value_json = excluded.value_json,
+              updated_at = excluded.updated_at
+            """,
+            (person_id, key, dumps(value), now),
+        )
+        changed.append(key)
+
+    return {"person_id": person_id, "keys": sorted(changed)}
 
 
 def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:

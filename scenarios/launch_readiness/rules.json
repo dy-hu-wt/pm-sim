@@ -199,6 +199,12 @@
           }
         },
         {
+          "type": "update_coworker_state",
+          "person_id": "luigi",
+          "key": "risk_surfaced",
+          "value": true
+        },
+        {
           "type": "add_evaluation_evidence",
           "key": "blocker_discovered",
           "note": "Luigi proactively disclosed stale repo sync risk."
@@ -235,6 +241,12 @@
         {
           "type": "reveal_doc",
           "doc_id": "doc_private_repo_security_baseline"
+        },
+        {
+          "type": "update_coworker_state",
+          "person_id": "luigi",
+          "key": "security_doc_shared",
+          "value": true
         },
         {
           "type": "add_evaluation_evidence",
@@ -334,6 +346,12 @@
           }
         },
         {
+          "type": "update_coworker_state",
+          "person_id": "luigi",
+          "key": "risk_surfaced",
+          "value": true
+        },
+        {
           "type": "add_evaluation_evidence",
           "key": "blocker_discovered",
           "note": "Luigi disclosed stale repo sync risk."
@@ -378,6 +396,12 @@
           }
         },
         {
+          "type": "update_coworker_state",
+          "person_id": "mario",
+          "key": "accepted_draft_mode",
+          "value": true
+        },
+        {
           "type": "add_evaluation_evidence",
           "key": "stakeholder_alignment",
           "note": "Mario accepted draft mode if repo sync risk is confirmed."
@@ -415,6 +439,12 @@
               "product_pressure_acknowledged": true
             }
           }
+        },
+        {
+          "type": "update_coworker_state",
+          "person_id": "mario",
+          "key": "accepted_draft_mode",
+          "value": true
         },
         {
           "type": "add_evaluation_evidence",
@@ -507,6 +537,12 @@
               "customer_constraint_known": true
             }
           }
+        },
+        {
+          "type": "update_coworker_state",
+          "person_id": "daisy",
+          "key": "reliability_preference_shared",
+          "value": true
         }
       ]
     },
@@ -619,6 +655,12 @@
           }
         },
         {
+          "type": "update_coworker_state",
+          "person_id": "peach",
+          "key": "scope_unblocked",
+          "value": true
+        },
+        {
           "type": "add_evaluation_evidence",
           "key": "peach_unblocked",
           "note": "Draft-mode scope clarified for Peach."
@@ -681,7 +723,7 @@
       },
       "reply": {
         "delay_minutes": 90,
-        "body": "Approved to de-scope auto-commenting for Friday. Ship draft mode with human approval, keep Luigi on repo sync hardening, and document auto-commenting as the follow-up."
+        "body": "Approved to de-scope auto-commenting for Friday. Ship draft mode with human approval, keep Luigi on repo sync hardening, and update the Friday Launch Decision Record with auto-commenting as the follow-up."
       },
       "effects": [
         {
@@ -707,6 +749,12 @@
           "type": "update_blocker",
           "blocker_id": "blocker_launch_scope_decision",
           "status": "resolved"
+        },
+        {
+          "type": "update_coworker_state",
+          "person_id": "toad",
+          "key": "approval_recorded",
+          "value": true
         },
         {
           "type": "add_evaluation_evidence",
@@ -1110,7 +1158,8 @@
     "risk_handling": {
       "points": 15,
       "evidence_keys": [
-        "draft_mode_approved"
+        "draft_mode_approved",
+        "decision_record_written"
       ],
       "preferred_before": "2026-06-25T15:00:00"
     },

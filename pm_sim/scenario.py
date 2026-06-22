@@ -77,6 +77,7 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
     _ids(data, "messages")
     _ids(data, "calendar_events")
     _ids(data, "events")
+    _ids(data, "coworker_state")
 
     valid_actors = people | {"agent"}
 
@@ -90,6 +91,15 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
             raise ScenarioError(
                 f"Person {person.get('id')} must define positive integer response_delay_minutes."
             )
+
+    for row in data.get("coworker_state", []):
+        if row.get("person_id") not in people:
+            raise ScenarioError(
+                f"Coworker state {row.get('id')} references unknown person_id: {row.get('person_id')}"
+            )
+        _require_string(row, "key", "coworker_state")
+        if "value" not in row:
+            raise ScenarioError(f"Coworker state {row.get('id')} is missing value.")
 
     for fact in data.get("facts", []):
         _validate_owner(fact, "fact", valid_actors)
@@ -190,6 +200,16 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
     _validate_event_rules(
         data.get("event_rules", []),
         event_types,
+        docs,
+        facts,
+        projects,
+        blockers,
+        tasks,
+        valid_actors,
+    )
+    _validate_meeting_rules(
+        data.get("meeting_rules", []),
+        people,
         docs,
         facts,
         projects,
@@ -316,6 +336,63 @@ def _validate_event_rules(
         )
 
 
+def _validate_meeting_rules(
+    rules: list[dict[str, Any]],
+    people: set[str],
+    docs: set[str],
+    facts: set[str],
+    projects: set[str],
+    blockers: set[str],
+    tasks: set[str],
+    valid_actors: set[str],
+) -> None:
+    seen = set()
+    for rule in rules:
+        rule_id = rule.get("id")
+        if not isinstance(rule_id, str) or not rule_id:
+            raise ScenarioError("Meeting rule must have a string id.")
+        if rule_id in seen:
+            raise ScenarioError(f"Meeting rules have duplicate id: {rule_id}")
+        seen.add(rule_id)
+
+        for key in ("required_attendees", "attendees_any"):
+            _validate_string_list(rule.get(key, []), f"Meeting rule {rule_id} {key}")
+            for attendee in rule.get(key, []):
+                if attendee not in people:
+                    raise ScenarioError(
+                        f"Meeting rule {rule_id} references unknown {key} attendee: {attendee}"
+                    )
+
+        for key in ("topic_terms_any", "topic_terms_all", "transcript_lines"):
+            _validate_string_list(rule.get(key, []), f"Meeting rule {rule_id} {key}")
+
+        for key in ("required_facts", "required_facts_any", "absent_facts"):
+            _validate_string_list(rule.get(key, []), f"Meeting rule {rule_id} {key}")
+            for fact_id in rule.get(key, []):
+                if fact_id not in facts:
+                    raise ScenarioError(
+                        f"Meeting rule {rule_id} references unknown {key} fact: {fact_id}"
+                    )
+
+        for key in ("required_evidence", "absent_evidence"):
+            _validate_string_list(rule.get(key, []), f"Meeting rule {rule_id} {key}")
+
+        effects = rule.get("effects", [])
+        if effects is not None:
+            if not isinstance(effects, list):
+                raise ScenarioError(f"Meeting rule {rule_id} effects must be a list.")
+            _validate_effects(
+                effects,
+                label=f"Meeting rule {rule_id}",
+                docs=docs,
+                facts=facts,
+                projects=projects,
+                blockers=blockers,
+                tasks=tasks,
+                valid_actors=valid_actors,
+            )
+
+
 def _validate_effects(
     effects: list[dict[str, Any]],
     *,
@@ -341,6 +418,18 @@ def _validate_effects(
             raise ScenarioError(
                 f"{label} references unknown update_project project_id: {effect.get('project_id')}"
             )
+        if effect_type == "update_coworker_state":
+            person_id = effect.get("person_id")
+            if person_id not in valid_actors or person_id == "agent":
+                raise ScenarioError(
+                    f"{label} references unknown update_coworker_state person_id: {person_id}"
+                )
+            values = effect.get("values")
+            if values is None:
+                if not isinstance(effect.get("key"), str) or not effect["key"]:
+                    raise ScenarioError(f"{label} has invalid update_coworker_state key.")
+            elif not isinstance(values, dict) or not values:
+                raise ScenarioError(f"{label} has invalid update_coworker_state values.")
         if effect_type == "update_blocker" and effect.get("blocker_id") not in blockers:
             raise ScenarioError(
                 f"{label} references unknown update_blocker blocker_id: {effect.get('blocker_id')}"

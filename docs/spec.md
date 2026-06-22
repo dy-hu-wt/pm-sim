@@ -18,6 +18,7 @@ Tool actions have deterministic logical costs:
 send_chat: 5 minutes
 send_email: 10 minutes
 read_doc: 15 minutes
+update_doc: 20 minutes
 schedule_meeting: 5 minutes to schedule; the meeting resolves at its scheduled end time
 update_task: 1 minute
 ```
@@ -56,6 +57,7 @@ send_email(to, subject, body)
 list_tasks()
 update_task(task_id, status, priority)
 read_doc(doc_id)
+update_doc(doc_id, body)
 schedule_meeting(attendees, time, topic)
 advance_time(duration)
 ```
@@ -72,11 +74,14 @@ They should have:
 - availability
 - response delays
 - private knowledge
+- mutable coworker state
 - behavior rules
 
 For the first version, coworker behavior should be deterministic at the state-transition level. I do not want grading-critical facts to depend on an LLM improvising.
 
 An LLM could later help turn a known fact into more natural wording, but it should not decide the fact.
+
+Coworker state is explicit actor memory, stored separately from global project state. It records durable commitments such as Luigi having surfaced the risk, Mario accepting draft mode, Peach becoming unblocked, Daisy receiving customer/security updates, and Toad recording approval. Facts, blockers, and project metadata still drive grading; coworker state makes NPC memory inspectable and reusable for future rules.
 
 Example:
 
@@ -252,6 +257,7 @@ Scenario data should define most of the setup:
 - a `world.json` starting-state file
 - a `rules.json` behavior/grading file
 - people
+- coworker state
 - projects
 - tasks
 - hidden facts
@@ -273,12 +279,13 @@ The defensible split is:
 Reusable engine:
   storage, tool actions, event delivery, timelines, effect application,
   condition evaluation, coworker rule matching, action logs, task gates,
-  state-derived evidence, harm checks, background event rules, outcome rules,
-  and evaluator scoring
+  state-derived evidence, coworker state, harm checks, background event rules,
+  outcome rules, and evaluator scoring
 
 Scenario-specific v1 data:
-  people, facts, docs, tasks, blockers, events, coworker rules, task gates,
-  state evidence rules, harm rules, background event rules, and outcome rules
+  people, coworker state, facts, docs, tasks, blockers, events, coworker rules,
+  task gates, state evidence rules, harm rules, background event rules, and
+  outcome rules
 
 Remaining boundary:
   meeting behavior still has some PR Review Agent-specific Python.
@@ -298,6 +305,7 @@ Possible CLI shape:
 pm-sim reset
 pm-sim observe
 pm-sim read-doc doc_project_brief
+pm-sim update-doc doc_launch_decision_record "Friday launch decision: ..."
 pm-sim send-chat luigi "Any repo sync blockers for launch?"
 pm-sim advance-time 2h
 pm-sim log
