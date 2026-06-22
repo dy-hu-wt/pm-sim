@@ -23,6 +23,8 @@ def format_output(command: str | None, value: Any) -> str:
         return _format_evaluate(value)
     if command == "log":
         return _format_log(value)
+    if command == "timeline":
+        return _format_timeline(value)
     return str(value)
 
 
@@ -224,9 +226,43 @@ def _format_log(entries: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _format_timeline(entries: list[dict[str, Any]]) -> str:
+    if not entries:
+        return "No timeline entries."
+    lines = ["Timeline"]
+    for entry in entries:
+        lines.append(
+            f"  {_pretty_time(entry['time'])}  {entry['kind']}  "
+            f"{entry['title']}  ({entry['id']})"
+        )
+        if entry["kind"] == "message":
+            lines.append(f"    {_short(entry.get('body', ''), 140)}")
+        elif entry["kind"] == "event_scheduled":
+            lines.append(f"    Runs at: {_pretty_time(entry.get('scheduled_at'))}")
+        elif entry["kind"] == "event_delivered":
+            effects = entry.get("result", {}).get("applied_effects", [])
+            if effects:
+                lines.append("    Effects:")
+                for effect in effects:
+                    lines.append(f"      - {_format_effect(effect)}")
+        elif entry["kind"] == "evidence":
+            lines.append(f"    {entry.get('note')}")
+            if entry.get("source"):
+                lines.append(f"    Source: {entry['source']}")
+        elif entry["kind"] == "action":
+            result = entry.get("result", {})
+            if "delivered_event_ids" in result:
+                lines.append(f"    Delivered: {', '.join(result['delivered_event_ids']) or 'none'}")
+            if "scheduled_reply_ids" in result:
+                lines.append(f"    Scheduled replies: {', '.join(result['scheduled_reply_ids']) or 'none'}")
+    return "\n".join(lines)
+
+
 def _format_evaluate(value: dict[str, Any]) -> str:
     if not value.get("ok"):
         return f"Error: {value.get('error')}"
+    if value.get("explain"):
+        return _format_evaluate_explain(value)
 
     lines = [
         "Evaluation",
@@ -262,6 +298,49 @@ def _format_evaluate(value: dict[str, Any]) -> str:
         )
 
     return "\n".join(lines)
+
+
+def _format_evaluate_explain(value: dict[str, Any]) -> str:
+    lines = [
+        "Evaluation Explanation",
+        f"Score: {value.get('score')} / {value.get('max_score')}",
+        "",
+    ]
+
+    for component in value.get("components", []):
+        lines.append(
+            f"+{component['earned']} {component['key']} "
+            f"({component['status']}, max {component['points']})"
+        )
+        missing = component.get("missing_evidence", [])
+        if component.get("note") and not missing:
+            lines.append(f"    {component['note']}")
+
+        evidence = component.get("evidence", [])
+        if evidence:
+            lines.append("    Evidence:")
+            for item in evidence:
+                timing = f", {item['timing']}" if item.get("timing") else ""
+                lines.append(
+                    f"      - {item['note']} at {item['created_at']} "
+                    f"from {item['source']}{timing}"
+                )
+
+        if missing:
+            lines.append(f"    Missing: {', '.join(missing)}")
+
+        harms = component.get("detected_harms", [])
+        if harms:
+            lines.append("    Harms:")
+            for harm in harms:
+                lines.append(f"      - {harm}")
+
+        if not evidence and not missing and not harms:
+            lines.append("    Missing: none")
+
+        lines.append("")
+
+    return "\n".join(lines).rstrip()
 
 
 def _format_effect(effect: dict[str, Any]) -> str:

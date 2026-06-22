@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +14,7 @@ from pm_sim.actions import (
     send_email,
     update_task,
 )
+from pm_sim.cli import main as cli_main
 from pm_sim.coworkers import effects_for_event, replies_for_chat
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
@@ -20,6 +23,7 @@ from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
 from pm_sim.state import event_log, observe, reset
 from pm_sim.time import advance_time
+from pm_sim.timeline import timeline
 
 
 class CoreSimulationTests(unittest.TestCase):
@@ -176,6 +180,36 @@ class CoreSimulationTests(unittest.TestCase):
 
         self.assertEqual(meeting_event["delivered_at"], "2026-06-22T10:30:00")
         self.assertEqual(evaluation["score"], evaluation["max_score"])
+
+    def test_timeline_shows_actions_events_messages_and_evidence_in_order(self) -> None:
+        send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
+        advance_time(self.db_path, "2h")
+
+        entries = timeline(self.db_path, limit=0)
+        kinds = {entry["kind"] for entry in entries}
+        times = [entry["time"] for entry in entries]
+
+        self.assertEqual(times, sorted(times))
+        self.assertIn("action", kinds)
+        self.assertIn("event_scheduled", kinds)
+        self.assertIn("event_delivered", kinds)
+        self.assertIn("message", kinds)
+        self.assertIn("evidence", kinds)
+
+        delivered = [
+            entry
+            for entry in entries
+            if entry["kind"] == "event_delivered" and entry["event_type"] == "coworker_reply"
+        ]
+        evidence = [
+            entry
+            for entry in entries
+            if entry["kind"] == "evidence" and entry["evidence_key"] == "blocker_discovered"
+        ]
+
+        self.assertEqual(len(delivered), 1)
+        self.assertTrue(delivered[0]["result"]["applied_effects"])
+        self.assertTrue(evidence)
 
 
 class CoworkerRuleTests(unittest.TestCase):
@@ -592,9 +626,14 @@ class EvaluatorTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmpdir.cleanup()
 
-    def test_reset_state_scores_below_agent_improved_path(self) -> None:
-        baseline = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+    def _run_cli(self, *args: str) -> str:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            exit_code = cli_main(["--db", str(self.db_path), *args])
+        self.assertEqual(exit_code, 0)
+        return output.getvalue()
 
+    def _drive_happy_path(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
         advance_time(self.db_path, "2h")
         send_chat(
@@ -616,6 +655,10 @@ class EvaluatorTests(unittest.TestCase):
         )
         advance_time(self.db_path, "90m")
 
+    def test_reset_state_scores_below_agent_improved_path(self) -> None:
+        baseline = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+
+        self._drive_happy_path()
         improved = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
 
         self.assertLess(baseline["score"], improved["score"])
@@ -744,6 +787,29 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(valid_component["earned"], 10)
         self.assertEqual(valid_component["status"], "partial")
         self.assertEqual(valid_component["evidence"][0]["key"], "peach_unblocked")
+
+    def test_evaluate_explain_prints_component_evidence(self) -> None:
+        self._drive_happy_path()
+
+        output = self._run_cli("evaluate", "--explain")
+
+        self.assertIn("Evaluation Explanation", output)
+        self.assertIn("Score: 100 / 100", output)
+        self.assertIn("+30 blocker_discovery (passed, max 30)", output)
+        self.assertIn("+20 stakeholder_communication (passed, max 20)", output)
+        self.assertIn("+20 task_state_improvement (passed, max 20)", output)
+        self.assertIn("+15 risk_handling (passed, max 15)", output)
+        self.assertIn("Evidence:", output)
+        self.assertIn("Stale repo sync risk is discovered in world state.", output)
+        self.assertIn("Draft-mode approval is recorded in world state.", output)
+
+    def test_evaluate_explain_prints_missing_evidence(self) -> None:
+        output = self._run_cli("evaluate", "--explain")
+
+        self.assertIn("Score: 15 / 100", output)
+        self.assertIn("+0 stakeholder_communication (missing, max 20)", output)
+        self.assertIn("Missing: stakeholder_alignment", output)
+        self.assertIn("Missing: peach_unblocked, draft_mode_approved", output)
 
 
 if __name__ == "__main__":

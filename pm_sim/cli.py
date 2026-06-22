@@ -20,6 +20,7 @@ from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .scenario import ScenarioError
 from .state import action_log, event_log, observe, reset
 from .time import advance_time
+from .timeline import timeline
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -117,14 +118,23 @@ def _build_parser() -> argparse.ArgumentParser:
     events_parser.add_argument("--limit", type=int, default=20)
     events_parser.set_defaults(func=lambda args: event_log(args.db, args.limit))
 
+    timeline_parser = subparsers.add_parser("timeline", help="Print the simulation timeline.")
+    timeline_parser.add_argument("--limit", type=int, default=0)
+    timeline_parser.set_defaults(func=lambda args: timeline(args.db, args.limit))
+
     evaluate_parser = subparsers.add_parser("evaluate", help="Score the current simulation state.")
+    evaluate_parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="Print a component-by-component scoring explanation.",
+    )
     evaluate_parser.add_argument(
         "--scenario",
         type=Path,
         default=DEFAULT_SCENARIO_PATH,
         help=f"Scenario JSON path. Default: {DEFAULT_SCENARIO_PATH}",
     )
-    evaluate_parser.set_defaults(func=lambda args: evaluate(args.db, args.scenario))
+    evaluate_parser.set_defaults(func=_evaluate_command)
 
     advance_parser = subparsers.add_parser("advance-time", help="Advance simulated time.")
     advance_parser.add_argument(
@@ -141,6 +151,13 @@ def _print_result(command: str | None, value: Any, *, as_json: bool) -> None:
         print(json.dumps(value, indent=2, sort_keys=True))
     else:
         print(format_output(command, value))
+
+
+def _evaluate_command(args: argparse.Namespace) -> dict[str, Any]:
+    result = evaluate(args.db, args.scenario)
+    if args.explain:
+        result = {**result, "explain": True}
+    return result
 
 
 def sqlite_missing_reset_error() -> tuple[type[Exception], ...]:

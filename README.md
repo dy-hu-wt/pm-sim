@@ -115,12 +115,20 @@ Inspect the action log:
 python3 -m pm_sim.cli log
 ```
 
+Inspect the combined action, event, message, and evidence timeline:
+
+```bash
+python3 -m pm_sim.cli timeline
+python3 -m pm_sim.cli timeline --limit 20
+```
+
 ## Evaluation
 
 Run the deterministic evaluator against the current SQLite state:
 
 ```bash
 python3 -m pm_sim.cli evaluate
+python3 -m pm_sim.cli evaluate --explain
 python3 -m pm_sim.cli --json evaluate
 ```
 
