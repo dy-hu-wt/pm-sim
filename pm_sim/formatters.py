@@ -318,9 +318,13 @@ def _format_evaluate(value: dict[str, Any]) -> str:
         f"  Scenario: {value.get('scenario_id')}",
         f"  Score:    {value.get('score')} / {value.get('max_score')}",
         f"  Evidence: {value.get('evidence_count')}",
-        "",
-        "Components",
     ]
+    final_outcome = value.get("final_outcome")
+    if isinstance(final_outcome, dict):
+        lines.append(f"  Outcome:  {final_outcome.get('outcome')}")
+        if final_outcome.get("summary"):
+            lines.append(f"            {final_outcome.get('summary')}")
+    lines.extend(["", "Components"])
     for component in value.get("components", []):
         lines.append(
             f"  {component['key']}: {component['earned']} / {component['points']} "
@@ -353,8 +357,13 @@ def _format_evaluate_explain(value: dict[str, Any]) -> str:
     lines = [
         "Evaluation Explanation",
         f"Score: {value.get('score')} / {value.get('max_score')}",
-        "",
     ]
+    final_outcome = value.get("final_outcome")
+    if isinstance(final_outcome, dict):
+        lines.append(f"Outcome: {final_outcome.get('outcome')}")
+        if final_outcome.get("summary"):
+            lines.append(f"  {final_outcome.get('summary')}")
+    lines.append("")
 
     for component in value.get("components", []):
         lines.append(

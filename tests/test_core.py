@@ -241,6 +241,10 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(outcome_doc["kind"], "outcome_report")
         self.assertIn("without an approved reliable launch plan", outcome_doc["body"])
 
+        evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        self.assertEqual(evaluation["final_outcome"]["outcome"], "no_approved_friday_plan")
+        self.assertEqual(evaluation["final_outcome"]["project_status"], "missed")
+
     def test_friday_deadline_records_successful_draft_mode_outcome(self) -> None:
         schedule_meeting(
             self.db_path,
@@ -1497,6 +1501,7 @@ class EvaluatorTests(unittest.TestCase):
         improved = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
 
         self.assertLess(baseline["score"], improved["score"])
+        self.assertIsNone(baseline["final_outcome"])
         self.assertEqual(improved["score"], improved["max_score"])
         component_scores = {
             component["key"]: component["earned"] for component in improved["components"]
@@ -1751,6 +1756,74 @@ class EvaluatorTests(unittest.TestCase):
         self.assertIn("Missing: stakeholder_alignment, customer_message_ready", output)
         self.assertIn("Missing: peach_unblocked, draft_mode_approved", output)
         self.assertIn("Missing: security_doc_found, security_question_answered", output)
+
+    def test_documented_noop_baseline_path_is_runnable(self) -> None:
+        self._run_cli("reset")
+        self._run_cli("advance-time", "to:2026-06-26T15:00:00")
+
+        evaluation = self._run_cli("evaluate", "--explain")
+        outcome = self._run_cli("read-doc", "doc_friday_outcome")
+
+        self.assertIn("Score: 15 / 110", evaluation)
+        self.assertIn("Late evidence: blocker_discovered.", evaluation)
+        self.assertIn("Missing: stakeholder_alignment, customer_message_ready", evaluation)
+        self.assertIn("Friday Outcome", outcome)
+        self.assertIn("Friday arrived without an approved reliable launch plan.", outcome)
+
+    def test_documented_meeting_path_is_runnable(self) -> None:
+        self._run_cli("reset")
+        self._run_cli("read-doc", "doc_project_brief")
+        self._run_cli("read-doc", "doc_beta_rollout_template")
+        self._run_cli(
+            "schedule-meeting",
+            "Draft-mode risk review for Nimbus launch",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            "luigi",
+            "daisy",
+            "mario",
+            "peach",
+            "toad",
+        )
+        self._run_cli("advance-time", "to:2026-06-22T10:30:00")
+        transcript = self._run_cli("read-doc", "doc_transcript_cal_1")
+        self._run_cli(
+            "send-email",
+            "daisy",
+            "Nimbus Friday draft-mode update",
+            (
+                "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has "
+                "stale-commit risk, so comments should require human approval before posting."
+            ),
+        )
+        self._run_cli("advance-time", "to:2026-06-24T14:00:00")
+        self._run_cli(
+            "send-chat",
+            "luigi",
+            "Nimbus asked if we store source code from private repos. Is there a security doc?",
+        )
+        self._run_cli("advance-time", "2h")
+        self._run_cli("read-doc", "doc_private_repo_security_baseline")
+        self._run_cli(
+            "send-email",
+            "daisy",
+            "Nimbus private repo security answer",
+            (
+                "Nimbus can tell their reviewer that private repo source code is processed "
+                "transiently. Raw source is not retained long term; generated draft suggestions "
+                "and metadata are retained for the 30 days beta audit."
+            ),
+        )
+
+        before_deadline = self._run_cli("evaluate", "--explain")
+        self._run_cli("advance-time", "to:2026-06-26T15:00:00")
+        after_deadline = self._run_cli("evaluate")
+
+        self.assertIn("Transcript: Draft-mode risk review for Nimbus launch", transcript)
+        self.assertIn("Toad approved draft mode", transcript)
+        self.assertIn("Score: 110 / 110", before_deadline)
+        self.assertIn("Outcome:  draft_mode_beta_shipped", after_deadline)
+        self.assertIn("shipped the reliable draft-mode beta", after_deadline)
 
 
 class ScriptedAgentTests(unittest.TestCase):

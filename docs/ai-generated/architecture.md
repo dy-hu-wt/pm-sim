@@ -1,15 +1,21 @@
-# Architecture Draft
+# Architecture Notes
 
-This is an AI-generated working draft, not the final writeup.
+This generated note is kept in `docs/ai-generated/` as reviewer-facing scaffolding and as source material for a future hand-written explanation. It should match the current implementation.
 
 ## Core Shape
 
 `pm-sim` is a single-node simulation backend. Scenario JSON defines the starting world, SQLite stores the mutable state, CLI commands expose the tools, scheduled events advance background activity, deterministic coworker rules emit effects, and the evaluator scores the resulting state.
 
-The main flow is:
+The main backend flow is:
 
 ```text
 scenario JSON -> SQLite state -> CLI tools -> actions -> event queue -> effects -> evaluator
+```
+
+Agent policies add one harness step after the action loop:
+
+```text
+agent stops -> finalize to scenario deadline -> Friday outcome event -> evaluator
 ```
 
 ## Simulated Time
@@ -112,6 +118,8 @@ The current rubric rewards:
 
 Evidence rows act as score-relevant receipts. Some evidence is written directly by tool/event effects. Other evidence is derived from consistent world state, such as draft-mode approval being present in project metadata.
 
+Before Friday, evaluation can report a full readiness score without a final outcome. After the Friday deadline event is delivered, evaluation also exposes the classified outcome from project metadata, such as `draft_mode_beta_shipped` or `no_approved_friday_plan`.
+
 The repo does not train an RL policy. The score is reward-like, but it is used for grading and comparison, not model training.
 
 ## Observability
@@ -151,3 +159,5 @@ The engine should stay scenario-agnostic where possible. A new scenario should m
 Direct coworker chat uses a structured rule interpreter. Rules can match on trigger terms, term groups, required facts, absent facts, and priority. The rule then emits fixed reply text, delay, and effects. For example, Luigi's security-doc reveal and Toad's draft-mode approval are authored in scenario JSON instead of hardcoded as Python branches.
 
 This is the main answer to the scaling concern: scenario files should describe the world, while engine code should define common simulation semantics.
+
+The current v1 still has some scenario-specific Python for Friday outcome classification and a few evaluator state checks. That is intentional for a single fully-authored scenario, but it is the next scaling boundary: additional scenarios should push more outcome rules into scenario data while keeping common action, event, effect, and storage semantics in the engine.

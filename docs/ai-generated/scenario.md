@@ -1,6 +1,6 @@
-# Scenario Draft
+# Scenario Notes
 
-This is an AI-generated working draft, not the final writeup.
+This generated note is kept in `docs/ai-generated/` as reviewer-facing scaffolding and as source material for a future hand-written explanation. It should match the current implementation.
 
 ## Summary
 
@@ -147,6 +147,19 @@ The evaluator gives full credit for `110 / 110`:
 
 The evaluator does not reward activity volume. It rewards evidence and state transitions that show the project is in a better position. Excessive direct outreach receives a small capped deduction under `avoid_harmful_actions`.
 
+## Baseline Path
+
+The no-op baseline is runnable:
+
+```text
+reset
+advance-time to:2026-06-26T15:00:00
+evaluate --explain
+read-doc doc_friday_outcome
+```
+
+Expected baseline score is `15 / 110`. Luigi eventually surfaces the repo-sync risk, but too late to align Daisy, unblock Peach, approve draft mode, or answer the security question. The Friday outcome report records that the beta arrived without an approved reliable launch plan.
+
 ## Good Path
 
 The README contains the runnable happy path. The short version is:
@@ -166,6 +179,8 @@ read the outcome doc
 
 The expected score before Friday is `110 / 110`. Advancing to the deadline then records the clean draft-mode beta outcome.
 
+A meeting-based good path is also supported. Scheduling a meeting titled around draft-mode risk or launch readiness with Luigi, Daisy, Mario, Peach, and Toad can surface the repo-sync risk, align stakeholders, clarify draft-mode scope, approve draft mode, and create a visible transcript doc when the meeting ends. The agent still needs to send Daisy the written Nimbus update and handle the Wednesday security interruption.
+
 The same good path can be run with:
 
 ```text
@@ -181,6 +196,8 @@ pm-sim run-agent --policy llm --reset --max-turns 40
 ```
 
 That path lets a model choose workplace tool calls. The model does not get the evaluator during the run; the simulator scores durable state and evidence after the agent stops. A model turn is one model decision round, and it may include multiple tool calls. During an LLM run, progress logs show simulated time, model wait points, tool execution, logical time cost, and short result summaries. After the agent stops, the runner finalizes to the Friday deadline as operator-owned simulation settlement, then grades the settled state.
+
+The evaluator reports score components during the week. Once the Friday deadline event has delivered, it also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
 ## Bad Paths
 

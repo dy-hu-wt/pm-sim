@@ -45,6 +45,19 @@ pm-sim reset --scenario scenarios/launch_readiness.json
 
 This creates `data/current.db`, which is ignored by git.
 
+## Baseline Comparison
+
+This is the no-op path. It lets the scheduled coworker events run to Friday without agent intervention, then scores the settled state and opens the generated outcome report.
+
+```bash
+pm-sim reset
+pm-sim advance-time to:2026-06-26T15:00:00
+pm-sim evaluate --explain
+pm-sim read-doc doc_friday_outcome
+```
+
+Expected baseline result: `15 / 110`. Luigi eventually surfaces the repo-sync risk, but it happens too late to align Daisy, unblock Peach, approve draft mode, or answer the security question. The Friday outcome report should say the beta arrived without an approved reliable launch plan.
+
 ## Quick Happy Path
 
 This is the shortest successful path through the scenario. It demonstrates discovery, stakeholder alignment, draft-mode approval, evaluation, and the Friday deadline outcome; it is not meant to exhaust the whole simulated week.
@@ -92,6 +105,35 @@ pm-sim run-agent --policy scripted --reset
 ```
 
 The scripted policy uses the normal tool functions. It does not mutate database state directly.
+
+## Meeting-Based Path
+
+The same launch decision can also be driven through calendar and meeting semantics. The meeting creates a transcript doc at the scheduled end time and applies deterministic effects based on attendees, topic, and known state.
+
+```bash
+pm-sim reset
+pm-sim read-doc doc_project_brief
+pm-sim read-doc doc_beta_rollout_template
+
+pm-sim schedule-meeting "Draft-mode risk review for Nimbus launch" 2026-06-22T10:00:00 2026-06-22T10:30:00 luigi daisy mario peach toad
+pm-sim advance-time to:2026-06-22T10:30:00
+pm-sim read-doc doc_transcript_cal_1
+
+pm-sim send-email daisy "Nimbus Friday draft-mode update" "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has stale-commit risk, so comments should require human approval before posting."
+
+pm-sim advance-time to:2026-06-24T14:00:00
+pm-sim send-chat luigi "Nimbus asked if we store source code from private repos. Is there a security doc?"
+pm-sim advance-time 2h
+pm-sim read-doc doc_private_repo_security_baseline
+pm-sim send-email daisy "Nimbus private repo security answer" "Nimbus can tell their reviewer that private repo source code is processed transiently. Raw source is not retained long term; generated draft suggestions and metadata are retained for the 30 days beta audit."
+
+pm-sim evaluate --explain
+pm-sim advance-time to:2026-06-26T15:00:00
+pm-sim evaluate
+pm-sim read-doc doc_friday_outcome
+```
+
+This path is useful for reviewing calendar, transcript capture, and multi-stakeholder coordination in one flow.
 
 ## Bad-Path Sanity Check
 
@@ -184,6 +226,8 @@ pm-sim --json evaluate
 The score comes from the rubric in `scenarios/launch_readiness.json`. It rewards outcomes and state improvements, not raw tool usage or activity volume. Evidence must show that the agent improved the project: discovering blockers, aligning stakeholders, unblocking real work, approving a defensible draft-mode launch, and avoiding harmful state. `avoid_harmful_actions` includes a light, capped penalty for excessive direct outreach.
 
 Task updates are checked against the surrounding world state to resist reward hacking. For example, marking repo sync complete while the stale-code blocker is unresolved is penalized, and draft-mode onboarding progress only counts when draft-mode scope is confirmed and the scope blocker is resolved.
+
+After the Friday deadline event is delivered, `evaluate` also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
 The backend is covered by:
 
