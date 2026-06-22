@@ -22,6 +22,58 @@ scenarios/launch_readiness/rules.json     # coworker/event behavior, gates, scor
 
 `pm-sim reset` loads the manifest, merges included files, validates the scenario, and writes the active run into SQLite.
 
+## Week At A Glance
+
+The simulation starts Monday, June 22, 2026 at 09:00 and advances only when the agent takes time-consuming actions or explicitly advances time. Seeded events are deterministic; earlier agent work can change what those events mean when they arrive.
+
+```mermaid
+flowchart LR
+  subgraph MON["Mon Jun 22"]
+    MON_START["09:00\nAgent starts\nBriefs, tasks, public blockers visible"]:::system
+    MON_SCOPE["Open\nLaunch mode unclear\nPeach/Toad blockers visible"]:::peach
+  end
+
+  subgraph TUE["Tue Jun 23"]
+    TUE_MARIO["10:00\nMario pushes auto-commenting\nif risk is not concrete"]:::mario
+  end
+
+  subgraph WED["Wed Jun 24"]
+    WED_KOOPA["10:00\nKoopa audit-log export request"]:::koopa
+    WED_PEACH["11:00\nPeach escalates blocked onboarding"]:::peach
+    WED_DAISY_CONF["13:00\nDaisy asks for confidence"]:::daisy
+    WED_SECURITY["14:00\nDaisy forwards Nimbus security question"]:::daisy
+    WED_NIMBUS["15:30\nNimbus asks launch-mode question"]:::daisy
+  end
+
+  subgraph THU["Thu Jun 25"]
+    THU_LUIGI["10:00\nLuigi proactively surfaces stale repo-sync risk\nif agent has not found it"]:::luigi
+    THU_KOOPA_DEADLINE["16:00\nKoopa security-review deadline"]:::deadline
+  end
+
+  subgraph FRI["Fri Jun 26"]
+    FRI_DEADLINE["15:00\nNimbus beta deadline\nfinal outcome is classified"]:::deadline
+  end
+
+  MON_START --> MON_SCOPE --> TUE_MARIO --> WED_KOOPA --> WED_PEACH --> WED_DAISY_CONF --> WED_SECURITY --> WED_NIMBUS --> THU_LUIGI --> THU_KOOPA_DEADLINE --> FRI_DEADLINE
+
+  classDef system fill:#eef2ff,stroke:#4f46e5,color:#111827
+  classDef mario fill:#fff7ed,stroke:#f97316,color:#111827
+  classDef luigi fill:#ecfdf5,stroke:#10b981,color:#111827
+  classDef peach fill:#fdf2f8,stroke:#ec4899,color:#111827
+  classDef daisy fill:#eff6ff,stroke:#3b82f6,color:#111827
+  classDef koopa fill:#f5f3ff,stroke:#8b5cf6,color:#111827
+  classDef deadline fill:#fef2f2,stroke:#ef4444,color:#111827,stroke-width:2px
+```
+
+| Color | Owner / Thread | What It Means |
+| --- | --- | --- |
+| Blue | Daisy / customer-facing pressure | Nimbus messaging, confidence, and security questions. |
+| Green | Luigi / backend risk | Hidden repo-sync risk and security-doc discovery. |
+| Pink | Peach / implementation unblock | Draft-mode onboarding cannot finish until scope is clear. |
+| Orange | Mario / product pressure | Pushes for the flashier auto-commenting launch unless risk is concrete. |
+| Purple | Koopa Bank interruption | Smaller audit-log export request that must be scoped without derailing Nimbus. |
+| Red | Deadlines | Project outcome events that classify final state from evidence and blockers. |
+
 ## Setup
 
 Use Python 3.9 or newer. Create a virtualenv and install the repo in editable mode so the `pm-sim` command is available:
