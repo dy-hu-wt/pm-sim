@@ -141,6 +141,10 @@
         <text x="712" y="99" class="event-title">Luigi reveals risk</text>
         <text x="712" y="117" class="event-meta">Repo sync can be stale</text>
 
+        <rect x="700" y="216" width="182" height="50" rx="8" fill="#1a73e8"/>
+        <text x="712" y="236" class="event-title">Daisy asks go/no-go</text>
+        <text x="712" y="253" class="event-meta">Final readiness note</text>
+
         <rect x="700" y="492" width="182" height="50" rx="8" fill="#d93025"/>
         <text x="712" y="512" class="event-title">Koopa review due</text>
         <text x="712" y="529" class="event-meta">Export answer needed</text>
