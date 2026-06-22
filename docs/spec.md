@@ -264,7 +264,7 @@ pm-sim advance-time 2h
 pm-sim log
 pm-sim evaluate
 pm-sim run-agent --policy scripted --reset
-pm-sim run-agent --policy llm --reset
+pm-sim run-agent --policy llm --reset --max-turns 40
 ```
 
 A UI is optional. If added, it should stay lightweight and should not hide the simulation semantics.

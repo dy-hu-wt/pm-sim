@@ -387,12 +387,29 @@ def _format_run_agent(value: dict[str, Any]) -> str:
         lines.append(f"  Model:  {value.get('model')}")
     if value.get("turns") is not None:
         lines.append(f"  Turns:  {value.get('turns')}")
+    missing = _agent_missing_components(evaluation)
+    if missing:
+        lines.extend(["", "Missing Evaluation"])
+        for component in missing:
+            evidence = component.get("missing_evidence") or []
+            if evidence:
+                lines.append(f"  {component['key']}: {', '.join(evidence)}")
+            else:
+                lines.append(f"  {component['key']}: {component.get('note', 'not passed')}")
     lines.extend(["", "Steps"])
     for index, step in enumerate(steps, start=1):
         status = "ok" if step.get("ok") else "failed"
         lines.append(f"  {index}. {step.get('name')} [{status}]")
 
     return "\n".join(lines)
+
+
+def _agent_missing_components(evaluation: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        component
+        for component in evaluation.get("components", [])
+        if component.get("status") != "passed"
+    ]
 
 
 def _format_effect(effect: dict[str, Any]) -> str:

@@ -25,6 +25,7 @@ from pm_sim.coworkers import effects_for_event, replies_for_chat
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
 from pm_sim.effects import apply_effects
+from pm_sim.formatters import format_output
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
 from pm_sim.scenario import ScenarioError, load_scenario
@@ -1677,6 +1678,25 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertIn("Policy: scripted", output)
         self.assertIn("Score:  110 / 110", output)
         self.assertIn("send_security_answer", output)
+
+    def test_run_agent_summary_prints_missing_evidence(self) -> None:
+        reset(self.db_path, DEFAULT_SCENARIO_PATH)
+        result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+
+        output = format_output(
+            "run-agent",
+            {
+                "ok": False,
+                "policy": "llm",
+                "model": "test-model",
+                "turns": 20,
+                "steps": [],
+                "evaluation": result,
+            },
+        )
+
+        self.assertIn("Missing Evaluation", output)
+        self.assertIn("security_interruption: security_doc_found, security_question_answered", output)
 
 
 class LlmAgentTests(unittest.TestCase):

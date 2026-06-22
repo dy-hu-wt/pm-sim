@@ -29,7 +29,7 @@ def run_llm_agent(
     *,
     reset_first: bool = False,
     model: str | None = None,
-    max_turns: int = 20,
+    max_turns: int = 40,
     client: Any | None = None,
     progress: ProgressFn | None = None,
 ) -> dict[str, Any]:
@@ -144,7 +144,10 @@ def _instructions() -> str:
         "You are the project-manager agent inside pm-sim. Use only the provided tools. "
         "Do not assume hidden facts; discover them through docs, coworkers, meetings, and time. "
         "Your objective is to improve the Friday launch outcome and get a high evaluator score. "
-        "Prefer substantive project progress over tool volume. Call finish when evaluation looks complete."
+        "Prefer substantive project progress over tool volume. Use evaluate to check missing evidence before "
+        "you finish. If the score is not complete, continue using tools until the missing evidence is addressed "
+        "or the turn limit is reached. Pay attention to scheduled future events; some required work only appears "
+        "after simulated time advances. Call finish only when evaluation reaches full score or no useful action remains."
     )
 
 

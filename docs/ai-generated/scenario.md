@@ -172,7 +172,7 @@ That command runs a deterministic policy through the normal docs, chat, email, t
 The LLM policy can be run with:
 
 ```text
-pm-sim run-agent --policy llm --reset --max-turns 20
+pm-sim run-agent --policy llm --reset --max-turns 40
 ```
 
 That path lets a model choose the next tool call. The simulator still evaluates only durable state and evidence. During an LLM run, progress logs show when the runner is waiting for the model and which tool is executing.

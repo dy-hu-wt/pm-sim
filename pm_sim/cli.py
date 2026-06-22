@@ -159,7 +159,7 @@ def _build_parser() -> argparse.ArgumentParser:
     agent_parser.add_argument(
         "--max-turns",
         type=int,
-        default=20,
+        default=40,
         help="Maximum model/tool loop turns for --policy llm.",
     )
     agent_parser.add_argument(
