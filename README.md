@@ -84,6 +84,14 @@ Expected evaluation result before the Friday deadline: `110 / 110`. The importan
 
 The path demonstrates good PM behavior by turning a hidden technical risk into a clear launch tradeoff, aligning the customer-facing owner, unblocking implementation work, and getting an explicit decision before the deadline.
 
+The same path can be run by the deterministic scripted agent:
+
+```bash
+pm-sim run-agent --policy scripted --reset
+```
+
+The scripted policy uses the normal tool functions. It does not mutate database state directly.
+
 ## Bad-Path Sanity Check
 
 The evaluator is not counting messages or task updates. A busywork path that sends vague chats, moves tasks to `in_progress`, and sends Daisy a generic status email will still miss evidence such as `customer_message_ready`, `draft_mode_approved`, and the security interruption. The test suite covers this as `test_busywork_does_not_score_like_good_pm_work`.
@@ -142,6 +150,13 @@ Inspect the combined action, event, message, and evidence timeline:
 ```bash
 pm-sim timeline
 pm-sim timeline --limit 20
+```
+
+Run the deterministic scripted agent:
+
+```bash
+pm-sim run-agent --policy scripted --reset
+pm-sim --json run-agent --policy scripted --reset
 ```
 
 ## Evaluation

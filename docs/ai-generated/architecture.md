@@ -120,10 +120,13 @@ pm-sim observe
 pm-sim events
 pm-sim log
 pm-sim timeline
+pm-sim run-agent --policy scripted --reset
 pm-sim evaluate --explain
 ```
 
 `timeline` combines actions, events, messages, and evidence into one ordered view. This is useful for understanding why a score was earned or missed.
+
+`run-agent --policy scripted --reset` runs the golden path through the same public tool functions used by the CLI. It is a deterministic agent policy, not an LLM and not a training loop. Its purpose is to prove the environment can be driven by an agent loop before adding model-based action selection.
 
 ## Scaling Path
 
@@ -138,6 +141,7 @@ The engine should stay scenario-agnostic where possible. A new scenario should m
 - scheduled events
 - evaluation targets
 - coworker rules
+- optional agent policies
 
 Direct coworker chat uses a structured rule interpreter. Rules can match on trigger terms, term groups, required facts, absent facts, and priority. The rule then emits fixed reply text, delay, and effects. For example, Luigi's security-doc reveal and Toad's draft-mode approval are authored in scenario JSON instead of hardcoded as Python branches.
 

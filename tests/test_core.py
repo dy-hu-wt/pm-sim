@@ -17,6 +17,7 @@ from pm_sim.actions import (
     send_email,
     update_task,
 )
+from pm_sim.agents.scripted import run_scripted_agent
 from pm_sim.cli import main as cli_main
 from pm_sim.coworkers import effects_for_event, replies_for_chat
 from pm_sim.db import connect
@@ -25,7 +26,7 @@ from pm_sim.effects import apply_effects
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
 from pm_sim.scenario import ScenarioError, load_scenario
-from pm_sim.state import event_log, observe, reset
+from pm_sim.state import action_log, event_log, observe, reset
 from pm_sim.time import advance_time
 from pm_sim.timeline import timeline
 
@@ -1623,6 +1624,49 @@ class EvaluatorTests(unittest.TestCase):
         self.assertIn("Missing: stakeholder_alignment, customer_message_ready", output)
         self.assertIn("Missing: peach_unblocked, draft_mode_approved", output)
         self.assertIn("Missing: security_doc_found, security_question_answered", output)
+
+
+class ScriptedAgentTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.tmpdir.name) / "test.db"
+
+    def tearDown(self) -> None:
+        self.tmpdir.cleanup()
+
+    def _run_cli(self, *args: str) -> str:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            exit_code = cli_main(["--db", str(self.db_path), *args])
+        self.assertEqual(exit_code, 0)
+        return output.getvalue()
+
+    def test_scripted_agent_reaches_full_score_from_reset(self) -> None:
+        result = run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["policy"], "scripted")
+        self.assertEqual(result["evaluation"]["score"], 110)
+        self.assertEqual(result["evaluation"]["score"], result["evaluation"]["max_score"])
+
+    def test_scripted_agent_uses_public_tool_actions(self) -> None:
+        run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
+
+        log = action_log(self.db_path, limit=100)
+        action_types = [entry["action_type"] for entry in log]
+
+        self.assertIn("reset", action_types)
+        self.assertEqual(action_types.count("send_chat"), 5)
+        self.assertEqual(action_types.count("send_email"), 2)
+        self.assertEqual(action_types.count("advance_time"), 6)
+
+    def test_cli_run_agent_prints_summary(self) -> None:
+        output = self._run_cli("run-agent", "--policy", "scripted", "--reset")
+
+        self.assertIn("Agent Run", output)
+        self.assertIn("Policy: scripted", output)
+        self.assertIn("Score:  110 / 110", output)
+        self.assertIn("send_security_answer", output)
 
 
 if __name__ == "__main__":

@@ -26,6 +26,8 @@ def format_output(command: str | None, value: Any) -> str:
         return _format_log(value)
     if command == "timeline":
         return _format_timeline(value)
+    if command == "run-agent":
+        return _format_run_agent(value)
     return str(value)
 
 
@@ -369,6 +371,25 @@ def _format_evaluate_explain(value: dict[str, Any]) -> str:
         lines.append("")
 
     return "\n".join(lines).rstrip()
+
+
+def _format_run_agent(value: dict[str, Any]) -> str:
+    evaluation = value.get("evaluation", {})
+    steps = value.get("steps", [])
+    lines = [
+        "Agent Run",
+        f"  Policy: {value.get('policy')}",
+        f"  Result: {'passed' if value.get('ok') else 'incomplete'}",
+        f"  Score:  {evaluation.get('score')} / {evaluation.get('max_score')}",
+        f"  Steps:  {len(steps)}",
+        "",
+        "Steps",
+    ]
+    for index, step in enumerate(steps, start=1):
+        status = "ok" if step.get("ok") else "failed"
+        lines.append(f"  {index}. {step.get('name')} [{status}]")
+
+    return "\n".join(lines)
 
 
 def _format_effect(effect: dict[str, Any]) -> str:

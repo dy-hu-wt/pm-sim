@@ -14,6 +14,7 @@ from .actions import (
     send_email,
     update_task,
 )
+from .agents.scripted import run_scripted_agent
 from .evaluator import evaluate
 from .formatters import format_output
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
@@ -143,6 +144,27 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     advance_parser.set_defaults(func=lambda args: advance_time(args.db, args.target))
 
+    agent_parser = subparsers.add_parser("run-agent", help="Run an agent policy through tools.")
+    agent_parser.add_argument(
+        "--policy",
+        choices=["scripted"],
+        default="scripted",
+        help="Agent policy to run. Default: scripted.",
+    )
+    agent_parser.add_argument(
+        "--reset",
+        action="store_true",
+        dest="reset_first",
+        help="Reset the DB from the scenario before running the agent.",
+    )
+    agent_parser.add_argument(
+        "--scenario",
+        type=Path,
+        default=DEFAULT_SCENARIO_PATH,
+        help=f"Scenario JSON path. Default: {DEFAULT_SCENARIO_PATH}",
+    )
+    agent_parser.set_defaults(func=_run_agent_command)
+
     return parser
 
 
@@ -158,6 +180,12 @@ def _evaluate_command(args: argparse.Namespace) -> dict[str, Any]:
     if args.explain:
         result = {**result, "explain": True}
     return result
+
+
+def _run_agent_command(args: argparse.Namespace) -> dict[str, Any]:
+    if args.policy != "scripted":
+        raise ValueError(f"Unsupported policy: {args.policy}")
+    return run_scripted_agent(args.db, args.scenario, reset_first=args.reset_first)
 
 
 def sqlite_missing_reset_error() -> tuple[type[Exception], ...]:

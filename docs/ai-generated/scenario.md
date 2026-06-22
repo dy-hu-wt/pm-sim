@@ -161,6 +161,14 @@ read the outcome doc
 
 The expected score before Friday is `110 / 110`. Advancing to the deadline then records the clean draft-mode beta outcome.
 
+The same good path can be run with:
+
+```text
+pm-sim run-agent --policy scripted --reset
+```
+
+That command runs a deterministic policy through the normal docs, chat, email, time, and evaluation functions. It is useful as a one-command reviewer demo and as the future insertion point for an LLM policy.
+
 ## Bad Paths
 
 The scenario should score lower if the agent:
