@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 from typing import Any
+
+from .conditions import all_conditions_match
+from .jsonutil import loads
 
 
 Effect = dict[str, Any]
@@ -14,14 +18,6 @@ class CoworkerReply:
     body: str
     effects: tuple[Effect, ...] = ()
 
-
-RESPONSE_DELAYS_MINUTES = {
-    "luigi": 120,
-    "mario": 60,
-    "peach": 90,
-    "daisy": 45,
-    "toad": 90,
-}
 
 RISK_TERMS = frozenset(
     {
@@ -51,43 +47,6 @@ RISK_TERMS = frozenset(
     }
 )
 
-LUIGI_RISK_INQUIRY_TERMS = frozenset(
-    {
-        "blocker",
-        "blocked",
-        "risk",
-        "risks",
-        "ready",
-        "readiness",
-        "repo",
-        "repository",
-        "sync",
-        "webhook",
-        "webhooks",
-        "commit",
-        "stale",
-        "auto-comment",
-        "auto-commenting",
-    }
-)
-
-SCOPE_TERMS = frozenset(
-    {
-        "scope",
-        "fallback",
-        "draft",
-        "draft-mode",
-        "mode",
-        "fields",
-        "requirements",
-        "design",
-        "onboarding",
-        "docs",
-        "full",
-        "demo",
-        "auto-commenting",
-    }
-)
 
 def replies_for_chat(
     person_id: str, body: str, state: dict[str, Any] | None = None
@@ -122,12 +81,21 @@ def _structured_replies_for_chat(
         replies.append(
             CoworkerReply(
                 person_id=person_id,
-                delay_minutes=int(reply.get("delay_minutes", RESPONSE_DELAYS_MINUTES.get(person_id, 60))),
+                delay_minutes=_reply_delay_minutes(person_id, reply, state),
                 body=reply.get("body", ""),
                 effects=tuple(dict(effect) for effect in rule.get("effects", [])),
             )
         )
     return replies
+
+
+def _reply_delay_minutes(person_id: str, reply: dict[str, Any], state: dict[str, Any]) -> int:
+    if "delay_minutes" in reply:
+        return int(reply["delay_minutes"])
+    response_delays = state.get("response_delays", {})
+    if person_id in response_delays:
+        return int(response_delays[person_id])
+    raise ValueError(f"No response delay configured for coworker: {person_id}")
 
 
 def _rule_matches(match: dict[str, Any], normalized: str, state: dict[str, Any]) -> bool:
@@ -160,110 +128,28 @@ def _rule_matches(match: dict[str, Any], normalized: str, state: dict[str, Any])
     return True
 
 
-def effects_for_event(event_type: str, payload: dict[str, Any]) -> list[Effect]:
-    # Event rules return effect dictionaries only; effects.py owns mutation.
-    if event_type == "luigi_proactive_repo_risk":
-        return [
-            _message(
-                "chat",
-                "luigi",
-                "agent",
-                "I do not think auto-commenting is safe for Friday. The repo "
-                "sync worker can process webhook events out of order, so the "
-                "agent may review a stale commit. We should ship draft mode "
-                "unless Toad explicitly accepts the risk.",
-            ),
-            _discover_fact("fact_repo_sync_stale", "luigi_proactive_repo_risk"),
-            _update_blocker("blocker_repo_sync_stale", "surfaced"),
-            _update_launch_conflict(
-                status="investigated",
-                technical_risk_substantiated=True,
-            ),
-            _add_evidence("blocker_discovered", "Luigi proactively disclosed stale repo sync risk."),
-        ]
+def effects_for_event(
+    conn: sqlite3.Connection,
+    event_type: str,
+    payload: dict[str, Any],
+) -> list[Effect]:
+    effects: list[Effect] = []
+    for rule in _event_rules(conn):
+        if rule.get("event_type") != event_type:
+            continue
+        if not all_conditions_match(
+            conn,
+            rule.get("when", []),
+            project_id=payload.get("project_id"),
+        ):
+            continue
+        effects.extend(dict(effect) for effect in rule.get("effects", []))
+    return effects
 
-    if event_type == "daisy_confidence_check":
-        return [
-            _message(
-                "chat",
-                "daisy",
-                "agent",
-                "Nimbus asked whether Friday's coding-agent beta is still on "
-                "track. I need a confidence update before I talk to them.",
-            ),
-            _update_launch_conflict(
-                status="investigated",
-                customer_constraint_known=True,
-            ),
-            _update_pressure("stakeholder_pressure", 1),
-        ]
 
-    if event_type == "nimbus_launch_mode_question":
-        return [
-            _message_with_subject(
-                "email",
-                "daisy",
-                "agent",
-                "Nimbus asked whether the beta agent will post comments "
-                "automatically or queue draft suggestions for approval. I need "
-                "a clear answer before I update them Thursday morning.",
-                "Nimbus launch mode question",
-            ),
-            _update_launch_conflict(
-                status="investigated",
-                customer_constraint_known=True,
-            ),
-            _update_pressure("stakeholder_pressure", 1),
-        ]
-
-    if event_type == "daisy_private_repo_security_question":
-        return [
-            _message_with_subject(
-                "email",
-                "daisy",
-                "agent",
-                "Nimbus's security reviewer asked whether the PR Review Agent "
-                "stores source code from private repos. I need a safe answer "
-                "before Friday's beta call.",
-                "Nimbus private repo security question",
-            ),
-            _update_pressure("stakeholder_pressure", 1),
-        ]
-
-    if event_type == "mario_auto_comment_push":
-        return [
-            _message(
-                "chat",
-                "mario",
-                "agent",
-                "I still want auto-commenting in the Friday beta if we can "
-                "make it work. Please call out any launch risk clearly before "
-                "we cut scope.",
-            ),
-            _update_launch_conflict(
-                status="investigated",
-                product_pressure_acknowledged=True,
-            ),
-            _update_pressure("scope_pressure", 1),
-        ]
-
-    if event_type == "peach_design_blocked_escalation":
-        return [
-            _message(
-                "chat",
-                "peach",
-                "agent",
-                "I am blocked on onboarding until someone confirms whether "
-                "auto-commenting or draft mode is in scope for Friday.",
-            ),
-            _update_launch_conflict(
-                status="investigated",
-                implementation_scope_clear=False,
-            ),
-            _update_blocker("blocker_scope_unclear", "surfaced"),
-        ]
-
-    return []
+def _event_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    row = conn.execute("SELECT value FROM sim_state WHERE key = 'event_rules_json'").fetchone()
+    return loads(row["value"], []) if row is not None else []
 
 
 def effects_for_meeting(payload: dict[str, Any], state: dict[str, Any] | None = None) -> list[Effect]:
@@ -423,29 +309,6 @@ def _mentions_any(body: str, terms: set[str] | frozenset[str]) -> bool:
 def _state_has_fact(state: dict[str, Any], fact_id: str) -> bool:
     facts = state.get("discovered_facts", ())
     return fact_id in facts
-
-
-def _message(channel: str, sender_id: str, recipient_id: str, body: str) -> Effect:
-    return _message_with_subject(channel, sender_id, recipient_id, body, None)
-
-
-def _message_with_subject(
-    channel: str,
-    sender_id: str,
-    recipient_id: str,
-    body: str,
-    subject: str | None,
-) -> Effect:
-    effect = {
-        "type": "create_message",
-        "channel": channel,
-        "sender_id": sender_id,
-        "recipient_id": recipient_id,
-        "body": body,
-    }
-    if subject:
-        effect["subject"] = subject
-    return effect
 
 
 def _discover_fact(fact_id: str, source: str) -> Effect:

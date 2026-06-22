@@ -248,6 +248,9 @@ The first scenario should not be a pile of one-off code.
 
 Scenario data should define most of the setup:
 
+- a `scenario.json` manifest with `include` entries
+- a `world.json` starting-state file
+- a `rules.json` behavior/grading file
 - people
 - projects
 - tasks
@@ -259,9 +262,10 @@ Scenario data should define most of the setup:
 - state evidence rules
 - task gate rules
 - harmful-action rules
+- background event rules
 - outcome rules
 
-Python behavior rules can handle logic that data alone cannot express, but scenario-specific scoring and outcome semantics should be data-authored where possible. The current implementation uses a small reusable condition language for task gates, state-derived evidence rows, harmful-action rules, and Friday outcome classification.
+Python behavior rules can handle logic that data alone cannot express, but scenario-specific scoring, outcome, and proactive event semantics should be data-authored where possible. The current implementation uses a small reusable condition language for task gates, state-derived evidence rows, harmful-action rules, background event rules, and Friday outcome classification.
 
 The defensible split is:
 
@@ -269,19 +273,20 @@ The defensible split is:
 Reusable engine:
   storage, tool actions, event delivery, timelines, effect application,
   condition evaluation, coworker rule matching, action logs, task gates,
-  state-derived evidence, harm checks, outcome rules, and evaluator scoring
+  state-derived evidence, harm checks, background event rules, outcome rules,
+  and evaluator scoring
 
 Scenario-specific v1 data:
   people, facts, docs, tasks, blockers, events, coworker rules, task gates,
-  state evidence rules, harm rules, and outcome rules
+  state evidence rules, harm rules, background event rules, and outcome rules
 
 Remaining boundary:
-  meeting/event behavior still has some PR Review Agent-specific Python.
-  The next scaling step is making those effects use the same declarative
+  meeting behavior still has some PR Review Agent-specific Python.
+  The next scaling step is making meeting effects use the same declarative
   rule style before adding a second scenario.
 ```
 
-The next scaling step is not a giant prompt. It is reducing the remaining meeting/event special cases so a second scenario can reuse the same engine without custom Python branches for every project.
+The next scaling step is not a giant prompt. It is reducing the remaining meeting special cases so a second scenario can reuse the same engine without custom Python branches for every project.
 
 ### Operator Workflow
 

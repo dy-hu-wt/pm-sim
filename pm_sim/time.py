@@ -181,14 +181,19 @@ def _effects_for_delivery(
     if event_type == "friday_nimbus_deadline":
         return _effects_for_friday_deadline(conn, payload)
 
-    return effects_for_event(event_type, payload)
+    return effects_for_event(conn, event_type, payload)
 
 
 def _effects_for_friday_deadline(
     conn: sqlite3.Connection,
     payload: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    project_id = payload.get("project_id", "project_pr_review_agent")
+    project_id = payload.get("project_id")
+    if not isinstance(project_id, str) or not project_id:
+        raise RuntimeError("Friday deadline event requires payload.project_id.")
+    deadline_id = payload.get("deadline_id")
+    if not isinstance(deadline_id, str) or not deadline_id:
+        raise RuntimeError("Friday deadline event requires payload.deadline_id.")
     outcome = _classify_friday_outcome(conn, project_id)
 
     return [
@@ -198,7 +203,7 @@ def _effects_for_friday_deadline(
             "status": outcome["status"],
             "risk_level": outcome["risk_level"],
             "deadline_reached": True,
-            "deadline_id": payload.get("deadline_id", "deadline_nimbus_beta"),
+            "deadline_id": deadline_id,
             "final_outcome": outcome["final_outcome"],
             "final_outcome_summary": outcome["summary"],
         },

@@ -49,6 +49,13 @@ class ScenarioValidationTests(unittest.TestCase):
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
+    def test_missing_person_response_delay_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        del scenario["people"][0]["response_delay_minutes"]
+
+        with self.assertRaises(ScenarioError):
+            load_scenario(self._write_scenario(scenario))
+
     def test_invalid_dependency_task_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.base)
         scenario["dependencies"][0]["upstream_task_id"] = "missing_task"
@@ -69,6 +76,67 @@ class ScenarioValidationTests(unittest.TestCase):
 
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
+
+    def test_invalid_event_rule_effect_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        scenario["event_rules"][0]["effects"][1]["project_id"] = "missing_project"
+
+        with self.assertRaises(ScenarioError):
+            load_scenario(self._write_scenario(scenario))
+
+    def test_manifest_scenario_includes_files(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        manifest = {
+            key: scenario.pop(key)
+            for key in ("id", "name", "company", "start_time", "timezone", "summary")
+            if key in scenario
+        }
+        world_keys = {
+            "projects",
+            "people",
+            "facts",
+            "tasks",
+            "dependencies",
+            "blockers",
+            "docs",
+            "messages",
+            "events",
+        }
+        world = {key: scenario.pop(key) for key in list(scenario) if key in world_keys}
+        rules = scenario
+
+        root = Path(self.tmpdir.name) / "scenario_dir"
+        root.mkdir()
+        (root / "scenario.json").write_text(
+            json.dumps({**manifest, "include": ["world.json", "rules.json"]})
+        )
+        (root / "world.json").write_text(json.dumps(world))
+        (root / "rules.json").write_text(json.dumps(rules))
+
+        loaded = load_scenario(root / "scenario.json")
+
+        self.assertEqual(loaded["id"], "launch_readiness")
+        self.assertEqual(len(loaded["people"]), 5)
+        self.assertTrue(loaded["coworker_rules"])
+        self.assertTrue(loaded["event_rules"])
+
+        loaded_from_dir = load_scenario(root)
+        self.assertEqual(loaded_from_dir["id"], "launch_readiness")
+
+    def test_missing_manifest_include_raises_scenario_error(self) -> None:
+        path = Path(self.tmpdir.name) / "scenario.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "id": "broken",
+                    "start_time": "2026-06-22T09:00:00",
+                    "include": ["missing.json"],
+                }
+            )
+        )
+
+        with self.assertRaises(ScenarioError):
+            load_scenario(path)
 
     def test_event_before_start_time_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.base)
@@ -562,6 +630,22 @@ class CoworkerRuleTests(unittest.TestCase):
         self.assertNotIn("discover_fact", effect_types)
         self.assertIn("ask me specifically", replies[0].body)
 
+    def test_rule_without_delay_uses_scenario_person_delay(self) -> None:
+        rules = copy.deepcopy(self.rules)
+        del rules[0]["reply"]["delay_minutes"]
+
+        replies = replies_for_chat(
+            "luigi",
+            "Any private repo security docs?",
+            {
+                "discovered_facts": [],
+                "coworker_rules": rules,
+                "response_delays": {"luigi": 120},
+            },
+        )
+
+        self.assertEqual(replies[0].delay_minutes, 120)
+
     def test_daisy_requires_customer_facing_risk_and_draft_context(self) -> None:
         vague = replies_for_chat(
             "daisy",
@@ -647,17 +731,47 @@ class CoworkerRuleTests(unittest.TestCase):
         self.assertIn("draft_mode_approved", ready_effect_keys)
 
     def test_background_event_has_deterministic_effects(self) -> None:
-        effects = effects_for_event(
-            "luigi_proactive_repo_risk",
-            {
-                "project_id": "project_pr_review_agent",
-                "blocker_id": "blocker_repo_sync_stale",
-            },
-        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            reset(db_path, DEFAULT_SCENARIO_PATH)
+            conn = connect(db_path)
+            try:
+                effects = effects_for_event(
+                    conn,
+                    "luigi_proactive_repo_risk",
+                    {
+                        "project_id": "project_pr_review_agent",
+                        "blocker_id": "blocker_repo_sync_stale",
+                    },
+                )
+            finally:
+                conn.close()
 
         self.assertGreaterEqual(len(effects), 3)
         self.assertEqual(effects[0]["type"], "create_message")
         self.assertIn("repo sync", effects[0]["body"])
+
+    def test_background_event_rule_can_be_suppressed_by_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            reset(db_path, DEFAULT_SCENARIO_PATH)
+            send_chat(db_path, "luigi", "Any repo sync blockers for launch?")
+            advance_time(db_path, "2h")
+
+            conn = connect(db_path)
+            try:
+                effects = effects_for_event(
+                    conn,
+                    "luigi_proactive_repo_risk",
+                    {
+                        "project_id": "project_pr_review_agent",
+                        "blocker_id": "blocker_repo_sync_stale",
+                    },
+                )
+            finally:
+                conn.close()
+
+        self.assertEqual(effects, [])
 
 
 class EffectApplicationTests(unittest.TestCase):

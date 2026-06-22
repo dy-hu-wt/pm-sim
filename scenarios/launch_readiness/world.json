@@ -1,0 +1,629 @@
+{
+  "projects": [
+    {
+      "id": "project_pr_review_agent",
+      "name": "PR Review Agent Beta",
+      "customer": "Nimbus Labs",
+      "deadline": "2026-06-26T15:00:00",
+      "status": "at_risk",
+      "risk_level": "high",
+      "stakeholder_pressure": "Daisy promised Nimbus Labs a Friday beta of the PR Review Agent.",
+      "description": "Launch a PR Review Agent beta for Nimbus Labs by Friday.",
+      "decision": "undecided",
+      "launch_conflict": {
+        "status": "open",
+        "resolution": null,
+        "final_launch_mode": null,
+        "inputs": {
+          "product_pressure_acknowledged": true,
+          "technical_risk_substantiated": false,
+          "customer_constraint_known": false,
+          "implementation_scope_clear": false
+        }
+      },
+      "success_criteria": [
+        "The agent can be demoed reliably on a real pull request.",
+        "Nimbus Labs has clear beta messaging before Thursday morning.",
+        "The team has an explicit auto-commenting versus draft-mode decision."
+      ]
+    }
+  ],
+  "people": [
+    {
+      "id": "mario",
+      "name": "Mario",
+      "role": "Product Manager",
+      "goals": [
+        "Show the strongest possible PR Review Agent beta.",
+        "Avoid surprising Nimbus Labs or customer-facing teams late in the week."
+      ],
+      "constraints": [
+        "Initially assumes auto-commenting is still realistic.",
+        "Needs concrete risk before agreeing to cut launch scope."
+      ],
+      "availability": [
+        {
+          "day": "Monday",
+          "start": "09:00",
+          "end": "17:00"
+        },
+        {
+          "day": "Tuesday",
+          "start": "09:00",
+          "end": "17:00"
+        },
+        {
+          "day": "Wednesday",
+          "start": "09:00",
+          "end": "17:00"
+        },
+        {
+          "day": "Thursday",
+          "start": "09:00",
+          "end": "17:00"
+        },
+        {
+          "day": "Friday",
+          "start": "09:00",
+          "end": "14:00"
+        }
+      ],
+      "response_delay_minutes": 60,
+      "private_knowledge": {},
+      "behavior": {
+        "rule": "mario"
+      },
+      "private_fact_ids": []
+    },
+    {
+      "id": "luigi",
+      "name": "Luigi",
+      "role": "Backend Engineer",
+      "goals": [
+        "Stabilize repository sync for the review agent.",
+        "Prevent the agent from reviewing stale code in the Friday beta."
+      ],
+      "constraints": [
+        "Owns the repo sync worker and webhook handling.",
+        "Does not proactively escalate until Thursday unless asked about launch risk, blockers, repo sync, stale code, or readiness."
+      ],
+      "availability": [
+        {
+          "day": "Monday",
+          "start": "10:00",
+          "end": "18:00"
+        },
+        {
+          "day": "Tuesday",
+          "start": "10:00",
+          "end": "18:00"
+        },
+        {
+          "day": "Wednesday",
+          "start": "10:00",
+          "end": "18:00"
+        },
+        {
+          "day": "Thursday",
+          "start": "10:00",
+          "end": "18:00"
+        },
+        {
+          "day": "Friday",
+          "start": "09:00",
+          "end": "13:00"
+        }
+      ],
+      "response_delay_minutes": 120,
+      "private_knowledge": {
+        "fact_ids": [
+          "fact_repo_sync_stale",
+          "fact_draft_mode_limits_customer_visible_risk"
+        ]
+      },
+      "behavior": {
+        "rule": "luigi"
+      },
+      "private_fact_ids": [
+        "fact_repo_sync_stale",
+        "fact_draft_mode_limits_customer_visible_risk"
+      ]
+    },
+    {
+      "id": "peach",
+      "name": "Peach",
+      "role": "Designer",
+      "goals": [
+        "Finalize the beta onboarding and review-flow screens.",
+        "Avoid documenting auto-commenting behavior that may not ship on Friday."
+      ],
+      "constraints": [
+        "Blocked until auto-commenting versus draft-mode scope is clarified.",
+        "Can finish draft-mode onboarding quickly once auto-posting is explicitly out of Friday scope."
+      ],
+      "availability": [
+        {
+          "day": "Monday",
+          "start": "09:00",
+          "end": "16:00"
+        },
+        {
+          "day": "Tuesday",
+          "start": "09:00",
+          "end": "16:00"
+        },
+        {
+          "day": "Wednesday",
+          "start": "09:00",
+          "end": "16:00"
+        },
+        {
+          "day": "Thursday",
+          "start": "09:00",
+          "end": "16:00"
+        },
+        {
+          "day": "Friday",
+          "start": "09:00",
+          "end": "12:00"
+        }
+      ],
+      "response_delay_minutes": 90,
+      "private_knowledge": {
+        "fact_ids": [
+          "fact_design_blocked_by_scope"
+        ]
+      },
+      "behavior": {
+        "rule": "peach"
+      },
+      "private_fact_ids": [
+        "fact_design_blocked_by_scope"
+      ]
+    },
+    {
+      "id": "daisy",
+      "name": "Daisy",
+      "role": "Customer Success Lead",
+      "goals": [
+        "Protect the Nimbus Labs beta relationship.",
+        "Get a clear confidence update and pilot talk track before speaking with the customer."
+      ],
+      "constraints": [
+        "Promised Nimbus Labs a useful coding-agent beta for Friday.",
+        "Will support draft mode if reliability risk and customer messaging are clear."
+      ],
+      "availability": [
+        {
+          "day": "Monday",
+          "start": "08:30",
+          "end": "17:00"
+        },
+        {
+          "day": "Tuesday",
+          "start": "08:30",
+          "end": "17:00"
+        },
+        {
+          "day": "Wednesday",
+          "start": "08:30",
+          "end": "17:00"
+        },
+        {
+          "day": "Thursday",
+          "start": "08:30",
+          "end": "17:00"
+        },
+        {
+          "day": "Friday",
+          "start": "08:30",
+          "end": "15:00"
+        }
+      ],
+      "response_delay_minutes": 45,
+      "private_knowledge": {
+        "fact_ids": [
+          "fact_nimbus_values_reliability"
+        ]
+      },
+      "behavior": {
+        "rule": "daisy"
+      },
+      "private_fact_ids": [
+        "fact_nimbus_values_reliability"
+      ]
+    },
+    {
+      "id": "toad",
+      "name": "Toad",
+      "role": "Engineering Manager",
+      "goals": [
+        "Make a defensible beta launch decision.",
+        "Keep engineers focused on the highest-risk work."
+      ],
+      "constraints": [
+        "Will not approve de-scope without concrete customer impact and technical risk.",
+        "Can approve draft-mode beta for Friday."
+      ],
+      "availability": [
+        {
+          "day": "Monday",
+          "start": "09:00",
+          "end": "17:30"
+        },
+        {
+          "day": "Tuesday",
+          "start": "09:00",
+          "end": "17:30"
+        },
+        {
+          "day": "Wednesday",
+          "start": "09:00",
+          "end": "17:30"
+        },
+        {
+          "day": "Thursday",
+          "start": "09:00",
+          "end": "17:30"
+        },
+        {
+          "day": "Friday",
+          "start": "09:00",
+          "end": "14:00"
+        }
+      ],
+      "response_delay_minutes": 90,
+      "private_knowledge": {},
+      "behavior": {
+        "rule": "toad"
+      },
+      "private_fact_ids": []
+    }
+  ],
+  "facts": [
+    {
+      "id": "fact_repo_sync_stale",
+      "visibility": "hidden",
+      "owner_id": "luigi",
+      "summary": "The repo sync worker sometimes reviews an older commit because webhook events can arrive out of order.",
+      "revealed_by": [
+        "Ask Luigi about launch risk, blockers, repo sync, stale code, webhooks, auto-commenting, or readiness.",
+        "Wait until Luigi's Thursday proactive escalation."
+      ]
+    },
+    {
+      "id": "fact_draft_mode_limits_customer_visible_risk",
+      "visibility": "hidden",
+      "owner_id": "luigi",
+      "summary": "Draft mode may still prepare an imperfect suggestion, but no customer-visible comment is posted until a human approves it.",
+      "revealed_by": [
+        "Ask Luigi why draft mode is safer than auto-commenting.",
+        "Include Luigi in a launch-mode risk meeting."
+      ]
+    },
+    {
+      "id": "fact_design_blocked_by_scope",
+      "visibility": "private",
+      "owner_id": "peach",
+      "summary": "Peach cannot finish onboarding screens until the Friday launch mode is clarified."
+    },
+    {
+      "id": "fact_nimbus_values_reliability",
+      "visibility": "private",
+      "owner_id": "daisy",
+      "summary": "For Nimbus Labs, reliable draft suggestions are better than auto-posted comments that might review stale code."
+    },
+    {
+      "id": "fact_draft_mode_scope_confirmed",
+      "visibility": "derived",
+      "summary": "The Friday beta scope is draft-suggestions mode with human approval before comments are posted."
+    },
+    {
+      "id": "fact_draft_mode_approved",
+      "visibility": "derived",
+      "summary": "Toad approved shipping draft mode for Friday."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task_repo_sync",
+      "project_id": "project_pr_review_agent",
+      "title": "Stabilize repo sync for latest commit reviews",
+      "owner_id": "luigi",
+      "status": "in_progress",
+      "priority": "high",
+      "due_at": "2026-06-25T12:00:00",
+      "metadata": {
+        "blocked_by": [
+          "blocker_repo_sync_stale"
+        ]
+      },
+      "visible": true,
+      "blocked_by": "blocker_repo_sync_stale"
+    },
+    {
+      "id": "task_review_context_pipeline",
+      "project_id": "project_pr_review_agent",
+      "title": "Prepare diff context and test fixtures",
+      "owner_id": "luigi",
+      "status": "ready",
+      "priority": "high",
+      "due_at": "2026-06-24T17:00:00",
+      "metadata": {},
+      "visible": true,
+      "blocked_by": ""
+    },
+    {
+      "id": "task_draft_mode_docs",
+      "project_id": "project_pr_review_agent",
+      "title": "Finalize draft-mode onboarding",
+      "owner_id": "peach",
+      "status": "blocked",
+      "priority": "medium",
+      "due_at": "2026-06-25T15:00:00",
+      "metadata": {
+        "blocked_by": [
+          "blocker_scope_unclear"
+        ]
+      },
+      "visible": true,
+      "blocked_by": "blocker_scope_unclear"
+    },
+    {
+      "id": "task_customer_talk_track",
+      "project_id": "project_pr_review_agent",
+      "title": "Draft Nimbus beta talk track",
+      "owner_id": "daisy",
+      "status": "not_started",
+      "priority": "high",
+      "due_at": "2026-06-25T10:00:00",
+      "metadata": {
+        "blocked_by": [
+          "blocker_launch_scope_decision"
+        ]
+      },
+      "visible": true,
+      "blocked_by": "blocker_launch_scope_decision"
+    },
+    {
+      "id": "task_beta_rollout_notes",
+      "project_id": "project_pr_review_agent",
+      "title": "Prepare Nimbus beta rollout notes",
+      "owner_id": "daisy",
+      "status": "not_started",
+      "priority": "medium",
+      "due_at": "2026-06-25T14:00:00",
+      "metadata": {
+        "blocked_by": [
+          "blocker_launch_scope_decision"
+        ]
+      },
+      "visible": true,
+      "blocked_by": "blocker_launch_scope_decision"
+    },
+    {
+      "id": "task_launch_decision",
+      "project_id": "project_pr_review_agent",
+      "title": "Decide auto-commenting versus draft mode",
+      "owner_id": "toad",
+      "status": "not_started",
+      "priority": "critical",
+      "due_at": "2026-06-25T11:00:00",
+      "metadata": {
+        "blocked_by": [
+          "blocker_launch_scope_decision"
+        ]
+      },
+      "visible": true,
+      "blocked_by": "blocker_launch_scope_decision"
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "dep_design_needs_scope",
+      "project_id": "project_pr_review_agent",
+      "upstream_task_id": "task_launch_decision",
+      "downstream_task_id": "task_draft_mode_docs",
+      "description": "Onboarding cannot finish until Friday launch mode is decided."
+    },
+    {
+      "id": "dep_talk_track_needs_decision",
+      "project_id": "project_pr_review_agent",
+      "upstream_task_id": "task_launch_decision",
+      "downstream_task_id": "task_customer_talk_track",
+      "description": "Customer beta talk track depends on the launch mode decision."
+    },
+    {
+      "id": "dep_rollout_notes_need_decision",
+      "project_id": "project_pr_review_agent",
+      "upstream_task_id": "task_launch_decision",
+      "downstream_task_id": "task_beta_rollout_notes",
+      "description": "Nimbus rollout notes need the final launch mode and safety language."
+    },
+    {
+      "id": "dep_auto_commenting_needs_repo_sync",
+      "project_id": "project_pr_review_agent",
+      "upstream_task_id": "task_repo_sync",
+      "downstream_task_id": "task_launch_decision",
+      "description": "Repo sync reliability determines whether auto-commenting is safe."
+    }
+  ],
+  "blockers": [
+    {
+      "id": "blocker_repo_sync_stale",
+      "project_id": "project_pr_review_agent",
+      "title": "Repo sync can review stale commits",
+      "status": "open",
+      "severity": "high",
+      "owner_id": "luigi",
+      "hidden": true,
+      "description": "Auto-commenting may post review comments against an older commit instead of the latest PR diff.",
+      "metadata": {
+        "fact_id": "fact_repo_sync_stale"
+      }
+    },
+    {
+      "id": "blocker_scope_unclear",
+      "project_id": "project_pr_review_agent",
+      "title": "Friday launch mode is unclear",
+      "status": "open",
+      "severity": "medium",
+      "owner_id": "peach",
+      "hidden": false,
+      "description": "Onboarding and customer messaging cannot finish until auto-commenting versus draft mode is decided.",
+      "metadata": {
+        "fact_id": "fact_design_blocked_by_scope"
+      }
+    },
+    {
+      "id": "blocker_launch_scope_decision",
+      "project_id": "project_pr_review_agent",
+      "title": "No auto-commenting versus draft-mode decision",
+      "status": "open",
+      "severity": "high",
+      "owner_id": "toad",
+      "hidden": false,
+      "description": "The team may drift into a risky auto-commenting beta without explicit approval."
+    }
+  ],
+  "docs": [
+    {
+      "id": "doc_project_brief",
+      "title": "PR Review Agent Beta Brief",
+      "kind": "brief",
+      "visible": true,
+      "body": "PR Review Agent goal: help engineering teams review pull requests faster. Friday pilot: Nimbus Labs. Full beta mode posts review comments automatically on PRs. Draft-mode beta prepares suggestions for human approval before posting. Draft mode is less flashy, but safer if repo sync is not reliable."
+    },
+    {
+      "id": "doc_monday_standup",
+      "title": "Monday Standup Notes",
+      "kind": "meeting_notes",
+      "visible": true,
+      "body": "Mario wants auto-commenting if possible. Peach needs launch-mode confirmation before final onboarding. Daisy needs confidence language before she updates Nimbus. Luigi said he is still hardening repo sync ordering."
+    },
+    {
+      "id": "doc_beta_rollout_template",
+      "title": "Nimbus Beta Rollout Template",
+      "kind": "customer_note_template",
+      "visible": true,
+      "body": "Rollout note must answer three questions: whether the agent posts comments automatically, what human approval means in draft mode, and what known limitation remains after Friday. Avoid promising auto-commenting until repo sync is proven reliable."
+    },
+    {
+      "id": "doc_repo_sync_notes",
+      "title": "Repo Sync Notes",
+      "kind": "engineering_notes",
+      "visible": false,
+      "owner_id": "luigi",
+      "metadata": {
+        "owner_id": "luigi"
+      },
+      "body": "Webhook events can arrive out of order. The sync worker sometimes evaluates an older commit SHA, so auto-posted review comments may target stale code. Draft mode avoids customer-visible bad comments while the worker is hardened."
+    },
+    {
+      "id": "doc_private_repo_security_baseline",
+      "title": "Private Repo Security Baseline",
+      "kind": "security_note",
+      "visible": false,
+      "owner_id": "luigi",
+      "metadata": {
+        "owner_id": "luigi"
+      },
+      "body": "For the Nimbus beta, the PR Review Agent processes private-repo source snippets transiently to generate review suggestions. Raw source code is not stored long term. Generated draft suggestions, PR metadata, commit SHAs, and audit metadata may be retained for 30 days during the beta. Customer-facing wording should say: source is processed transiently, raw source is not retained long term, and generated suggestions plus metadata are retained for the beta audit window."
+    }
+  ],
+  "messages": [
+    {
+      "id": "msg_initial_mario",
+      "sent_at": "2026-06-22T08:50:00",
+      "channel": "chat",
+      "sender_id": "mario",
+      "recipient_id": "agent",
+      "subject": null,
+      "body": "Can you drive launch readiness for the PR Review Agent beta this week? Nimbus Labs expects the Friday pilot, and I would love to keep auto-commenting in scope if risk allows."
+    },
+    {
+      "id": "msg_initial_daisy",
+      "sent_at": "2026-06-22T08:55:00",
+      "channel": "email",
+      "sender_id": "daisy",
+      "recipient_id": "agent",
+      "subject": "Nimbus Friday beta prep",
+      "body": "Nimbus Labs is expecting a useful coding-agent beta on Friday. Please tell me by Thursday morning what we can confidently show."
+    }
+  ],
+  "events": [
+    {
+      "id": "event_mario_auto_comment_push",
+      "event_type": "mario_auto_comment_push",
+      "scheduled_at": "2026-06-23T10:00:00",
+      "status": "pending",
+      "priority": 100,
+      "payload": {
+        "project_id": "project_pr_review_agent"
+      }
+    },
+    {
+      "id": "event_peach_design_blocked_escalation",
+      "event_type": "peach_design_blocked_escalation",
+      "scheduled_at": "2026-06-24T11:00:00",
+      "status": "pending",
+      "priority": 100,
+      "payload": {
+        "project_id": "project_pr_review_agent",
+        "task_id": "task_draft_mode_docs"
+      }
+    },
+    {
+      "id": "event_daisy_confidence_check",
+      "event_type": "daisy_confidence_check",
+      "scheduled_at": "2026-06-24T13:00:00",
+      "status": "pending",
+      "priority": 100,
+      "payload": {
+        "project_id": "project_pr_review_agent"
+      }
+    },
+    {
+      "id": "event_nimbus_launch_mode_question",
+      "event_type": "nimbus_launch_mode_question",
+      "scheduled_at": "2026-06-24T15:30:00",
+      "status": "pending",
+      "priority": 100,
+      "payload": {
+        "project_id": "project_pr_review_agent"
+      }
+    },
+    {
+      "id": "event_daisy_private_repo_security_question",
+      "event_type": "daisy_private_repo_security_question",
+      "scheduled_at": "2026-06-24T14:00:00",
+      "status": "pending",
+      "priority": 100,
+      "payload": {
+        "project_id": "project_pr_review_agent"
+      }
+    },
+    {
+      "id": "event_luigi_proactive_repo_risk",
+      "event_type": "luigi_proactive_repo_risk",
+      "scheduled_at": "2026-06-25T10:00:00",
+      "status": "pending",
+      "priority": 100,
+      "payload": {
+        "project_id": "project_pr_review_agent",
+        "blocker_id": "blocker_repo_sync_stale"
+      }
+    },
+    {
+      "id": "event_friday_nimbus_deadline",
+      "event_type": "friday_nimbus_deadline",
+      "scheduled_at": "2026-06-26T15:00:00",
+      "status": "pending",
+      "priority": 100,
+      "payload": {
+        "project_id": "project_pr_review_agent",
+        "deadline_id": "deadline_nimbus_beta"
+      }
+    }
+  ]
+}

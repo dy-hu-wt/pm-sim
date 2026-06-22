@@ -227,6 +227,8 @@ def _load_scenario(conn: sqlite3.Connection, scenario: dict[str, Any]) -> None:
     set_state_value(conn, "scenario_id", scenario["id"])
     set_state_value(conn, "current_time", scenario["start_time"])
     set_state_value(conn, "coworker_rules_json", dumps(scenario.get("coworker_rules", [])))
+    set_state_value(conn, "event_rules_json", dumps(scenario.get("event_rules", [])))
+    set_state_value(conn, "response_delays_json", dumps(_response_delays(scenario)))
     set_state_value(conn, "state_evidence_rules_json", dumps(scenario.get("state_evidence_rules", [])))
     set_state_value(conn, "task_gate_rules_json", dumps(scenario.get("task_gate_rules", [])))
     set_state_value(conn, "outcome_rules_json", dumps(scenario.get("outcome_rules", [])))
@@ -273,6 +275,14 @@ def _insert_people(conn: sqlite3.Connection, people: list[dict[str, Any]]) -> No
                 dumps(person.get("behavior", {})),
             ),
         )
+
+
+def _response_delays(scenario: dict[str, Any]) -> dict[str, int]:
+    return {
+        person["id"]: person["response_delay_minutes"]
+        for person in scenario.get("people", [])
+        if isinstance(person.get("response_delay_minutes"), int)
+    }
 
 
 def _insert_projects(conn: sqlite3.Connection, projects: list[dict[str, Any]]) -> None:

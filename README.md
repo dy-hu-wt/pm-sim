@@ -12,6 +12,16 @@ Fireflower is a B2B SaaS company preparing a PR Review Agent beta for Nimbus Lab
 
 The agent's job is to discover the stale-code risk, align Mario, Luigi, Peach, Daisy, and Toad, clarify scope, and improve the Friday launch outcome.
 
+The scenario is authored as three JSON files:
+
+```text
+scenarios/launch_readiness/scenario.json  # manifest: id, start time, includes
+scenarios/launch_readiness/world.json     # people, project, facts, tasks, docs, events
+scenarios/launch_readiness/rules.json     # coworker/event behavior, gates, scoring, outcomes
+```
+
+`pm-sim reset` loads the manifest, merges included files, validates the scenario, and writes the active run into SQLite.
+
 ## Setup
 
 Use Python 3.9 or newer. Create a virtualenv and install the repo in editable mode so the `pm-sim` command is available:
@@ -40,7 +50,7 @@ python -m pip install -e ".[llm]"
 Reset the local SQLite state from the scenario:
 
 ```bash
-pm-sim reset --scenario scenarios/launch_readiness.json
+pm-sim reset --scenario scenarios/launch_readiness
 ```
 
 This creates `data/current.db`, which is ignored by git.
@@ -223,13 +233,13 @@ pm-sim evaluate --explain
 pm-sim --json evaluate
 ```
 
-The score comes from the rubric in `scenarios/launch_readiness.json`. It rewards outcomes and state improvements, not raw tool usage or activity volume. Evidence must show that the agent improved the project: discovering blockers, aligning stakeholders, unblocking real work, approving a defensible draft-mode launch, and avoiding harmful state. `avoid_harmful_actions` includes a light, capped penalty for excessive direct outreach.
+The score comes from the rubric in `scenarios/launch_readiness/rules.json`. It rewards outcomes and state improvements, not raw tool usage or activity volume. Evidence must show that the agent improved the project: discovering blockers, aligning stakeholders, unblocking real work, approving a defensible draft-mode launch, and avoiding harmful state. `avoid_harmful_actions` includes a light, capped penalty for excessive direct outreach.
 
 Task updates are checked against the surrounding world state to resist reward hacking. For example, marking repo sync complete while the stale-code blocker is unresolved is penalized, and draft-mode onboarding progress only counts when draft-mode scope is confirmed and the scope blocker is resolved.
 
 After the Friday deadline event is delivered, `evaluate` also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
-Most scenario semantics now live in `scenarios/launch_readiness.json`: task gates, state-derived evidence, harmful-action rules, coworker chat rules, and Friday outcome rules are evaluated by reusable engine code. The remaining v1 boundary is meeting/event behavior that still contains some scenario-specific Python for the authored PR Review Agent scenario. That is acceptable for one complete scenario; the next scaling step is to make meeting/event effects use the same declarative rule style before adding a second scenario.
+The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, and `rules.json`. Most scenario semantics now live in data: task gates, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, and Friday outcome rules are evaluated by reusable engine code. The remaining v1 boundary is meeting behavior, which still contains some scenario-specific Python for the authored PR Review Agent scenario. That is acceptable for one complete scenario; the next scaling step is to make meeting effects use the same declarative rule style before adding a second scenario.
 
 The backend is covered by:
 

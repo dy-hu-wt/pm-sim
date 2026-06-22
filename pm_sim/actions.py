@@ -577,9 +577,11 @@ def _behavior_state(conn: sqlite3.Connection) -> dict[str, Any]:
         """
     ).fetchall()
     rules = loads(get_state_value(conn, "coworker_rules_json") or "[]", [])
+    response_delays = loads(get_state_value(conn, "response_delays_json") or "{}", {})
     return {
         "discovered_facts": [row["id"] for row in facts],
         "coworker_rules": rules,
+        "response_delays": response_delays,
     }
 
 

@@ -10,6 +10,18 @@ Auto-commenting is more impressive because the agent posts comments directly on 
 
 The hidden risk is that repo sync can process stale commit context. If Fireflower ships auto-commenting while that risk is unresolved, the agent could post comments about old code.
 
+## Files
+
+The scenario is authored as three JSON files:
+
+```text
+scenarios/launch_readiness/scenario.json  # id, start time, include list
+scenarios/launch_readiness/world.json     # people, project, facts, tasks, docs, events
+scenarios/launch_readiness/rules.json     # coworker, event, task, scoring, and outcome rules
+```
+
+The loader merges the included files, validates the result, and then `reset` writes the active run into SQLite.
+
 ## What The Agent Must Do
 
 The agent is expected to improve the launch outcome, not just send messages. A strong run should:

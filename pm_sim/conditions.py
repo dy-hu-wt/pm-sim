@@ -160,13 +160,6 @@ def project_decision(conn: sqlite3.Connection, project_id: str | None) -> str | 
     return decision if isinstance(decision, str) else None
 
 
-def blocker_resolved(conn: sqlite3.Connection, blocker_id: str) -> bool:
-    row = conn.execute("SELECT status FROM blockers WHERE id = ?", (blocker_id,)).fetchone()
-    if row is None:
-        return False
-    return row["status"].lower() not in UNRESOLVED_BLOCKER_STATUSES
-
-
 def task_status(conn: sqlite3.Connection, task_id: str) -> str | None:
     row = conn.execute("SELECT status FROM tasks WHERE id = ?", (task_id,)).fetchone()
     return None if row is None else row["status"]

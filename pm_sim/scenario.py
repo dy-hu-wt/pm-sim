@@ -12,11 +12,45 @@ class ScenarioError(ValueError):
 
 def load_scenario(path: Path | str) -> dict[str, Any]:
     scenario_path = Path(path)
+    if scenario_path.is_dir():
+        scenario_path = scenario_path / "scenario.json"
     if not scenario_path.exists():
         raise ScenarioError(f"Scenario file not found: {scenario_path}")
 
-    data = json.loads(scenario_path.read_text())
+    data = _load_scenario_data(scenario_path)
     _validate_scenario(data, scenario_path)
+    return data
+
+
+def _load_scenario_data(path: Path) -> dict[str, Any]:
+    data = _load_json_object(path)
+    includes = data.get("include", [])
+    if includes is None:
+        includes = []
+    if not isinstance(includes, list):
+        raise ScenarioError(f"{path} include must be a list.")
+
+    merged = {key: value for key, value in data.items() if key != "include"}
+    for include in includes:
+        if not isinstance(include, str) or not include:
+            raise ScenarioError(f"{path} include entries must be non-empty strings.")
+        include_path = path.parent / include
+        included = _load_json_object(include_path)
+        for key, value in included.items():
+            if key in merged:
+                raise ScenarioError(
+                    f"{include_path} defines duplicate scenario key already present in {path}: {key}"
+                )
+            merged[key] = value
+    return merged
+
+
+def _load_json_object(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        raise ScenarioError(f"Scenario include file not found: {path}")
+    data = json.loads(path.read_text())
+    if not isinstance(data, dict):
+        raise ScenarioError(f"Scenario file must contain a JSON object: {path}")
     return data
 
 
@@ -51,6 +85,11 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
 
     for person in data["people"]:
         _require_string(person, "id", "people")
+        response_delay = person.get("response_delay_minutes")
+        if not isinstance(response_delay, int) or response_delay <= 0:
+            raise ScenarioError(
+                f"Person {person.get('id')} must define positive integer response_delay_minutes."
+            )
 
     for fact in data.get("facts", []):
         _validate_owner(fact, "fact", valid_actors)
@@ -125,8 +164,39 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
             if invalid:
                 raise ScenarioError(f"Evaluation target {key} evidence_keys must be non-empty strings.")
 
+    response_delays = {
+        person["id"]: person.get("response_delay_minutes")
+        for person in data.get("people", [])
+    }
+
     for rule in data.get("coworker_rules", []):
-        _validate_coworker_rule(rule, people, docs, facts, projects, blockers, tasks)
+        _validate_coworker_rule(
+            rule,
+            people,
+            docs,
+            facts,
+            projects,
+            blockers,
+            tasks,
+            valid_actors,
+            response_delays,
+        )
+
+    event_types = {
+        event.get("event_type")
+        for event in data.get("events", [])
+        if isinstance(event.get("event_type"), str)
+    }
+    _validate_event_rules(
+        data.get("event_rules", []),
+        event_types,
+        docs,
+        facts,
+        projects,
+        blockers,
+        tasks,
+        valid_actors,
+    )
 
 
 def _ids(data: dict[str, Any], section: str) -> set[str]:
@@ -166,6 +236,8 @@ def _validate_coworker_rule(
     projects: set[str],
     blockers: set[str],
     tasks: set[str],
+    valid_actors: set[str],
+    response_delays: dict[str, Any],
 ) -> None:
     rule_id = rule.get("id")
     if not isinstance(rule_id, str) or not rule_id:
@@ -188,33 +260,106 @@ def _validate_coworker_rule(
     reply = rule.get("reply", {})
     if not isinstance(reply.get("body"), str) or not reply["body"].strip():
         raise ScenarioError(f"Coworker rule {rule_id} reply.body must be a non-empty string.")
+    delay = reply.get("delay_minutes", response_delays.get(person_id))
+    if not isinstance(delay, int) or delay <= 0:
+        raise ScenarioError(
+            f"Coworker rule {rule_id} must define positive integer reply.delay_minutes "
+            f"or use a person with response_delay_minutes."
+        )
 
-    for effect in rule.get("effects", []):
+    _validate_effects(
+        rule.get("effects", []),
+        label=f"Coworker rule {rule_id}",
+        docs=docs,
+        facts=facts,
+        projects=projects,
+        blockers=blockers,
+        tasks=tasks,
+        valid_actors=valid_actors,
+    )
+
+
+def _validate_event_rules(
+    rules: list[dict[str, Any]],
+    event_types: set[str],
+    docs: set[str],
+    facts: set[str],
+    projects: set[str],
+    blockers: set[str],
+    tasks: set[str],
+    valid_actors: set[str],
+) -> None:
+    seen = set()
+    for rule in rules:
+        rule_id = rule.get("id")
+        if not isinstance(rule_id, str) or not rule_id:
+            raise ScenarioError("Event rule must have a string id.")
+        if rule_id in seen:
+            raise ScenarioError(f"Event rules have duplicate id: {rule_id}")
+        seen.add(rule_id)
+
+        event_type = rule.get("event_type")
+        if event_type not in event_types:
+            raise ScenarioError(f"Event rule {rule_id} references unknown event_type: {event_type}")
+        effects = rule.get("effects", [])
+        if not isinstance(effects, list) or not effects:
+            raise ScenarioError(f"Event rule {rule_id} effects must be a non-empty list.")
+        _validate_effects(
+            effects,
+            label=f"Event rule {rule_id}",
+            docs=docs,
+            facts=facts,
+            projects=projects,
+            blockers=blockers,
+            tasks=tasks,
+            valid_actors=valid_actors,
+        )
+
+
+def _validate_effects(
+    effects: list[dict[str, Any]],
+    *,
+    label: str,
+    docs: set[str],
+    facts: set[str],
+    projects: set[str],
+    blockers: set[str],
+    tasks: set[str],
+    valid_actors: set[str],
+) -> None:
+    for effect in effects:
         effect_type = effect.get("type")
         if effect_type == "reveal_doc" and effect.get("doc_id") not in docs:
             raise ScenarioError(
-                f"Coworker rule {rule_id} references unknown reveal_doc doc_id: {effect.get('doc_id')}"
+                f"{label} references unknown reveal_doc doc_id: {effect.get('doc_id')}"
             )
         if effect_type == "discover_fact" and effect.get("fact_id") not in facts:
             raise ScenarioError(
-                f"Coworker rule {rule_id} references unknown discover_fact fact_id: {effect.get('fact_id')}"
+                f"{label} references unknown discover_fact fact_id: {effect.get('fact_id')}"
             )
         if effect_type == "update_project" and effect.get("project_id") not in projects:
             raise ScenarioError(
-                f"Coworker rule {rule_id} references unknown update_project project_id: {effect.get('project_id')}"
+                f"{label} references unknown update_project project_id: {effect.get('project_id')}"
             )
         if effect_type == "update_blocker" and effect.get("blocker_id") not in blockers:
             raise ScenarioError(
-                f"Coworker rule {rule_id} references unknown update_blocker blocker_id: {effect.get('blocker_id')}"
+                f"{label} references unknown update_blocker blocker_id: {effect.get('blocker_id')}"
             )
         if effect_type == "update_task" and effect.get("task_id") not in tasks:
             raise ScenarioError(
-                f"Coworker rule {rule_id} references unknown update_task task_id: {effect.get('task_id')}"
+                f"{label} references unknown update_task task_id: {effect.get('task_id')}"
             )
+        if effect_type == "create_message":
+            sender_id = effect.get("sender_id")
+            recipient_id = effect.get("recipient_id")
+            if sender_id not in valid_actors:
+                raise ScenarioError(f"{label} references unknown message sender_id: {sender_id}")
+            if recipient_id and recipient_id not in valid_actors:
+                raise ScenarioError(f"{label} references unknown message recipient_id: {recipient_id}")
         if effect_type == "add_evaluation_evidence":
             key = effect.get("key")
             if not isinstance(key, str) or not key.strip():
-                raise ScenarioError(f"Coworker rule {rule_id} has invalid evaluation evidence key.")
+                raise ScenarioError(f"{label} has invalid evaluation evidence key.")
 
 
 def _validate_string_list(values: Any, label: str) -> None:
