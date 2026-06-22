@@ -338,7 +338,7 @@ class CoreSimulationTests(unittest.TestCase):
             ).fetchone()
             outcome_doc = conn.execute(
                 """
-                SELECT kind, body
+                SELECT kind, body, visibility_scope
                 FROM docs
                 WHERE id = 'doc_friday_outcome'
                 """
@@ -352,7 +352,7 @@ class CoreSimulationTests(unittest.TestCase):
             ).fetchone()
             koopa_outcome_doc = conn.execute(
                 """
-                SELECT kind, body
+                SELECT kind, body, visibility_scope
                 FROM docs
                 WHERE id = 'doc_koopa_audit_export_outcome'
                 """
@@ -366,6 +366,7 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(project["risk_level"], "high")
         self.assertEqual(loads(project["metadata_json"])["final_outcome"], "no_approved_friday_plan")
         self.assertEqual(outcome_doc["kind"], "outcome_report")
+        self.assertEqual(outcome_doc["visibility_scope"], "generated")
         self.assertIn("without an approved reliable launch plan", outcome_doc["body"])
         self.assertEqual(koopa_project["status"], "at_risk")
         self.assertEqual(koopa_project["risk_level"], "medium")
@@ -374,6 +375,7 @@ class CoreSimulationTests(unittest.TestCase):
             "koopa_audit_scope_unresolved",
         )
         self.assertEqual(koopa_outcome_doc["kind"], "outcome_report")
+        self.assertEqual(koopa_outcome_doc["visibility_scope"], "generated")
         self.assertIn("without a clear scoped answer", koopa_outcome_doc["body"])
 
         evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
@@ -1192,7 +1194,7 @@ class EffectApplicationTests(unittest.TestCase):
             ).fetchone()
             transcript = conn.execute(
                 """
-                SELECT title, kind, body, visible_at
+                SELECT title, kind, body, visibility_scope, visible_at
                 FROM docs
                 WHERE id = ?
                 """,
@@ -1214,6 +1216,7 @@ class EffectApplicationTests(unittest.TestCase):
             self.assertEqual(calendar_event["status"], "completed")
             self.assertEqual(calendar_event["transcript_doc_id"], "doc_transcript_cal_1")
             self.assertEqual(transcript["kind"], "meeting_transcript")
+            self.assertEqual(transcript["visibility_scope"], "generated")
             self.assertEqual(transcript["visible_at"], "2026-06-22T10:30:00")
             self.assertIn("repo sync", transcript["body"])
             self.assertIn("blocker_repo_sync_stale", blocker_ids)

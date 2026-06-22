@@ -176,7 +176,11 @@ def _instructions() -> str:
         "update a task just to show activity. When alignment or a decision becomes clear, preserve it "
         "in a durable artifact such as a visible decision record or launch note. Do not update docs "
         "with guesses or vague summaries; written artifacts should reflect decisions, risks, blockers, "
-        "or customer commitments that are already supported by visible state. When a customer-facing "
+        "or customer commitments that are already supported by visible state. When writing the launch "
+        "decision record, include the approved launch mode, Toad's approval, human approval before "
+        "posting, auto-commenting out of Friday scope or left as follow-up, and the repo-sync stale-commit "
+        "rationale. If a critical decision-record update applies no effect, revise the doc with the "
+        "missing grounded details before finishing. When a customer-facing "
         "security or compliance question appears, handle it as a same-day interruption: ask the owner "
         "for the source of truth, wait for the reply, read the referenced doc, then answer the customer "
         "owner directly. Do not schedule a meeting for a security wording question unless the needed "
@@ -239,7 +243,11 @@ def _tool_specs() -> list[dict[str, Any]]:
         ),
         _tool(
             "update_doc",
-            "Replace the body of a visible existing document.",
+            (
+                "Replace the body of a visible existing document. For doc_launch_decision_record, "
+                "write the complete decision: Toad approval, draft mode, human approval before posting, "
+                "auto-commenting out of Friday scope or follow-up, and repo-sync stale-commit rationale."
+            ),
             {"doc_id": {"type": "string"}, "body": {"type": "string"}},
             ["doc_id", "body"],
         ),
