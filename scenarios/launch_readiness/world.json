@@ -358,6 +358,12 @@
       "value": false
     },
     {
+      "id": "coworker_state_toad_decision_record_written",
+      "person_id": "toad",
+      "key": "decision_record_written",
+      "value": false
+    },
+    {
       "id": "coworker_state_daisy_koopa_update_received",
       "person_id": "daisy",
       "key": "koopa_update_received",
@@ -468,6 +474,7 @@
       "id": "task_draft_mode_docs",
       "project_id": "project_pr_review_agent",
       "title": "Finalize draft-mode onboarding",
+      "description": "Peach needs the approved Friday launch mode early enough to finish onboarding copy before Thursday afternoon readiness checks.",
       "owner_id": "peach",
       "status": "blocked",
       "priority": "medium",
@@ -482,7 +489,8 @@
     {
       "id": "task_customer_talk_track",
       "project_id": "project_pr_review_agent",
-      "title": "Draft Nimbus beta talk track",
+      "title": "Email Daisy the Nimbus beta talk track",
+      "description": "Daisy needs customer-ready Nimbus wording by Thursday morning so she can forward and archive the exact approved language before the customer update.",
       "owner_id": "daisy",
       "status": "not_started",
       "priority": "high",
@@ -498,6 +506,7 @@
       "id": "task_beta_rollout_notes",
       "project_id": "project_pr_review_agent",
       "title": "Prepare Nimbus beta rollout notes",
+      "description": "The rollout note should be grounded in the approved launch mode, human-approval language, and any known repo-sync limitation before the Thursday final-readiness check.",
       "owner_id": "daisy",
       "status": "not_started",
       "priority": "medium",
@@ -513,6 +522,7 @@
       "id": "task_launch_decision",
       "project_id": "project_pr_review_agent",
       "title": "Decide auto-commenting versus draft mode",
+      "description": "Toad needs an explicit Friday launch option before downstream customer messaging and onboarding can finish.",
       "owner_id": "toad",
       "status": "not_started",
       "priority": "critical",
@@ -528,6 +538,7 @@
       "id": "task_audit_export_scope",
       "project_id": "project_audit_log_export",
       "title": "Clarify audit log export scope for Koopa Bank",
+      "description": "Koopa needs a scoped one-time CSV versus full self-serve export answer before Thursday's security review.",
       "owner_id": "toad",
       "status": "not_started",
       "priority": "high",
@@ -543,6 +554,7 @@
       "id": "task_audit_export_feasibility",
       "project_id": "project_audit_log_export",
       "title": "Confirm one-time CSV export feasibility",
+      "description": "Luigi should confirm whether a one-time admin audit-log CSV is feasible in time for Koopa's Thursday security review.",
       "owner_id": "luigi",
       "status": "not_started",
       "priority": "medium",
@@ -553,7 +565,8 @@
     {
       "id": "task_koopa_status_update",
       "project_id": "project_audit_log_export",
-      "title": "Send Koopa Bank status update through Daisy",
+      "title": "Email Daisy the Koopa Bank status update",
+      "description": "Daisy needs customer-facing Koopa wording by email before the Thursday security review, after feasibility and scope are confirmed.",
       "owner_id": "daisy",
       "status": "not_started",
       "priority": "medium",
@@ -679,7 +692,7 @@
       "kind": "meeting_notes",
       "visibility_scope": "public",
       "visible_at": "2026-06-22T09:00:00",
-      "body": "Mario wants auto-commenting if possible. Peach needs launch-mode confirmation before final onboarding. Daisy needs confidence language before she updates Nimbus. Luigi said he is still hardening repo sync ordering."
+      "body": "Mario wants auto-commenting if possible. Peach needs launch-mode confirmation before final onboarding. Daisy needs written customer-ready language by email before she updates Nimbus. Luigi said he is still hardening repo sync ordering."
     },
     {
       "id": "doc_beta_rollout_template",
@@ -687,7 +700,7 @@
       "kind": "customer_note_template",
       "visibility_scope": "public",
       "visible_at": "2026-06-22T09:00:00",
-      "body": "Rollout note must answer three questions: whether the agent posts comments automatically, what human approval means in draft mode, and what known limitation remains after Friday. Avoid promising auto-commenting until repo sync is proven reliable."
+      "body": "Rollout note must answer three questions: whether the agent posts comments automatically, what human approval means in draft mode, and what known limitation remains after Friday. Daisy needs the final customer-ready handoff by email, not chat, so she can forward and archive the approved wording. Avoid promising auto-commenting until repo sync is proven reliable."
     },
     {
       "id": "doc_launch_decision_record",
@@ -724,7 +737,7 @@
       "title": "Koopa Audit Export Note",
       "kind": "customer_note",
       "visibility_scope": "hidden",
-      "body": "Koopa Bank asked whether admin audit logs can be exported before their Thursday security review. The open question is scope: a one-time CSV for the review may be feasible, while a full self-serve export likely needs follow-up planning."
+      "body": "Koopa Bank asked whether admin audit logs can be exported before their Thursday security review. The open question is scope: a one-time CSV for the review may be feasible, while a full self-serve export likely needs follow-up planning. Daisy needs any customer-facing Koopa answer by email so she can send the exact wording to Koopa."
     }
   ],
   "messages": [
@@ -744,7 +757,7 @@
       "sender_id": "daisy",
       "recipient_id": "agent",
       "subject": "Nimbus Friday beta prep",
-      "body": "Nimbus Labs is expecting a useful coding-agent beta on Friday. Please tell me by Thursday morning what we can confidently show."
+      "body": "Nimbus Labs is expecting a useful coding-agent beta on Friday. Please send me the customer-ready wording by email before Thursday morning so I can forward and archive the exact approved language."
     }
   ],
   "events": [

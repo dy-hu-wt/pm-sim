@@ -138,7 +138,11 @@
           }
         },
         {
-          "evidence_exists": "security_doc_found"
+          "coworker_state": {
+            "person_id": "luigi",
+            "key": "security_doc_shared",
+            "equals": true
+          }
         }
       ],
       "action": {
@@ -340,7 +344,11 @@
           }
         },
         {
-          "evidence_exists": "decision_record_written"
+          "coworker_state": {
+            "person_id": "toad",
+            "key": "decision_record_written",
+            "equals": true
+          }
         },
         {
           "coworker_state": {
@@ -516,7 +524,11 @@
           }
         },
         {
-          "evidence_exists": "decision_record_written"
+          "coworker_state": {
+            "person_id": "toad",
+            "key": "decision_record_written",
+            "equals": true
+          }
         },
         {
           "coworker_state": {
@@ -891,11 +903,6 @@
           "person_id": "luigi",
           "key": "risk_surfaced",
           "value": true
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "blocker_discovered",
-          "note": "Luigi proactively disclosed stale repo sync risk."
         }
       ]
     },
@@ -919,7 +926,7 @@
           "channel": "chat",
           "sender_id": "daisy",
           "recipient_id": "agent",
-          "body": "Koopa Bank asked whether admin audit logs can be exported before their Thursday security review. I need a scoped answer, but please do not derail the Nimbus launch path."
+          "body": "Koopa Bank asked whether admin audit logs can be exported before their Thursday security review. I need the scoped customer-facing answer by email so I can forward exact wording, but please do not derail the Nimbus launch path."
         },
         {
           "type": "discover_fact",
@@ -963,7 +970,7 @@
           "channel": "chat",
           "sender_id": "daisy",
           "recipient_id": "agent",
-          "body": "Before I send the final Nimbus agenda, can you give me a Thursday go/no-go? I need one concise readiness note covering launch mode, private-repo security wording, and whether Koopa stayed scoped away from the Friday beta."
+          "body": "Before I send the final Nimbus agenda, can you email me a Thursday go/no-go? I need one concise readiness note covering launch mode, private-repo security wording, and whether Koopa stayed scoped away from the Friday beta."
         },
         {
           "type": "update_project",
@@ -1018,11 +1025,6 @@
           "person_id": "luigi",
           "key": "audit_export_feasibility_shared",
           "value": true
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "koopa_scoped",
-          "note": "Luigi confirmed a one-time Koopa audit CSV is feasible while self-serve export is follow-up."
         }
       ]
     },
@@ -1077,11 +1079,6 @@
           "person_id": "toad",
           "key": "audit_scope_aligned",
           "value": true
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "koopa_scoped",
-          "note": "Toad aligned Koopa scope to one-time CSV and kept full export as follow-up."
         }
       ]
     },
@@ -1119,11 +1116,6 @@
           "person_id": "luigi",
           "key": "security_doc_shared",
           "value": true
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "security_doc_found",
-          "note": "Luigi pointed the agent to the private repo security baseline."
         }
       ]
     },
@@ -1240,11 +1232,6 @@
           "person_id": "luigi",
           "key": "risk_surfaced",
           "value": true
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "blocker_discovered",
-          "note": "Luigi disclosed stale repo sync risk."
         }
       ]
     },
@@ -1290,11 +1277,6 @@
           "person_id": "mario",
           "key": "accepted_draft_mode",
           "value": true
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "stakeholder_alignment",
-          "note": "Mario accepted draft mode if repo sync risk is confirmed."
         }
       ]
     },
@@ -1335,11 +1317,6 @@
           "person_id": "mario",
           "key": "accepted_draft_mode",
           "value": true
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "stakeholder_alignment",
-          "note": "Mario accepted draft mode if repo sync risk is confirmed."
         }
       ]
     },
@@ -1448,11 +1425,6 @@
         "body": "For Nimbus, reliability matters more than auto-posting comments. I can message draft mode as a safer beta if you give me clear language by Thursday morning."
       },
       "effects": [
-        {
-          "type": "add_evaluation_evidence",
-          "key": "stakeholder_alignment",
-          "note": "Daisy supported reliable draft mode with clear messaging."
-        },
         {
           "type": "discover_fact",
           "fact_id": "fact_nimbus_values_reliability",
@@ -1627,11 +1599,6 @@
           "person_id": "peach",
           "key": "scope_unblocked",
           "value": true
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "peach_unblocked",
-          "note": "Draft-mode scope clarified for Peach."
         }
       ]
     },
@@ -1769,11 +1736,6 @@
           "person_id": "toad",
           "key": "approval_recorded",
           "value": true
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "draft_mode_approved",
-          "note": "Toad approved Friday draft mode after stale-code risk was raised."
         }
       ]
     },
@@ -1858,11 +1820,6 @@
           "values": {
             "risk_surfaced": true
           }
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "blocker_discovered",
-          "note": "Meeting surfaced Luigi's stale repo sync risk."
         }
       ]
     },
@@ -1962,11 +1919,6 @@
           "values": {
             "scope_unblocked": true
           }
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "peach_unblocked",
-          "note": "Meeting clarified draft-mode scope for Peach."
         }
       ]
     },
@@ -1988,13 +1940,7 @@
         "draft",
         "draft-mode"
       ],
-      "effects": [
-        {
-          "type": "add_evaluation_evidence",
-          "key": "stakeholder_alignment",
-          "note": "Meeting aligned Daisy around repo sync risk and draft-mode messaging."
-        }
-      ]
+      "effects": []
     },
     {
       "id": "meeting_mario_accepts_draft_after_risk",
@@ -2027,11 +1973,6 @@
               "product_pressure_acknowledged": true
             }
           }
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "stakeholder_alignment",
-          "note": "Mario accepted draft mode after the meeting made repo sync risk concrete."
         },
         {
           "type": "update_coworker_state",
@@ -2133,103 +2074,11 @@
           "values": {
             "approval_recorded": true
           }
-        },
-        {
-          "type": "add_evaluation_evidence",
-          "key": "draft_mode_approved",
-          "note": "Toad approved draft mode in a meeting with technical risk context."
         }
       ]
     }
   ],
   "action_rules": [
-    {
-      "id": "email_daisy_customer_launch_update",
-      "action_type": "send_email",
-      "priority": 100,
-      "recipient_id": "daisy",
-      "when": [
-        {
-          "fact_discovered": "fact_repo_sync_stale"
-        },
-        {
-          "fact_discovered": "fact_nimbus_values_reliability"
-        }
-      ],
-      "effects": [
-        {
-          "type": "add_evaluation_evidence",
-          "key": "stakeholder_alignment",
-          "note": "Agent sent Daisy a concrete Nimbus repo-sync risk and draft-mode status update."
-        },
-        {
-          "type": "update_project",
-          "project_id": "project_pr_review_agent",
-          "launch_conflict": {
-            "status": "investigated",
-            "inputs": {
-              "customer_constraint_known": true
-            }
-          }
-        },
-        {
-          "type": "update_coworker_state",
-          "person_id": "daisy",
-          "values": {
-            "customer_update_received": true,
-            "draft_mode_message_aligned": true
-          }
-        }
-      ],
-      "semantic_match": {
-        "required": [
-          {
-            "id": "repo_sync_risk",
-            "description": "Repo sync or webhook ordering can make the agent review a stale or older commit.",
-            "signal_groups_all": [
-              [
-                "repo sync",
-                "repo-sync",
-                "webhook",
-                "stale",
-                "older commit",
-                "older diff"
-              ],
-              [
-                "risk",
-                "stale",
-                "older commit",
-                "older diff",
-                "commit"
-              ]
-            ]
-          },
-          {
-            "id": "draft_mode",
-            "description": "Friday launch mode is draft mode or queued draft suggestions.",
-            "signals_any": [
-              "draft mode",
-              "draft-mode",
-              "draft suggestions",
-              "queue draft",
-              "queues draft",
-              "queued draft"
-            ]
-          },
-          {
-            "id": "nimbus_beta",
-            "description": "The message is about the Nimbus Friday beta or pilot.",
-            "signals_any": [
-              "nimbus",
-              "friday beta",
-              "nimbus beta",
-              "friday pilot",
-              "pilot"
-            ]
-          }
-        ]
-      }
-    },
     {
       "id": "doc_launch_decision_record_written",
       "action_type": "update_doc",
@@ -2252,9 +2101,10 @@
       ],
       "effects": [
         {
-          "type": "add_evaluation_evidence",
+          "type": "update_coworker_state",
+          "person_id": "toad",
           "key": "decision_record_written",
-          "note": "Agent documented the Friday draft-mode decision with Toad approval, repo-sync risk rationale, human approval, and auto-commenting as follow-up."
+          "value": true
         }
       ],
       "semantic_match": {
@@ -2371,68 +2221,142 @@
   "state_evidence_rules": [
     {
       "evidence_key": "blocker_discovered",
-      "note": "Stale repo sync risk is discovered in world state.",
+      "note": "Luigi has surfaced the stale repo-sync risk.",
       "when": [
         {
-          "fact_discovered": "fact_repo_sync_stale"
+          "coworker_state": {
+            "person_id": "luigi",
+            "key": "risk_surfaced",
+            "equals": true
+          }
         }
       ],
       "created_at": {
-        "fact_discovered": "fact_repo_sync_stale"
+        "coworker_state": {
+          "person_id": "luigi",
+          "key": "risk_surfaced"
+        }
       }
     },
     {
       "evidence_key": "stakeholder_alignment",
-      "note": "Daisy's reliability preference for Nimbus is discovered in world state.",
+      "note": "Daisy has shared Nimbus's reliability preference.",
       "when": [
         {
-          "fact_discovered": "fact_nimbus_values_reliability"
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "reliability_preference_shared",
+            "equals": true
+          }
         }
       ],
       "created_at": {
-        "fact_discovered": "fact_nimbus_values_reliability"
+        "coworker_state": {
+          "person_id": "daisy",
+          "key": "reliability_preference_shared"
+        }
       }
     },
     {
       "evidence_key": "peach_unblocked",
-      "note": "Draft-mode onboarding is unblocked by confirmed scope and resolved blocker.",
+      "note": "Peach has been unblocked on draft-mode onboarding scope.",
       "when": [
         {
-          "fact_discovered": "fact_draft_mode_scope_confirmed"
-        },
-        {
-          "blocker_status": {
-            "id": "blocker_scope_unclear",
-            "is": "resolved"
-          }
-        },
-        {
-          "task_status": {
-            "id": "task_draft_mode_docs",
-            "in": [
-              "in_progress",
-              "complete",
-              "completed",
-              "done",
-              "resolved"
-            ]
+          "coworker_state": {
+            "person_id": "peach",
+            "key": "scope_unblocked",
+            "equals": true
           }
         }
       ],
       "created_at": {
-        "fact_discovered": "fact_draft_mode_scope_confirmed"
+        "coworker_state": {
+          "person_id": "peach",
+          "key": "scope_unblocked"
+        }
       }
     },
     {
       "evidence_key": "draft_mode_approved",
-      "note": "Draft-mode approval is recorded in world state.",
+      "note": "Toad has recorded approval for draft mode.",
       "when": [
         {
-          "fact_discovered": "fact_draft_mode_approved"
+          "coworker_state": {
+            "person_id": "toad",
+            "key": "approval_recorded",
+            "equals": true
+          }
         }
       ],
       "created_at": {
-        "fact_discovered": "fact_draft_mode_approved"
+        "coworker_state": {
+          "person_id": "toad",
+          "key": "approval_recorded"
+        }
+      }
+    },
+    {
+      "evidence_key": "security_doc_found",
+      "note": "Luigi has shared the private repo security baseline.",
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "luigi",
+            "key": "security_doc_shared",
+            "equals": true
+          }
+        }
+      ],
+      "created_at": {
+        "coworker_state": {
+          "person_id": "luigi",
+          "key": "security_doc_shared"
+        }
+      }
+    },
+    {
+      "evidence_key": "koopa_scoped",
+      "note": "Toad has aligned Koopa scope to one-time CSV with self-serve export as follow-up.",
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "luigi",
+            "key": "audit_export_feasibility_shared",
+            "equals": true
+          }
+        },
+        {
+          "coworker_state": {
+            "person_id": "toad",
+            "key": "audit_scope_aligned",
+            "equals": true
+          }
+        }
+      ],
+      "created_at": {
+        "coworker_state": {
+          "person_id": "toad",
+          "key": "audit_scope_aligned"
+        }
+      }
+    },
+    {
+      "evidence_key": "decision_record_written",
+      "note": "The Friday launch decision record has been written with the grounded draft-mode decision.",
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "toad",
+            "key": "decision_record_written",
+            "equals": true
+          }
+        }
+      ],
+      "created_at": {
+        "coworker_state": {
+          "person_id": "toad",
+          "key": "decision_record_written"
+        }
       }
     }
   ],

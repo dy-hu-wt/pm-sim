@@ -111,6 +111,19 @@ class ScenarioValidationTests(unittest.TestCase):
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
+    def test_direct_scored_evidence_effect_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        scenario["event_rules"][0]["effects"].append(
+            {
+                "type": "add_evaluation_evidence",
+                "key": "blocker_discovered",
+                "note": "Direct scoring evidence should not be authored.",
+            }
+        )
+
+        with self.assertRaisesRegex(ScenarioError, "directly writes scored evidence"):
+            load_scenario(self._write_scenario(scenario))
+
     def test_manifest_scenario_includes_files(self) -> None:
         scenario = copy.deepcopy(self.base)
         manifest = {
@@ -985,12 +998,15 @@ class CoworkerRuleTests(unittest.TestCase):
         )
 
         self.assertEqual(vague[0].effects, ())
-        concrete_effect_keys = {
-            effect["key"]
-            for effect in concrete[0].effects
-            if effect["type"] == "add_evaluation_evidence"
-        }
-        self.assertIn("stakeholder_alignment", concrete_effect_keys)
+        self.assertIn(
+            {
+                "type": "update_coworker_state",
+                "person_id": "daisy",
+                "key": "reliability_preference_shared",
+                "value": True,
+            },
+            concrete[0].effects,
+        )
 
     def test_peach_requires_draft_scope_and_prior_customer_context(self) -> None:
         early = replies_for_chat(
@@ -1005,12 +1021,15 @@ class CoworkerRuleTests(unittest.TestCase):
         )
 
         self.assertEqual({effect["type"] for effect in early[0].effects}, {"update_blocker"})
-        ready_effect_keys = {
-            effect["key"]
-            for effect in ready[0].effects
-            if effect["type"] == "add_evaluation_evidence"
-        }
-        self.assertIn("peach_unblocked", ready_effect_keys)
+        self.assertIn(
+            {
+                "type": "update_coworker_state",
+                "person_id": "peach",
+                "key": "scope_unblocked",
+                "value": True,
+            },
+            ready[0].effects,
+        )
 
     def test_peach_accepts_out_of_scope_auto_commenting_wording(self) -> None:
         replies = replies_for_chat(
@@ -1022,13 +1041,15 @@ class CoworkerRuleTests(unittest.TestCase):
             self._state(["fact_repo_sync_stale", "fact_nimbus_values_reliability"]),
         )
 
-        effect_keys = {
-            effect["key"]
-            for effect in replies[0].effects
-            if effect["type"] == "add_evaluation_evidence"
-        }
-
-        self.assertIn("peach_unblocked", effect_keys)
+        self.assertIn(
+            {
+                "type": "update_coworker_state",
+                "person_id": "peach",
+                "key": "scope_unblocked",
+                "value": True,
+            },
+            replies[0].effects,
+        )
 
     def test_toad_refuses_approval_until_risk_and_customer_context_exist(self) -> None:
         early = replies_for_chat(
@@ -1049,12 +1070,15 @@ class CoworkerRuleTests(unittest.TestCase):
 
         self.assertEqual(early[0].effects, ())
         self.assertEqual(missing_customer_context[0].effects, ())
-        ready_effect_keys = {
-            effect["key"]
-            for effect in ready[0].effects
-            if effect["type"] == "add_evaluation_evidence"
-        }
-        self.assertIn("draft_mode_approved", ready_effect_keys)
+        self.assertIn(
+            {
+                "type": "update_coworker_state",
+                "person_id": "toad",
+                "key": "approval_recorded",
+                "value": True,
+            },
+            ready[0].effects,
+        )
 
     def test_background_event_has_deterministic_effects(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1437,11 +1461,11 @@ class EffectApplicationTests(unittest.TestCase):
                 """,
                 (calendar_event["transcript_doc_id"],),
             ).fetchone()
+            evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
             evidence_keys = {
-                row["evidence_key"]
-                for row in conn.execute(
-                    "SELECT evidence_key FROM evaluation_evidence"
-                ).fetchall()
+                evidence["key"]
+                for component in evaluation["components"]
+                for evidence in component.get("evidence", [])
             }
 
             delivered = result["delivered_events"][0]
@@ -1546,14 +1570,12 @@ class EffectApplicationTests(unittest.TestCase):
 
         advance_time(self.db_path, "to:2026-06-22T10:30:00")
         state = observe(self.db_path)
-        conn = connect(self.db_path)
-        try:
-            evidence_keys = {
-                row["evidence_key"]
-                for row in conn.execute("SELECT evidence_key FROM evaluation_evidence").fetchall()
-            }
-        finally:
-            conn.close()
+        evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        evidence_keys = {
+            evidence["key"]
+            for component in evaluation["components"]
+            for evidence in component.get("evidence", [])
+        }
 
         fact_ids = {fact["id"] for fact in state["discovered_facts"]}
 
@@ -1665,7 +1687,12 @@ class ToolActionTests(unittest.TestCase):
         )
 
         self.assertTrue(
-            any(effect.get("key") == "decision_record_written" for effect in valid["applied_effects"])
+            any(
+                effect.get("type") == "update_coworker_state"
+                and effect.get("person_id") == "toad"
+                and "decision_record_written" in effect.get("keys", [])
+                for effect in valid["applied_effects"]
+            )
         )
 
     def test_decision_record_accepts_natural_out_of_scope_wording(self) -> None:
@@ -1683,7 +1710,12 @@ class ToolActionTests(unittest.TestCase):
         )
 
         self.assertTrue(
-            any(effect.get("key") == "decision_record_written" for effect in result["applied_effects"])
+            any(
+                effect.get("type") == "update_coworker_state"
+                and effect.get("person_id") == "toad"
+                and "decision_record_written" in effect.get("keys", [])
+                for effect in result["applied_effects"]
+            )
         )
 
     def test_decision_record_accepts_llm_markdown_record(self) -> None:
@@ -1714,7 +1746,12 @@ Luigi surfaced a repo-sync stale-commit risk: webhook events can arrive out of o
         )
 
         self.assertTrue(
-            any(effect.get("key") == "decision_record_written" for effect in result["applied_effects"])
+            any(
+                effect.get("type") == "update_coworker_state"
+                and effect.get("person_id") == "toad"
+                and "decision_record_written" in effect.get("keys", [])
+                for effect in result["applied_effects"]
+            )
         )
 
     def test_decision_record_accepts_automatic_pr_commenting_wording(self) -> None:
@@ -1743,7 +1780,12 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         )
 
         self.assertTrue(
-            any(effect.get("key") == "decision_record_written" for effect in result["applied_effects"])
+            any(
+                effect.get("type") == "update_coworker_state"
+                and effect.get("person_id") == "toad"
+                and "decision_record_written" in effect.get("keys", [])
+                for effect in result["applied_effects"]
+            )
         )
 
     def test_private_repo_security_doc_is_hidden_until_luigi_reveals_it(self) -> None:
@@ -1758,11 +1800,12 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         revealed = read_doc(self.db_path, "doc_private_repo_security_baseline")
         conn = connect(self.db_path)
         try:
-            evidence = conn.execute(
+            state = conn.execute(
                 """
-                SELECT evidence_key
-                FROM evaluation_evidence
-                WHERE evidence_key = 'security_doc_found'
+                SELECT value_json
+                FROM coworker_state
+                WHERE person_id = 'luigi'
+                  AND key = 'security_doc_shared'
                 """
             ).fetchone()
         finally:
@@ -1771,7 +1814,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertFalse(hidden["ok"])
         self.assertTrue(revealed["ok"])
         self.assertIn("Raw source code is not stored long term", revealed["doc"]["body"])
-        self.assertIsNotNone(evidence)
+        self.assertTrue(loads(state["value_json"]))
 
     def test_private_repo_security_reply_is_scenario_rule_driven(self) -> None:
         scenario = load_scenario(DEFAULT_SCENARIO_PATH)
@@ -1921,7 +1964,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertEqual(result["applied_effects"], [])
         self.assertIsNone(evidence)
 
-    def test_substantive_daisy_email_after_discovery_records_stakeholder_evidence(self) -> None:
+    def test_substantive_daisy_email_after_discovery_records_customer_ready_state(self) -> None:
         self._drive_to_draft_approval()
 
         result = send_email(
@@ -1935,19 +1978,27 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         )
         conn = connect(self.db_path)
         try:
-            evidence = conn.execute(
+            state = conn.execute(
                 """
-                SELECT evidence_key, note
-                FROM evaluation_evidence
-                WHERE evidence_key = 'stakeholder_alignment'
+                SELECT value_json
+                FROM coworker_state
+                WHERE person_id = 'daisy'
+                  AND key = 'customer_message_ready'
                 """
             ).fetchone()
         finally:
             conn.close()
 
         self.assertTrue(result["ok"])
-        self.assertTrue(any(effect.get("key") == "stakeholder_alignment" for effect in result["applied_effects"]))
-        self.assertEqual(evidence["evidence_key"], "stakeholder_alignment")
+        self.assertTrue(
+            any(
+                effect.get("type") == "update_coworker_state"
+                and effect.get("person_id") == "daisy"
+                and "customer_message_ready" in effect.get("keys", [])
+                for effect in result["applied_effects"]
+            )
+        )
+        self.assertTrue(loads(state["value_json"]))
 
     def test_customer_message_ready_uses_scenario_authored_claims(self) -> None:
         self._drive_to_draft_approval()
@@ -2716,7 +2767,7 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(task_component["earned"], 0)
         self.assertIn("peach_unblocked", task_component["missing_evidence"])
 
-    def test_draft_mode_progress_counts_only_after_scope_fact_and_blocker_resolution(self) -> None:
+    def test_draft_mode_progress_counts_only_after_peach_state_records_unblock(self) -> None:
         update_task(self.db_path, "task_draft_mode_docs", status="in_progress", priority=None)
 
         conn = connect(self.db_path)
@@ -2762,6 +2813,33 @@ class EvaluatorTests(unittest.TestCase):
         finally:
             conn.close()
 
+        fact_and_blocker = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        fact_and_blocker_component = next(
+            component
+            for component in fact_and_blocker["components"]
+            if component["key"] == "task_state_improvement"
+        )
+        self.assertEqual(fact_and_blocker_component["earned"], 0)
+
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "peach",
+                        "key": "scope_unblocked",
+                        "value": True,
+                    }
+                ],
+                now="2026-06-22T10:20:00",
+                source="test:peach_unblocked",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
         valid = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
         valid_component = next(
             component
@@ -2787,10 +2865,10 @@ class EvaluatorTests(unittest.TestCase):
         self.assertIn("+10 security_interruption (passed, max 10)", output)
         self.assertIn("+10 portfolio_tradeoff (passed, max 10)", output)
         self.assertIn("Evidence:", output)
-        self.assertIn("Stale repo sync risk is discovered in world state.", output)
+        self.assertIn("Luigi has surfaced the stale repo-sync risk.", output)
         self.assertIn("Daisy has received grounded customer-ready Nimbus beta wording.", output)
-        self.assertIn("Draft-mode approval is recorded in world state.", output)
-        self.assertIn("Luigi pointed the agent to the private repo security baseline.", output)
+        self.assertIn("Toad has recorded approval for draft mode.", output)
+        self.assertIn("Luigi has shared the private repo security baseline.", output)
 
     def test_evaluate_explain_prints_missing_evidence(self) -> None:
         output = self._run_cli("evaluate", "--explain")
@@ -3266,6 +3344,9 @@ class LlmAgentTests(unittest.TestCase):
         self.assertIn("smallest useful set of people", instructions)
         self.assertIn("You do not need to simulate every empty hour", instructions)
         self.assertIn("visible calendar obligations", instructions)
+        self.assertIn("customer-ready Nimbus wording early enough for her Thursday account update", instructions)
+        self.assertIn("Koopa needs scoped wording before Thursday's security review", instructions)
+        self.assertIn("Thursday final-readiness requests need an answer", instructions)
         self.assertIn("Call finish only when", instructions)
 
 

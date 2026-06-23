@@ -356,6 +356,7 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         tasks,
         valid_actors,
     )
+    _validate_scored_evidence_is_state_derived(data)
     _validate_scripted_policy(data.get("scripted_policy", []), people, docs, tasks)
 
 
@@ -622,6 +623,48 @@ def _validate_semantic_match(spec: Any, label: str) -> None:
                 _validate_string_list(item.get(list_key, []), f"{item_label} {list_key}")
             for group in item.get("signal_groups_all", []):
                 _validate_string_list(group, f"{item_label} signal group")
+
+
+def _validate_scored_evidence_is_state_derived(data: dict[str, Any]) -> None:
+    scored_keys = {
+        key
+        for target in data.get("evaluation_targets", {}).values()
+        for key in target.get("evidence_keys", [])
+    }
+    if not scored_keys:
+        return
+
+    allowed_state_keys = {
+        rule.get("evidence_key")
+        for rule in data.get("state_evidence_rules", [])
+        if isinstance(rule, dict)
+    }
+    missing = sorted(scored_keys - allowed_state_keys)
+    if missing:
+        raise ScenarioError(
+            "Evaluation evidence keys must be derived from state_evidence_rules: "
+            + ", ".join(missing)
+        )
+
+    for section in (
+        "event_rules",
+        "coworker_rules",
+        "meeting_rules",
+        "action_rules",
+        "task_gate_rules",
+        "harmful_action_rules",
+    ):
+        for rule in data.get(section, []):
+            rule_id = rule.get("id", "<unknown>")
+            for effect in rule.get("effects", []):
+                if (
+                    effect.get("type") == "add_evaluation_evidence"
+                    and effect.get("key") in scored_keys
+                ):
+                    raise ScenarioError(
+                        f"{section} {rule_id} directly writes scored evidence "
+                        f"{effect.get('key')}; use state mutation plus state_evidence_rules."
+                    )
 
 
 def _validate_scripted_policy(

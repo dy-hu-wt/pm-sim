@@ -4,8 +4,10 @@ from pathlib import Path
 from typing import Any
 
 from .db import connect
+from .evaluator import _load_state_evidence
 from .jsonutil import loads
-from .paths import DEFAULT_DB_PATH
+from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
+from .scenario import load_scenario
 
 
 TIMELINE_KINDS = {"action", "event", "event_scheduled", "event_delivered", "message", "evidence"}
@@ -16,13 +18,14 @@ def timeline(
     limit: int = 0,
     kind: str | None = None,
 ) -> list[dict[str, Any]]:
+    scenario = load_scenario(DEFAULT_SCENARIO_PATH)
     conn = connect(db_path)
     try:
         entries = []
         entries.extend(_action_entries(conn))
         entries.extend(_event_entries(conn))
         entries.extend(_message_entries(conn))
-        entries.extend(_evidence_entries(conn))
+        entries.extend(_evidence_entries(conn, scenario))
     finally:
         conn.close()
 
@@ -132,7 +135,7 @@ def _message_entries(conn) -> list[dict[str, Any]]:
     return entries
 
 
-def _evidence_entries(conn) -> list[dict[str, Any]]:
+def _evidence_entries(conn, scenario: dict[str, Any]) -> list[dict[str, Any]]:
     rows = conn.execute(
         """
         SELECT id, evidence_key, note, created_at, source
@@ -140,7 +143,14 @@ def _evidence_entries(conn) -> list[dict[str, Any]]:
         """
     ).fetchall()
     entries = []
-    for row in rows:
+    evidence_rows = [dict(row) for row in rows]
+    evidence_rows.extend(_load_state_evidence(conn, scenario))
+    seen = set()
+    for row in evidence_rows:
+        dedupe_key = (row["evidence_key"], row["note"], row["created_at"], row["source"])
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
         entries.append(
             {
                 "time": row["created_at"],
