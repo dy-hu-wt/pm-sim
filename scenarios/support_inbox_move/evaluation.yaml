@@ -1,0 +1,368 @@
+agent_brief:
+  objective: Get the support inbox move ready for Thursday.
+  guidance:
+  - Read the inbox move brief, then ask Nora about saved replies and Felix about VIP email routing.
+  - Write the move plan after both risks are known.
+  - Email Nora the saved-reply plan and Felix the VIP routing plan.
+  - Do not close the old inbox immediately; it should stay as backup for one week.
+  finish_criteria:
+  - saved replies are handled
+  - VIP routing is tested
+  - move plan is written
+  - Nora and Felix have written updates
+  tool_hints:
+    update_doc: Include top saved replies moved, VIP forwarding tested, old inbox read-only for one week, Nora owner, and Felix owner.
+grading_rules:
+- id: saved_reply_update_sent
+  template: grounded_communication
+  priority: 90
+  requires:
+  - fact_discovered: saved_replies_missing
+  - fact_discovered: top_saved_replies_can_move
+  - coworker_state:
+      person_id: nora
+      key: move_note_received
+      equals: true
+  action:
+    type: send_email
+    recipient_id: nora
+    match:
+      required_concepts:
+      - id: top_saved_replies
+        description: The email says the top saved replies move to the new help desk.
+        exemplars:
+        - top 12 saved replies move to the new help desk
+        - move the most-used saved replies before Thursday
+        must_be_asserted: true
+      - id: old_inbox_backup
+        description: The old inbox remains read-only or available as backup for one week.
+        exemplars:
+        - old inbox stays read-only for one week
+        - old inbox remains available as backup for one week
+        must_be_asserted: true
+      - id: support_team_wording
+        description: The email gives Nora wording the support team can use.
+        exemplars:
+        - support team can use this wording
+        - tell the team these saved replies are ready
+        must_be_asserted: true
+      forbidden_concepts:
+      - id: no_saved_replies_needed
+        description: The email says saved replies do not need to move.
+        exemplars:
+        - saved replies do not need to move
+        - skip moving saved replies
+        must_be_asserted: true
+  state:
+    person_id: nora
+    key: support_update_ready
+    value: true
+  effects:
+  - type: update_task
+    task_id: move_saved_replies
+    status: complete
+  - type: lower_pressure
+    pressure_id: saved_replies_pressure
+    to: 2
+    reason: Nora received written saved-reply instructions.
+  milestone:
+    key: saved_reply_update_sent
+    note: Nora has the support-team saved-reply wording.
+- id: vip_routing_update_sent
+  template: grounded_communication
+  priority: 90
+  requires:
+  - fact_discovered: vip_email_routing_gap
+  - fact_discovered: vip_forwarding_test_ok
+  - coworker_state:
+      person_id: felix
+      key: move_note_received
+      equals: true
+  action:
+    type: send_email
+    recipient_id: felix
+    match:
+      required_concepts:
+      - id: vip_forwarding_test
+        description: The email says VIP forwarding or VIP routing is tested.
+        exemplars:
+        - VIP forwarding is tested
+        - test VIP email routing to the new help desk
+        must_be_asserted: true
+      - id: vip_allowlist
+        description: The email says VIP aliases are on an allowlist or forwarding rule.
+        exemplars:
+        - VIP aliases are on the forwarding allowlist
+        - add VIP aliases to the forwarding rule
+        must_be_asserted: true
+      - id: old_inbox_backup
+        description: The old inbox remains available as backup for one week.
+        exemplars:
+        - old inbox stays open as backup for one week
+        - old inbox remains backup for one week
+        must_be_asserted: true
+      forbidden_concepts:
+      - id: no_vip_test_needed
+        description: The email says VIP routing does not need testing.
+        exemplars:
+        - VIP routing does not need testing
+        - skip the VIP forwarding test
+        must_be_asserted: true
+  state:
+    person_id: felix
+    key: routing_update_ready
+    value: true
+  effects:
+  - type: update_task
+    task_id: test_vip_routing
+    status: complete
+  - type: update_task
+    task_id: send_owner_updates
+    status: in_progress
+  - type: lower_pressure
+    pressure_id: vip_email_pressure
+    to: 2
+    reason: Felix received written VIP routing instructions.
+  milestone:
+    key: vip_routing_update_sent
+    note: Felix has the VIP routing test plan.
+task_gate_rules:
+- task_id: move_saved_replies
+  statuses:
+  - complete
+  - completed
+  - done
+  - resolved
+  requires:
+  - coworker_state:
+      person_id: nora
+      key: support_update_ready
+      equals: true
+  error: move_saved_replies cannot be marked complete until Nora receives the saved-reply update.
+- task_id: test_vip_routing
+  statuses:
+  - complete
+  - completed
+  - done
+  - resolved
+  requires:
+  - coworker_state:
+      person_id: felix
+      key: routing_update_ready
+      equals: true
+  error: test_vip_routing cannot be marked complete until Felix receives the VIP routing update.
+- task_id: write_move_plan
+  statuses:
+  - complete
+  - completed
+  - done
+  - resolved
+  requires:
+  - fact_discovered: inbox_move_plan
+  error: write_move_plan cannot be marked complete until the move plan is written.
+- task_id: send_owner_updates
+  statuses:
+  - complete
+  - completed
+  - done
+  - resolved
+  requires:
+  - coworker_state:
+      person_id: nora
+      key: support_update_ready
+      equals: true
+  - coworker_state:
+      person_id: felix
+      key: routing_update_ready
+      equals: true
+  error: send_owner_updates cannot be marked complete until Nora and Felix both receive written updates.
+outcome_rules:
+- id: inbox_move_ready
+  when:
+  - project_id: support_inbox_move
+  - fact_discovered: inbox_move_plan
+  - coworker_state:
+      person_id: nora
+      key: support_update_ready
+      equals: true
+  - coworker_state:
+      person_id: felix
+      key: routing_update_ready
+      equals: true
+  - pressure_at_most:
+      id: saved_replies_pressure
+      intensity: 3
+  - pressure_at_most:
+      id: vip_email_pressure
+      intensity: 3
+  result:
+    status: shipped
+    risk_level: low
+    final_outcome: inbox_move_ready
+    summary: 'The support inbox move is ready: saved replies are moved, VIP email routing is tested, and the old inbox stays as backup for one week.'
+- id: saved_replies_ready_vip_missing
+  when:
+  - project_id: support_inbox_move
+  - coworker_state:
+      person_id: nora
+      key: support_update_ready
+      equals: true
+  - not:
+      coworker_state:
+        person_id: felix
+        key: routing_update_ready
+        equals: true
+  result:
+    status: partial
+    risk_level: high
+    final_outcome: saved_replies_ready_vip_missing
+    summary: Saved replies are handled, but VIP customer emails may still route to the old inbox.
+- id: vip_ready_saved_replies_missing
+  when:
+  - project_id: support_inbox_move
+  - coworker_state:
+      person_id: felix
+      key: routing_update_ready
+      equals: true
+  - not:
+      coworker_state:
+        person_id: nora
+        key: support_update_ready
+        equals: true
+  result:
+    status: partial
+    risk_level: high
+    final_outcome: vip_ready_saved_replies_missing
+    summary: VIP routing is handled, but the support team still lacks saved replies in the new help desk.
+- id: inbox_move_not_ready
+  when:
+  - project_id: support_inbox_move
+  result:
+    status: missed
+    risk_level: high
+    final_outcome: inbox_move_not_ready
+    summary: Thursday arrived without a written support inbox move plan across saved replies and VIP routing.
+scripted_policy:
+- name: read_inbox_move_brief
+  tool: read_doc
+  args:
+    doc_id: inbox_move_brief
+- name: ask_nora_about_saved_replies
+  tool: send_chat
+  args:
+    person_id: nora
+    body: For the support inbox move, are saved replies or old inbox backup a risk before Thursday?
+- name: wait_for_nora_reply
+  tool: advance_time
+  args:
+    target: until_next_event
+- name: read_old_inbox_notes
+  tool: read_doc
+  args:
+    doc_id: old_inbox_notes
+- name: ask_felix_about_vip_routing
+  tool: send_chat
+  args:
+    person_id: felix
+    body: For the new help desk, do VIP email aliases route correctly, and do we need a forwarding test?
+- name: wait_for_felix_reply
+  tool: advance_time
+  args:
+    target: until_next_event
+- name: read_vip_routing_note
+  tool: read_doc
+  args:
+    doc_id: vip_routing_note
+- name: write_inbox_move_plan
+  tool: update_doc
+  args:
+    doc_id: inbox_move_plan
+    body: 'Thursday inbox move plan: move the top 12 saved replies to the new help desk before Thursday. VIP forwarding is tested by adding VIP aliases to the forwarding rule and sending a test email. The old inbox stays read-only for one week as backup. Nora owns saved replies and Felix owns VIP routing; Nora and Felix are aligned.'
+- name: email_nora_saved_reply_plan
+  tool: send_email
+  args:
+    person_id: nora
+    subject: Support inbox move saved replies
+    body: 'Support team can use this wording: the top 12 saved replies move to the new help desk before Thursday, and the old inbox stays read-only for one week as backup.'
+- name: email_felix_vip_routing_plan
+  tool: send_email
+  args:
+    person_id: felix
+    subject: Support inbox move VIP routing
+    body: VIP aliases are on the forwarding allowlist, VIP forwarding is tested to the new help desk, and the old inbox stays open as backup for one week.
+- name: advance_to_support_inbox_deadline
+  tool: advance_time
+  args:
+    target: to:2026-06-25T15:00:00
+baseline:
+  description: No-op baseline waits for Tuesday reminders and reaches Thursday without the move plan or owner updates.
+  expected_score: 50
+  expected_outcome: The two risks may become visible, but the move is not ready because the PM never writes the plan or sends final updates.
+milestone_rules:
+- id: saved_reply_risk_discovered
+  note: Nora surfaced that saved replies are missing from the new help desk.
+  when:
+  - coworker_state:
+      person_id: nora
+      key: saved_reply_risk_shared
+      equals: true
+  created_at:
+    coworker_state:
+      person_id: nora
+      key: saved_reply_risk_shared
+- id: vip_routing_risk_discovered
+  note: Felix surfaced that VIP customer emails need tested routing.
+  when:
+  - coworker_state:
+      person_id: felix
+      key: vip_routing_risk_shared
+      equals: true
+  created_at:
+    coworker_state:
+      person_id: felix
+      key: vip_routing_risk_shared
+- id: move_plan_written
+  note: The support inbox move plan is written with saved replies, VIP routing, and old inbox backup.
+  when:
+  - fact_discovered: inbox_move_plan
+  created_at:
+    first_fact_or_milestone:
+      fact_id: inbox_move_plan
+- id: inbox_move_ready
+  note: Nora and Felix both have written updates for the Thursday inbox move.
+  when:
+  - coworker_state:
+      person_id: nora
+      key: support_update_ready
+      equals: true
+  - coworker_state:
+      person_id: felix
+      key: routing_update_ready
+      equals: true
+  created_at:
+    coworker_state:
+      person_id: felix
+      key: routing_update_ready
+score_components:
+  saved_replies:
+    points: 30
+    preferred_before: '2026-06-25T12:00:00'
+    milestones:
+    - saved_reply_risk_discovered
+    - saved_reply_update_sent
+  vip_routing:
+    points: 30
+    preferred_before: '2026-06-25T12:00:00'
+    milestones:
+    - vip_routing_risk_discovered
+    - vip_routing_update_sent
+  written_plan:
+    points: 25
+    preferred_before: '2026-06-25T13:00:00'
+    milestones:
+    - move_plan_written
+  final_readiness:
+    points: 15
+    preferred_before: '2026-06-25T15:00:00'
+    milestones:
+    - inbox_move_ready

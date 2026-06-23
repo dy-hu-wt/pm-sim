@@ -1,0 +1,14 @@
+id: support_inbox_move
+name: Support Inbox Move
+company: Poppy
+start_time: '2026-06-22T09:00:00'
+timezone: America/New_York
+summary: Poppy is moving support from an old shared inbox to a new help desk by Thursday afternoon.
+include:
+- world.yaml
+- events.yaml
+- policies.yaml
+- replies.yaml
+- meetings.yaml
+- actions.yaml
+- evaluation.yaml

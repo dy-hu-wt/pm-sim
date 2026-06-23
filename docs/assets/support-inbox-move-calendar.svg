@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2360" height="1520" viewBox="0 0 1180 760" role="img" aria-labelledby="title desc">
+  <title id="title">Support Inbox Move Week Calendar</title>
+  <desc id="desc">A Google Calendar style week view showing support inbox move events from Monday June 22 through Thursday June 25.</desc>
+  <defs>
+    <style>
+      .bg { fill: #ffffff; }
+      .chrome { fill: #f8fafd; }
+      .grid { stroke: #e8eaed; stroke-width: 1; }
+      .major { stroke: #dadce0; stroke-width: 1; }
+      .text { font-family: Arial, Helvetica, sans-serif; fill: #3c4043; text-rendering: optimizeLegibility; }
+      .muted { fill: #5f6368; }
+      .tiny { font-size: 13px; }
+      .small { font-size: 14px; }
+      .label { font-size: 18px; font-weight: 700; }
+      .date { font-size: 34px; font-weight: 400; }
+      .event-title { font-family: Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700; fill: #ffffff; text-rendering: optimizeLegibility; }
+      .event-meta { font-family: Arial, Helvetica, sans-serif; font-size: 13px; fill: #ffffff; opacity: 0.95; text-rendering: optimizeLegibility; }
+      .event-dark { font-family: Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700; fill: #202124; text-rendering: optimizeLegibility; }
+      .event-dark-meta { font-family: Arial, Helvetica, sans-serif; font-size: 13px; fill: #3c4043; text-rendering: optimizeLegibility; }
+    </style>
+  </defs>
+
+  <rect width="1180" height="760" rx="18" class="bg"/>
+  <rect x="0" y="0" width="1180" height="78" class="chrome"/>
+  <line x1="0" y1="78" x2="1180" y2="78" class="major"/>
+
+  <text x="32" y="34" class="text label">Support inbox move week</text>
+  <text x="32" y="56" class="text small muted">Simulated calendar: June 22-25, 2026</text>
+
+  <g transform="translate(782 24)">
+    <rect x="0" y="0" width="18" height="10" rx="5" fill="#1a73e8"/>
+    <text x="26" y="10" class="text tiny muted">Nora</text>
+    <rect x="126" y="0" width="18" height="10" rx="5" fill="#188038"/>
+    <text x="152" y="10" class="text tiny muted">Felix</text>
+    <rect x="252" y="0" width="18" height="10" rx="5" fill="#d93025"/>
+    <text x="278" y="10" class="text tiny muted">Deadline</text>
+    <rect x="0" y="22" width="18" height="10" rx="5" fill="#f9ab00"/>
+    <text x="26" y="32" class="text tiny muted">Planning</text>
+    <rect x="126" y="22" width="18" height="10" rx="5" fill="#a142f4"/>
+    <text x="152" y="32" class="text tiny muted">Both streams</text>
+  </g>
+
+  <g id="calendar" transform="translate(24 92)">
+    <rect x="0" y="0" width="1132" height="638" rx="16" fill="#ffffff" stroke="#dadce0"/>
+    <rect x="0" y="0" width="1132" height="82" rx="16" fill="#ffffff"/>
+    <line x1="0" y1="82" x2="1132" y2="82" class="major"/>
+
+    <g transform="translate(70 0)">
+      <g>
+        <text x="103" y="24" text-anchor="middle" class="text small muted">MON</text>
+        <text x="103" y="58" text-anchor="middle" class="text date">22</text>
+      </g>
+      <g transform="translate(206 0)">
+        <text x="103" y="24" text-anchor="middle" class="text small muted">TUE</text>
+        <text x="103" y="58" text-anchor="middle" class="text date">23</text>
+      </g>
+      <g transform="translate(412 0)">
+        <text x="103" y="24" text-anchor="middle" class="text small muted">WED</text>
+        <text x="103" y="58" text-anchor="middle" class="text date">24</text>
+      </g>
+      <g transform="translate(618 0)">
+        <text x="103" y="24" text-anchor="middle" class="text small muted">THU</text>
+        <text x="103" y="58" text-anchor="middle" class="text date">25</text>
+      </g>
+      <g transform="translate(824 0)">
+        <text x="103" y="24" text-anchor="middle" class="text small muted">FRI</text>
+        <text x="103" y="58" text-anchor="middle" class="text date">26</text>
+      </g>
+    </g>
+
+    <g transform="translate(0 82)">
+      <rect x="0" y="0" width="1132" height="556" fill="#ffffff"/>
+      <line x1="70" y1="0" x2="70" y2="556" class="major"/>
+      <line x1="276" y1="0" x2="276" y2="556" class="grid"/>
+      <line x1="482" y1="0" x2="482" y2="556" class="grid"/>
+      <line x1="688" y1="0" x2="688" y2="556" class="grid"/>
+      <line x1="894" y1="0" x2="894" y2="556" class="grid"/>
+      <line x1="1100" y1="0" x2="1100" y2="556" class="grid"/>
+
+      <g class="text tiny muted" text-anchor="end">
+        <text x="58" y="5">9 AM</text>
+        <text x="58" y="75">10 AM</text>
+        <text x="58" y="144">11 AM</text>
+        <text x="58" y="214">12 PM</text>
+        <text x="58" y="283">1 PM</text>
+        <text x="58" y="353">2 PM</text>
+        <text x="58" y="422">3 PM</text>
+        <text x="58" y="492">4 PM</text>
+        <text x="58" y="561">5 PM</text>
+      </g>
+
+      <g class="grid">
+        <line x1="70" y1="0" x2="1132" y2="0"/>
+        <line x1="70" y1="70" x2="1132" y2="70"/>
+        <line x1="70" y1="139" x2="1132" y2="139"/>
+        <line x1="70" y1="209" x2="1132" y2="209"/>
+        <line x1="70" y1="278" x2="1132" y2="278"/>
+        <line x1="70" y1="348" x2="1132" y2="348"/>
+        <line x1="70" y1="417" x2="1132" y2="417"/>
+        <line x1="70" y1="487" x2="1132" y2="487"/>
+        <line x1="70" y1="556" x2="1132" y2="556"/>
+      </g>
+
+      <g>
+        <rect x="82" y="8" width="182" height="58" rx="8" fill="#f9ab00"/>
+        <text x="94" y="29" class="event-title">Move starts</text>
+        <text x="94" y="47" class="event-meta">Read brief and ask owners</text>
+
+        <rect x="82" y="88" width="182" height="58" rx="8" fill="#e8f0fe" stroke="#1a73e8"/>
+        <text x="94" y="109" class="event-dark">Two streams open</text>
+        <text x="94" y="127" class="event-dark-meta">Replies + VIP routing</text>
+
+        <rect x="288" y="78" width="182" height="58" rx="8" fill="#1a73e8"/>
+        <text x="300" y="99" class="event-title">Nora flags replies</text>
+        <text x="300" y="117" class="event-meta">Saved replies are missing</text>
+
+        <rect x="288" y="148" width="182" height="58" rx="8" fill="#188038"/>
+        <text x="300" y="169" class="event-title">Felix flags VIP email</text>
+        <text x="300" y="187" class="event-meta">Routing needs a test</text>
+
+        <rect x="494" y="78" width="182" height="58" rx="8" fill="#a142f4"/>
+        <text x="506" y="99" class="event-title">Good day to write plan</text>
+        <text x="506" y="117" class="event-meta">Both facts can be known</text>
+
+        <rect x="700" y="42" width="182" height="58" rx="8" fill="#1a73e8"/>
+        <text x="712" y="63" class="event-title">Nora needs wording</text>
+        <text x="712" y="81" class="event-meta">Support instructions due</text>
+
+        <rect x="700" y="112" width="182" height="58" rx="8" fill="#188038"/>
+        <text x="712" y="133" class="event-title">Felix needs note</text>
+        <text x="712" y="151" class="event-meta">VIP test plan due</text>
+
+        <rect x="700" y="420" width="182" height="58" rx="8" fill="#d93025"/>
+        <text x="712" y="441" class="event-title">Inbox move deadline</text>
+        <text x="712" y="459" class="event-meta">Outcome is graded</text>
+      </g>
+    </g>
+  </g>
+</svg>

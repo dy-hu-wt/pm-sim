@@ -2,7 +2,7 @@
 
 A scenario is one PM work week. It should start from a believable Monday morning state, hide some important information, force tradeoffs during the week, and let the evaluator measure whether the PM actually improved the outcome.
 
-Start with the story, not the YAML. Pick one main project, one smaller interruption, three to five important coworkers, one or two hidden risks, and one or two deadlines. Then write the state and behaviors that make that week real.
+Start with the story, not the YAML. Pick a believable week shape: one main project with an interruption, two equal workstreams, or another small PM coordination problem. Keep the first version narrow enough that a reviewer can explain the people, hidden facts, deadlines, and scoring path in a few minutes.
 
 ## File Layout
 

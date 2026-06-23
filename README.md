@@ -2,11 +2,14 @@
 
 `pm-sim` is a local project-manager simulation environment. It runs a simulated work week against persistent SQLite state, scheduled events, stateful coworkers, workplace tools, and an evaluator that scores durable project outcomes instead of activity volume.
 
-The current repository ships one fully authored scenario: Fireflower preparing a Friday PR Review Agent beta for Nimbus Labs while handling a smaller Koopa Bank interruption.
+The repository ships two authored scenarios:
+
+- `scenarios/launch_readiness/`: Fireflower prepares a Friday PR Review Agent beta for Nimbus Labs while handling a smaller Koopa Bank interruption.
+- `scenarios/support_inbox_move/`: Poppy moves support from an old shared inbox to a new help desk, with two equal readiness streams: saved replies and VIP email routing.
 
 ## What Is Here
 
-The active scenario lives in `scenarios/launch_readiness/`.
+Each scenario lives in its own directory.
 
 ```text
 scenario.yaml      manifest and include list
@@ -99,6 +102,12 @@ Run the scripted reference path in deterministic local-review mode:
 PM_SIM_CONCEPT_MODE=local pm-sim run-agent --policy scripted --reset
 ```
 
+Run the second scenario:
+
+```bash
+PM_SIM_CONCEPT_MODE=local pm-sim run-agent --policy scripted --scenario scenarios/support_inbox_move --reset
+```
+
 Evaluate the current state:
 
 ```bash
@@ -115,7 +124,7 @@ pm-sim advance-time to:2026-06-26T15:00:00
 pm-sim evaluate --explain
 ```
 
-The scripted reference path should reach `120 / 120` when `OPENAI_API_KEY` is configured.
+The launch scripted reference path should reach `120 / 120`. The support-inbox scripted reference path should reach `100 / 100`.
 
 The LLM path is not guaranteed to get full score. That is expected. The environment is meant to expose tradeoffs, missed sequencing, and late communication, not guarantee a perfect run.
 
@@ -190,4 +199,4 @@ The full breakdown for the launch scenario is in `scenarios/launch_readiness/sce
 
 - Read `docs/spec.md` to understand runtime semantics and system boundaries.
 - Read `docs/scenario_authoring.md` to add or modify scenarios.
-- Read `scenarios/launch_readiness/scenario.md` to understand the actual launch week story, deadlines, and scoring path.
+- Read `scenarios/launch_readiness/scenario.md` or `scenarios/support_inbox_move/scenario.md` to understand a scenario story, deadlines, and scoring path.

@@ -87,6 +87,17 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertEqual(result["evaluation"]["score"], 120)
         self.assertEqual(result["evaluation"]["score"], result["evaluation"]["max_score"])
 
+    def test_second_scenario_scripted_agent_reaches_full_score(self) -> None:
+        scenario_path = Path("scenarios/support_inbox_move")
+
+        with unittest.mock.patch.dict("os.environ", {"PM_SIM_CONCEPT_MODE": "local"}, clear=False):
+            result = run_scripted_agent(self.db_path, scenario_path, reset_first=True)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["evaluation"]["score"], 100)
+        self.assertEqual(result["evaluation"]["score"], result["evaluation"]["max_score"])
+        self.assertEqual(result["evaluation"]["final_outcome"]["outcome"], "inbox_move_ready")
+
     def test_scripted_agent_uses_public_tool_actions(self) -> None:
         run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
 
