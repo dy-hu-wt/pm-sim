@@ -1,390 +1,184 @@
 # Project Manager Simulation Environment
 
-This is the design baseline for the implementation. The goal is to build the backend first: simulation engine, state, events, tools, coworkers, and evaluation. UI and APIs can come later if they help the demo.
+This file is the concise architecture note for the current implementation.
 
-## What The Environment Must Demonstrate
+## Core Model
 
-### 1. Time Advances Through A Simulated Work Week
+The simulator runs a work week against one SQLite database. A scenario reset loads authored YAML, validates references, and writes the initial world state into SQLite. From that point on, SQLite is the source of truth for the run.
 
-The environment has its own clock. It is not tied to real time.
-
-If an LLM takes 5 seconds or 5 minutes to choose an action, the simulated week does not move forward during that wait. Time moves because simulated work takes time, not because inference was slow.
-
-The agent can advance time because waiting is a real project-management action. The operator can also advance time during a manual demo.
-
-Tool actions have deterministic logical costs:
+The main loop is:
 
 ```text
-send_chat: 5 minutes
-send_email: 10 minutes
-read_doc: 15 minutes
-update_doc: 20 minutes
-schedule_meeting: 5 minutes to schedule; the meeting resolves at its scheduled end time
-update_task: 1 minute
+scenario files -> SQLite state -> tool action -> time advance -> event delivery -> effects -> evaluation
 ```
 
-Examples:
+The agent never writes state directly. Every action goes through the simulator layer and produces explicit effects.
+
+## Time
+
+Simulated time is independent from wall-clock latency. Model inference can take seconds or minutes without moving the work week.
+
+Time moves only when:
+
+- a tool action has a fixed effort cost,
+- the operator or agent explicitly advances time,
+- a scheduled meeting reaches its end time,
+- due events are delivered.
+
+Current logical action costs:
 
 ```text
-advance_time 30m
-advance_time 2h
-advance_time until_next_event
-advance_time to "Tuesday 09:00"
+send_chat        5m
+send_email      10m
+read_doc        15m
+update_doc      20m
+schedule_meeting 5m
+update_task      1m
 ```
 
-The week should jump between meaningful events and action costs: replies, meetings, deadlines, escalations, reading, communication, and final evaluation. It does not need minute-by-minute ticks.
+Coworker reply delays are separate from action cost and only count inside authored coworker availability windows.
 
-Visible calendar obligations are different from hidden background events. If a scheduled commitment or project deadline is visible to the agent, `finish` should not succeed until that obligation has passed. The agent can jump time to the next obligation, but it cannot declare the week done while known calendar work remains.
+## Tool Surfaces
 
-### 2. The Agent Interacts Through Internal Tools
-
-The agent should interact through workplace tools, not direct database access.
-
-Initial tools:
+The simulator exposes workplace tools rather than direct storage operations:
 
 - chat
 - email
-- calendar
-- task tracking
 - docs
-- meeting notes or transcripts
-
-These are different surfaces over one shared company state.
-
-Example actions:
-
-```text
-send_chat(person_id, body)
-send_email(to, subject, body)
-observe()
-update_task(task_id, status, priority)
-read_doc(doc_id)
-update_doc(doc_id, body)
-schedule_meeting(attendees, time, topic)
-advance_time(duration)
-```
-
-### 3. Coworkers Have Goals, Constraints, And Background Activity
-
-Coworkers are part of the environment. They are not the agent being graded.
-
-They should have:
-
-- role
-- goals
-- constraints
-- current focus
-- needs from the PM
-- known constraints
-- availability
-- response delays
-- private knowledge
-- mutable coworker state
-- actor behaviors
-- autonomous actor policies
-
-Coworker behavior should be autonomous enough to create PM-relevant pressure, but deterministic at the state-transition level. Direct replies are not just first-match rules: the coworker decision step loads actor memory, goals, workload, commitments, visible facts, and project decisions; turns matched behaviors and agenda constraints into candidates; ranks them; and composes a delayed response. I do not want grading-critical facts to depend on an LLM improvising.
-
-An LLM could later help turn a known fact into more natural wording, but it should not decide the fact.
-
-Coworker response delays count only inside the person's authored availability windows. Agent action costs stay fixed, but a late-day chat to a coworker can schedule the reply in the next available work window.
-
-Coworker state is explicit actor memory, stored separately from global project state. It records durable commitments such as Luigi having surfaced the risk, Mario accepting draft mode, Peach becoming unblocked, Daisy receiving customer/security updates, and Toad recording approval. Facts, blockers, and project metadata still drive grading; coworker state makes NPC memory inspectable and reusable for future rules and autonomous policies.
-
-Example:
-
-```text
-Luigi, backend engineer
-- owns the auth migration
-- knows the vendor API is flaky
-- replies after about 2 simulated hours
-- reveals the blocker if asked about launch risk or auth status
-- proactively escalates concern if ignored until Thursday
-```
-
-### 4. The Agent Must Manage The Project
-
-The scenario should require more than checking boxes. The agent should need to:
-
-- discover blockers
-- resolve conflicts
-- prioritize tradeoffs
-- communicate risk
-- keep the project moving
-
-The agent should not see everything upfront. Some facts should live in docs, tasks, meeting notes, emails, or coworker private knowledge.
-
-### 5. The System Evaluates Improved Outcomes
-
-The evaluator should score outcomes and decisions, not activity volume. It can apply a small capped penalty for excessive outreach, because spraying messages is different from targeted coordination. The outreach threshold should be high enough for a realistic week with more than one project thread.
-
-The main comparison is:
-
-```text
-baseline project trajectory vs. agent-driven project trajectory
-```
-
-The baseline can be a no-op or default rollout. The agent rollout should be better if the agent discovers blockers, improves the critical path, communicates risk, and makes reasonable tradeoffs.
-
-Current score components:
-
-```text
-30 points blocker discovery and resolution
-20 points stakeholder communication
-20 points task/project state improvement
-15 points risk handling
-10 points security interruption handling
-10 points handling a competing smaller request without derailing the main launch
-15 points avoiding harmful or superficial actions, including excessive direct outreach
-```
-
-This is RL-adjacent because the simulator has state, actions, transitions, observations, and rewards. The goal is not to train an RL policy for v1. The goal is an agent evaluation environment with defensible grading.
-
-## Systems Problems To Make Legible
-
-### State Transitions
-
-Every meaningful action should have a clear before/after effect on state.
-
-Examples:
-
-- sending chat creates a message and may schedule a reply
-- updating a task changes ownership, status, or priority
-- resolving a blocker changes project risk
-- missing a deadline may increase stakeholder pressure
-
-The simulator owns state mutation. Tool actions and event handlers should go through the simulator layer instead of editing storage directly.
-
-### Event Delivery
-
-The simulator should use an event queue.
-
-Agent actions happen synchronously first and consume their deterministic action cost. Background activity happens through scheduled events, including events that become due during an action's time cost.
-
-Synchronous examples:
-
-- send a chat
-- send an email
-- update a task
-- edit a doc
-- schedule a meeting
-
-Asynchronous examples:
-
-- coworker replies after a delay
-- coworker proactively reaches out about a risk
-- meeting transcript appears after a meeting
-- a blocker gets worse if ignored
-- a stakeholder escalates after missed communication
-
-When time advances, the engine processes all due events and due autonomous actor policies in deterministic order. Events and policies can mutate state and schedule more events.
-
-The system should record:
-
-- when an event was created
-- when it is due
-- whether it has been delivered
-- what handler processed it
-- what state changed
-
-### Discoverability Of Information
-
-The agent should have to use the environment well to learn what matters.
-
-Some information should be visible in public docs or tasks. Other information should require asking the right coworker, reading a meeting transcript, or noticing a stakeholder message.
-
-This matters because project management is partly about knowing what to ask and where to look.
-
-### Long-Horizon Consistency
-
-The state should remain consistent across the simulated week.
-
-If Luigi says the vendor API is blocked on Monday, that fact should still matter on Wednesday. If a task is reassigned, later events should reflect the new owner.
-
-Persistent state plus an event/action log should make this inspectable.
-
-### Defensible Grading
-
-The score should be explainable from state and history.
-
-The evaluator should point to concrete evidence:
-
-- blocker discovered at a specific time
-- stakeholder informed before or after a deadline
-- task dependency resolved or left unresolved
-- risk increased or decreased
-- harmful actions taken or avoided
-
-The score should not depend on vague style judgments. Any communication penalty should be tied to observable counts or state, and should be small compared with outcome evidence.
-
-Model-based verification, when enabled, is deliberately narrow. The evaluator still inspects the database, event log, coworker state, and final project state directly. A lightweight concept matcher may be used only to decide whether an action's text communicates authored required ideas without forbidden claims. Deterministic causal gates run first, matcher results are cached, and malformed or low-confidence model output fails closed.
-
-## Core Building Blocks
-
-### Backend First
-
-The first implementation should focus on the backend simulator:
-
-- scenario loading
-- SQLite state
-- action handlers
-- event queue
-- actor behaviors
-- evaluator
-- CLI/operator commands
-
-The operator UI is intentionally thin. It reads from the same SQLite state as the CLI, shows current projects, calendar obligations, evaluation, timeline, and logs, and can advance simulated time by calling the same backend event-queue code as `advance-time`. It does not own separate scenario state.
-
-### Storage
-
-I plan to use local SQLite.
-
-The world state should include:
-
-- people
-- project
-- milestones
 - tasks
-- dependencies
-- blockers
-- chat
-- email
-- calendar
-- docs
-- meeting transcripts
-- scheduled events
-- action log
+- calendar / meetings
+- timeline / observation
+- evaluation
 
-SQLite is local, inspectable, easy to reset, and enough for a single-node simulator.
+These are different interfaces over the same state.
 
-### Scenario Authoring
+## State Ownership
 
-The first scenario should not be a pile of one-off code.
+The scenario authors:
 
-Scenario data should define most of the setup:
-
-- a `scenario.yaml` manifest with `include` entries
-- a `world.yaml` starting-state file
-- authored behavior files for events, policies, replies, meetings, and action checks
-- an `evaluation.yaml` grading/outcome file
 - people
 - coworker state
 - projects
-- tasks
-- hidden facts
-- documents
-- initial messages
+- tasks and dependencies
+- blockers
+- docs
 - scheduled events
-- evaluation targets
-- state evidence rules
-- task gate rules
-- harmful-action rules
-- action rules
-- background event rules
+- reply rules
+- proactive policies
 - meeting rules
-- outcome rules
-- actor behaviors
+- action-triggered rules
+- evaluation rules
 
-Python owns reusable interpreters and mutation semantics, while scenario-specific scoring, outcomes, actor behaviors, proactive events, action-derived effects, and meeting semantics should be data-authored. The current implementation uses a small reusable condition language for task gates, action rules, state-derived evidence rows, harmful-action rules, actor behaviors, background event rules, meeting rules, and outcome classification. Actor routing and action scoring both use the shared `match` object: deterministic mode routes stable coworker behavior, while `mode: concept_match` validates authored required and forbidden concepts before state mutation.
+The runtime owns:
 
-The defensible split is:
+- current simulated time
+- delivered messages
+- delivered events
+- visibility timestamps
+- task/project/blocker mutations
+- action logs
+- evaluation evidence
+
+`visibility_scope` is authored metadata. `visible_at` is runtime state. Facts, blockers, and docs can exist in the world before they become visible to the PM.
+
+## Coworkers
+
+Coworkers are stateful deterministic actors. They are not free-form LLM agents.
+
+Each coworker can have:
+
+- role
+- goals
+- response delay
+- availability
+- current focus
+- mutable memory in `coworker_state`
+- direct reply rules
+- proactive policy rules
+
+This gives the simulator realism without making grading depend on unconstrained model behavior.
+
+## Events
+
+Asynchronous activity is modeled through a deterministic event queue.
+
+Examples:
+
+- coworker replies
+- customer interruptions
+- deadline events
+- meeting transcript generation
+- proactive coworker nudges
+
+When time advances, the engine delivers all due events in deterministic order and applies their effects.
+
+## Effects And Conditions
+
+The runtime uses two generic interpreters:
+
+- conditions decide whether a rule can fire
+- effects mutate state
+
+That keeps scenario-specific logic in YAML instead of Python branches. The same effect system handles direct actions, coworker replies, proactive policies, scheduled events, and meetings.
+
+## Evaluation
+
+The evaluator scores durable state, not surface activity.
+
+The intended chain is:
 
 ```text
-Reusable engine:
-  `pm_sim/engine` owns event delivery, effect application, condition
-  evaluation, actor/action rule matching, runtime rule loading, autonomous
-  actor policy delivery, task gates, background event rules, and outcome rules.
-  Storage, tool actions, timelines, action logs, coworker state,
-  state-derived evidence, harm checks, and evaluator scoring stay reusable
-  but live in adjacent modules because they are public surfaces or storage.
-
-Scenario-specific v1 data:
-  people, coworker state, facts, docs, tasks, blockers, events, actor behaviors,
-  task gates, state evidence rules, harm rules, background event rules, and
-  outcome rules
-
-Remaining boundary:
-  two scenarios now use the same engine surface. The next scaling step is
-  making calendar/meeting modeling richer across scenarios, including attendee
-  conflicts and more reusable meeting transcript authoring.
+action
+-> deterministic prerequisites
+-> optional concept check
+-> world/coworker state mutation
+-> milestone derivation
+-> component score
 ```
 
-The next scaling step is not a giant prompt. It is adding reusable authoring affordances and richer calendar semantics so more scenarios can be added without custom Python branches for every project.
+LLM use is intentionally narrow. Concept matching checks whether a grounded communication action expresses the authored required ideas and avoids forbidden ones. It does not decide project truth, task completion, blocker status, or final score by itself.
 
-### Operator Workflow
+Scoring comes from state such as:
 
-The reviewer should be able to run the system locally with documented commands.
+- discovered facts
+- resolved blockers
+- project decisions
+- task movement behind real gates
+- coworker state showing that the right recipient actually received the update
 
-Possible CLI shape:
+## Scenario Layout
+
+Each scenario is split by concern:
+
+```text
+scenario.yaml      manifest
+world.yaml         initial state
+events.yaml        scheduled interruption behavior
+policies.yaml      proactive coworker behavior
+replies.yaml       direct reply behavior
+meetings.yaml      meeting behavior
+actions.yaml       action-triggered authored checks
+evaluation.yaml    scoring, outcomes, baseline, scripted path
+scenario.md        human-readable guide
+```
+
+This is the current answer to “how does this scale?” The engine stays generic; scenario semantics live in authored data.
+
+## Operator Surfaces
+
+The CLI is the primary interface.
+
+Useful commands:
 
 ```text
 pm-sim reset
 pm-sim observe
-pm-sim read-doc doc_project_brief
-pm-sim update-doc doc_launch_decision_record "Friday launch decision: ..."
-pm-sim send-chat luigi "Any repo sync blockers for launch?"
-pm-sim advance-time until_next_event
-pm-sim timeline --kind action
-pm-sim evaluate
+pm-sim timeline
+pm-sim read-doc
+pm-sim evaluate --explain
 pm-sim run-agent --policy scripted --reset
-pm-sim run-agent --policy llm --reset --max-turns 40
+pm-sim run-agent --policy llm --reset --max-turns 80
+pm-sim ui --policy llm --max-turns 80
 ```
 
-A UI is optional. If added, it should stay lightweight and should not hide the simulation semantics.
-
-## Initial Scenario
-
-Working scenario: launch readiness week.
-
-Company: Fireflower, a small B2B SaaS company that sells developer workflow tools.
-
-Product context:
-
-Customers use Fireflower to review pull requests faster, catch common issues earlier, and reduce review backlogs.
-
-Project: launch a PR Review Agent beta for a pilot customer by Friday.
-
-The agent is meant to read pull request diffs and prepare useful review suggestions. The most impressive version auto-posts comments directly on PRs.
-
-The pilot customer, Nimbus Labs, expects a Friday beta demo. Daisy promised they would see something useful and reliable.
-
-Nimbus also asks mid-week whether the beta will post comments automatically or queue draft suggestions for approval. That creates stakeholder pressure if the launch mode is still unclear.
-
-Core risk:
-
-Auto-commenting depends on repo sync always reviewing the latest commit. That sync path is flaky because webhook events can arrive out of order. Draft suggestions with human approval are reliable.
-
-The PM has to help the team choose between:
-
-```text
-Auto-commenting beta:
-  more impressive for the pilot, but higher customer-visible failure risk
-
-Draft-mode beta:
-  suggestions require human approval before posting, less flashy but safer for Friday
-```
-
-The scenario includes a rollout-note template and a separate rollout-notes task so the agent can inspect written guidance, not only chat with coworkers.
-
-The PM starts on Monday. There is stakeholder pressure, a hidden backend blocker, unclear task ownership, and a Friday decision point.
-
-Possible coworkers:
-
-- Luigi: backend engineer
-- Mario: product manager
-- Peach: designer
-- Daisy: customer success lead
-- Toad: engineering manager
-
-The successful path should involve discovering the blocker, clarifying ownership, communicating risk, and making a reasonable launch tradeoff.
-
-## Open Choices
-
-These should be decided before coding too much:
-
-- exact database schema
-- exact CLI commands
-- exact scenario facts
-- final scoring rubric
-- whether any UI is worth adding after the backend works
-- whether any LLM-generated wording is worth including
+The browser UI is optional. It reads the same SQLite state and advances the same backend event queue. It does not own separate simulation state.

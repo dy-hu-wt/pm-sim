@@ -1,192 +1,42 @@
 # Architecture Notes
 
-This generated note is kept in `docs/ai-generated/` as reviewer-facing scaffolding and as source material for a future hand-written explanation. It should match the current implementation.
+This file is a short reviewer-facing mirror of `docs/spec.md`. It exists only as a compact secondary note.
 
-## Core Shape
+## Summary
 
-`pm-sim` is a single-node simulation backend. A scenario manifest includes `world.yaml`, authored behavior files, and `evaluation.yaml`; SQLite stores the mutable state, CLI commands expose the tools, scheduled events advance background activity, deterministic actor behaviors emit effects, and the evaluator scores the resulting state.
+`pm-sim` is a single-node simulation backend. A scenario reset loads authored YAML into SQLite. Tool actions mutate the run only through explicit effects. Simulated time advances through action cost, waiting, meetings, and event delivery. The evaluator scores durable state, not activity volume.
 
-The main backend flow is:
-
-```text
-scenario YAML -> SQLite state -> CLI tools -> actions -> event queue -> effects -> evaluator
-```
-
-The authored launch scenario lives in four files:
+## Runtime Flow
 
 ```text
-scenarios/launch_readiness/scenario.yaml      # id, start time, include list
-scenarios/launch_readiness/world.yaml         # starting world state and coworker memory
-scenarios/launch_readiness/events.yaml        # scheduled event behavior
-scenarios/launch_readiness/policies.yaml      # proactive coworker behavior
-scenarios/launch_readiness/replies.yaml       # direct reply behavior
-scenarios/launch_readiness/meetings.yaml      # meeting behavior
-scenarios/launch_readiness/actions.yaml       # action-triggered behavior
-scenarios/launch_readiness/evaluation.yaml    # scoring, gates, outcomes, baseline, scripted path
+scenario files
+-> SQLite state
+-> CLI or UI tool action
+-> time advance
+-> event delivery
+-> effects
+-> evaluation
 ```
 
-Agent policies add one harness step after the action loop:
+## Scenario Layout
 
 ```text
-agent stops -> finalize to scenario deadline -> Friday outcome event -> evaluator
+scenarios/launch_readiness/scenario.yaml
+scenarios/launch_readiness/world.yaml
+scenarios/launch_readiness/events.yaml
+scenarios/launch_readiness/policies.yaml
+scenarios/launch_readiness/replies.yaml
+scenarios/launch_readiness/meetings.yaml
+scenarios/launch_readiness/actions.yaml
+scenarios/launch_readiness/evaluation.yaml
 ```
 
-## Simulated Time
+## Key Boundaries
 
-The simulator has its own clock stored in SQLite. It is not tied to wall-clock time or LLM latency. If an agent takes five seconds or five minutes to choose an action, that latency does not move the simulated week.
+- SQLite is the source of truth for an active run.
+- Coworkers are deterministic stateful actors.
+- LLM use is narrow and limited to concept matching for authored communication checks.
+- Scoring comes from world state and coworker state, not raw text alone.
+- The browser UI is optional and reads the same backend state as the CLI.
 
-Workplace actions do consume deterministic simulated effort. Chat costs 5 minutes, email costs 10 minutes, reading a doc costs 15 minutes, updating a doc costs 20 minutes, scheduling a meeting costs 5 minutes, and task updates cost 1 minute. Coworker reply delays count only inside the recipient's authored availability windows. Meetings resolve at their scheduled end time. This keeps project work from being free while keeping time movement inspectable.
-
-Time can move by duration, to an exact timestamp, or to the next scheduled event:
-
-```text
-pm-sim advance-time 2h
-pm-sim advance-time to:2026-06-24T14:00:00
-pm-sim advance-time until_next_event
-```
-
-When time advances, either through `advance-time` or action effort, due events are delivered in deterministic order. Each delivered event records when it was scheduled, when it was delivered, what handler ran, and what effects were applied.
-
-## State Ownership
-
-SQLite is the source of truth for the active run. The schema defines tables for people, facts, projects, tasks, dependencies, blockers, docs, messages, calendar events, scheduled events, evaluation evidence, action logs, and state values.
-
-The scenario file owns initial authored content. After reset, the database owns the run state. Tool actions and events do not directly edit arbitrary tables. They produce explicit effects, and `pm_sim/engine/effects.py` applies those mutations in one place.
-
-This keeps state transitions inspectable. A reviewer can see both the final state and the path that produced it.
-
-Discoverability uses two fields on state that can become visible over time. `visibility_scope` is authored scenario metadata such as `public`, `hidden`, `private`, `derived`, or `generated`. `visible_at` is mutable runtime state. Docs are readable when `docs.visible_at` is set, facts are known when `facts.visible_at` is set, and blockers appear in observation when `blockers.visible_at` is set. Fact rules still use names like `fact_discovered` because that is the domain action, but storage uses the same visibility timestamp.
-
-## Tool Surfaces
-
-The agent interacts through workplace tools instead of direct database writes:
-
-- chat
-- email
-- docs
-- task tracking
-- calendar and meetings
-- timeline/log inspection
-- evaluation
-
-Actions are synchronous. For example, `send-chat` creates the agent's message at the current simulated time, schedules any coworker reply for later, then advances the clock by its 5-minute effort cost. Coworker reply delays count only inside the recipient's authored availability windows, so late-day questions can roll into the next work window. `send-chat` does not instantly deliver a reply unless the action's effort crosses the reply's scheduled time.
-
-## Events
-
-Background behavior is modeled with an event queue. Events represent coworker replies, proactive outreach, meetings, interruptions, and the Friday deadline.
-
-Examples:
-
-- Luigi replies after two of his available working hours.
-- Daisy sends a midweek security question.
-- Daisy asks for a Thursday final go/no-go after the major interruptions have landed.
-- A scheduled meeting produces a transcript at the end time.
-- The Friday deadline classifies the final project outcome.
-
-This separates immediate agent actions from asynchronous company activity.
-
-## Coworkers
-
-Coworkers are deterministic NPCs, not the agent being graded. They have roles, private knowledge, availability windows, response delays, actor behaviors, and explicit mutable state.
-
-For v1, grading-critical facts are not generated by an LLM. Luigi either reveals the repo-sync risk because the state and message match the rule, or he does not. Toad either approves draft mode because the prerequisites are satisfied, or he refuses.
-
-Coworker state is stored in `coworker_state` as per-person key/value memory. It records durable actor-level commitments such as `luigi.risk_surfaced`, `mario.accepted_draft_mode`, `peach.scope_unblocked`, `daisy.customer_update_received`, and `toad.approval_recorded`. This does not replace facts, blockers, or project metadata; it makes the NPC memory explicit and inspectable.
-
-The current implementation keeps direct coworker replies, proactive policy behavior, scheduled-event behavior, meeting behavior, and action-derived behavior in separate authored sections. The loader compiles those sections into runtime rule lists. They update coworker state through the same effect system used for facts and blockers. Python owns the deterministic interpreters; scenario data owns the people, match intents, transcript lines, and effects.
-
-## Effects
-
-Effects are small mutation commands emitted by actions, actor behaviors, and event handlers. Examples:
-
-```text
-create_message
-discover_fact
-reveal_doc
-update_blocker
-update_task
-update_project
-update_coworker_state
-create_doc
-record_milestone
-```
-
-Task dependencies are causal engine state. When an upstream task is completed and every upstream dependency for a blocked downstream task is complete, the shared mutation layer can move the downstream task to `in_progress` once its blocker is resolved.
-
-The important boundary is:
-
-```text
-actions/time decide when something happens
-coworker/event rules decide what should happen
-effects mutate the database
-evaluator scores the result
-```
-
-## Evaluation
-
-The evaluator reads the current database and scenario rubric. It produces a score from evidence and defensible state, not raw activity volume.
-
-The current rubric rewards:
-
-- discovering the hidden repo-sync blocker
-- aligning stakeholders
-- producing a customer-ready Daisy update
-- unblocking Peach's draft-mode work
-- getting Toad's draft-mode approval
-- scoping the smaller Koopa audit-log request without derailing the launch
-- answering the async security interruption from the hidden doc
-- avoiding harmful or fake progress
-- keeping direct outreach targeted instead of spraying check-ins
-
-Evidence rows act as score-relevant receipts. Some evidence is written directly by tool/event effects. Other evidence is derived from consistent world state, such as draft-mode approval being present in project metadata.
-
-Before Friday, evaluation can report a full readiness score without a final outcome. After the Friday deadline event is delivered, evaluation also exposes the classified outcome from project metadata, such as `draft_mode_beta_shipped` or `no_approved_friday_plan`.
-
-The repo does not train an RL policy. The score is reward-like, but it is used for grading and comparison, not model training.
-
-## Observability
-
-The CLI exposes enough state for local review:
-
-```text
-pm-sim observe
-pm-sim timeline
-pm-sim run-agent --policy scripted --reset
-pm-sim evaluate --explain
-```
-
-`timeline` combines actions, events, messages, and evidence into one ordered view. This is useful for understanding why a score was earned or missed.
-
-`run-agent --policy scripted --reset` runs the golden path through the same public tool functions used by the CLI. It is a deterministic policy, not an LLM and not a training loop.
-
-`run-agent --policy llm --reset --max-turns 40` uses the OpenAI API to choose simulator tool calls. The local runner exposes observation, docs, chat, email, tasks, meetings, calendar obligations, and time as callable tools. The evaluator is not exposed as an agent tool during the episode; final scoring is operator-side after the agent stops. A model turn is one model decision round, not one tool call, and a single model turn may request multiple tools. The LLM instructions tell the model to keep coworker outreach targeted and to call `finish` once the visible project state is defensible. The runner validates `finish`; if visible calendar obligations or project deadlines remain, it returns a failed tool result and the model must continue. The CLI prints concise colorized progress logs with simulated time, action labels, logical time cost, and short result summaries because model calls can otherwise look idle until the final result is returned. After the agent stops, the runner finalizes any remaining deadline settlement as an operator-owned step, then grades the settled state. Long runs summarize step counts and recent steps instead of printing every action. If the run ends below full score, the operator summary prints missing evaluator evidence so the operator can see what the model failed to resolve.
-
-`ui` starts a local operator UI over the current SQLite state. It combines observation, score components, visible docs, calendar obligations, recent messages, timeline rows, action logs, and event logs. Its Play button advances simulated time through the same backend event queue used by `advance-time`; it does not introduce a separate scenario state store.
-
-## Scaling Path
-
-The engine should stay scenario-agnostic where possible. A new scenario should mostly define:
-
-- a `scenario.yaml` manifest
-- people
-- coworker state
-- project state
-- tasks and dependencies
-- blockers
-- docs
-- initial messages
-- scheduled events
-- evaluation targets
-- grouped interaction behaviors
-- background event rules
-- state evidence rules
-- task gate rules
-- harmful-action rules
-- outcome rules
-- optional agent policies
-
-Direct coworker chat, action-derived chat/email/doc effects, background events, and meetings use structured interpreters. Direct coworker replies run through a deterministic actor decision step: matched reply behaviors, open commitments, and workload/capacity constraints become ranked candidates, then the simulator composes one delayed response. Interaction behaviors and action rules use the shared `match` object plus required facts, absent facts, attendees, action context, causal conditions, and priority. They then emit fixed text where needed plus deterministic effects. Concept-match rules are evaluated after deterministic gates and use the cached, fail-closed LLM concept matcher. For example, security-doc reveal, manager approval, customer-readiness scoring, and meeting transcripts are authored in scenario YAML instead of Python branches.
-
-This is the main answer to the scaling concern: scenario files should describe the world, while engine code should define common simulation semantics.
-
-The reusable engine code lives under `pm_sim/engine/`: simulated time and event delivery, effect application, condition evaluation, runtime scenario config loading, and shared rule matching. The broader common surface also includes storage, tool actions, timelines, coworker state, action logs, task gates, state-derived evidence, harm checks, outcome rules, and evaluator component scoring. A second scenario should primarily add new data files instead of adding custom Python branches for every project.
+For details, read `docs/spec.md`.
