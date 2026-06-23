@@ -28,12 +28,12 @@ from pm_sim.coworkers import effects_for_event, replies_for_chat, replies_for_em
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
 from pm_sim.engine.effects import apply_effects
-from pm_sim.formatters import format_agent_progress_html, format_output, format_semantic_progress
+from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
 from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
-from pm_sim import semantic_match as semantic_match_module
+from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset
 from pm_sim.engine.time import advance_time
 from pm_sim.timeline import timeline
@@ -223,6 +223,187 @@ class CoreSimulationTests(unittest.TestCase):
         }
         self.assertNotIn("daisy_autonomous_customer_wording_nudge", applied_policy_ids)
 
+    def test_autonomous_daisy_security_followup_depends_on_customer_wording_state(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "daisy",
+                        "key": "customer_message_ready",
+                        "value": True,
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "peach",
+                        "key": "scope_unblocked",
+                        "value": True,
+                    },
+                ],
+                now="2026-06-22T09:00:00",
+                source="test",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        result = advance_time(self.db_path, "to:2026-06-24T16:30:00")
+        state = observe(self.db_path)
+
+        applied_policy_ids = {
+            policy["id"] for policy in result["applied_actor_behaviors"]
+        }
+        coworker_state = self._coworker_state_map(state)
+        recent_messages = [message["body"] for message in state["recent_messages"]]
+
+        self.assertIn("daisy_autonomous_security_followup", applied_policy_ids)
+        self.assertTrue(coworker_state[("daisy", "autonomous_security_followup_sent")])
+        self.assertTrue(any("security still needs" in body for body in recent_messages))
+
+    def test_autonomous_luigi_repo_hardening_depends_on_discovered_risk(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {"type": "discover_fact", "fact_id": "fact_repo_sync_stale"},
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "peach",
+                        "key": "scope_unblocked",
+                        "value": True,
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "daisy",
+                        "values": {
+                            "customer_message_ready": True,
+                            "security_answer_received": True,
+                        },
+                    },
+                ],
+                now="2026-06-22T09:00:00",
+                source="test",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        result = advance_time(self.db_path, "to:2026-06-25T09:15:00")
+        state = observe(self.db_path)
+
+        applied_policy_ids = {
+            policy["id"] for policy in result["applied_actor_behaviors"]
+        }
+        coworker_state = self._coworker_state_map(state)
+        recent_messages = [message["body"] for message in state["recent_messages"]]
+
+        self.assertIn("luigi_autonomous_repo_hardening_update", applied_policy_ids)
+        self.assertTrue(coworker_state[("luigi", "repo_hardening_update_sent")])
+        self.assertTrue(any("latest-commit guarantees" in body for body in recent_messages))
+
+    def test_autonomous_mario_accepts_draft_mode_after_project_decision(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_project",
+                        "project_id": "project_pr_review_agent",
+                        "decision": "draft_mode_approved",
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "peach",
+                        "key": "scope_unblocked",
+                        "value": True,
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "daisy",
+                        "values": {
+                            "customer_message_ready": True,
+                            "security_answer_received": True,
+                        },
+                    },
+                ],
+                now="2026-06-22T09:00:00",
+                source="test",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        result = advance_time(self.db_path, "to:2026-06-25T09:45:00")
+        state = observe(self.db_path)
+
+        applied_policy_ids = {
+            policy["id"] for policy in result["applied_actor_behaviors"]
+        }
+        coworker_state = self._coworker_state_map(state)
+        recent_messages = [message["body"] for message in state["recent_messages"]]
+
+        self.assertIn("mario_autonomous_scope_acceptance", applied_policy_ids)
+        self.assertTrue(coworker_state[("mario", "accepted_draft_mode")])
+        self.assertTrue(any("I am aligned" in body for body in recent_messages))
+
+    def test_autonomous_toad_records_koopa_followup_after_customer_update(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "peach",
+                        "key": "scope_unblocked",
+                        "value": True,
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "daisy",
+                        "values": {
+                            "customer_message_ready": True,
+                            "security_answer_received": True,
+                            "koopa_update_received": True,
+                        },
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "luigi",
+                        "key": "repo_hardening_update_sent",
+                        "value": True,
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "mario",
+                        "key": "accepted_draft_mode",
+                        "value": True,
+                    },
+                ],
+                now="2026-06-22T09:00:00",
+                source="test",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        result = advance_time(self.db_path, "to:2026-06-25T13:00:00")
+        state = observe(self.db_path)
+
+        applied_policy_ids = {
+            policy["id"] for policy in result["applied_actor_behaviors"]
+        }
+        coworker_state = self._coworker_state_map(state)
+        task = next(task for task in state["tasks"] if task["id"] == "task_self_serve_audit_export_followup")
+
+        self.assertIn("toad_autonomous_followup_scope_note", applied_policy_ids)
+        self.assertTrue(coworker_state[("toad", "koopa_followup_scope_recorded")])
+        self.assertEqual(task["status"], "ready")
+
     def test_interruption_creates_actor_commitment(self) -> None:
         advance_time(self.db_path, "to:2026-06-24T10:00:00")
         state = observe(self.db_path)
@@ -266,16 +447,23 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertTrue(conflict["inputs"]["implementation_scope_clear"])
 
     def test_customer_launch_mode_question_adds_pressure_event(self) -> None:
+        before = observe(self.db_path)
         result = advance_time(self.db_path, "to:2026-06-24T15:30:00")
         state = observe(self.db_path)
 
         event_types = {event["event_type"] for event in result["delivered_events"]}
         recent = state["recent_messages"][0]
+        pressures_before = {row["id"]: row for row in before["pressures"]}
+        pressures_after = {row["id"]: row for row in state["pressures"]}
 
         self.assertIn("nimbus_launch_mode_question", event_types)
         self.assertEqual(recent["sender_id"], "daisy")
         self.assertEqual(recent["channel"], "email")
         self.assertIn("post comments automatically", recent["body"])
+        self.assertGreater(
+            pressures_after["pressure_nimbus_customer_confidence"]["intensity"],
+            pressures_before["pressure_nimbus_customer_confidence"]["intensity"],
+        )
 
     def test_private_repo_security_question_arrives_as_background_event(self) -> None:
         result = advance_time(self.db_path, "to:2026-06-24T14:00:00")
@@ -683,6 +871,12 @@ class CoreSimulationTests(unittest.TestCase):
             return loads(project["metadata_json"])
         finally:
             conn.close()
+
+    def _coworker_state_map(self, state: dict[str, Any]) -> dict[tuple[str, str], Any]:
+        return {
+            (row["person_id"], row["key"]): loads(row["value_json"])
+            for row in state["coworker_state"]
+        }
 
     def _send_customer_ready_email(self) -> None:
         send_email(

@@ -39,6 +39,8 @@ def evaluate(
             "score": score,
             "max_score": max_score,
             "final_outcome": _final_outcome(conn),
+            "outcome_comparison": _outcome_comparison(conn, scenario, score),
+            "critical_path": _critical_path(conn),
             "state_delta": _state_delta(conn, scenario),
             "components": components,
             "milestone_count": len(milestones),
@@ -68,19 +70,101 @@ def _load_state_milestones(conn, scenario: dict[str, Any]) -> list[dict[str, Any
         created_at = condition_time(conn, rule["created_at"])
         if created_at is None:
             continue
-        milestones.append(_state_milestone(rule["id"], rule["note"], created_at))
+        milestones.append(
+            _state_milestone(
+                rule["id"],
+                rule["note"],
+                created_at,
+                _state_source(conn, rule["created_at"]),
+            )
+        )
     return milestones
 
 
-def _state_milestone(key: str, note: str, created_at: str) -> dict[str, Any]:
+def _state_milestone(key: str, note: str, created_at: str, source: str) -> dict[str, Any]:
     return {
         "id": f"state:{key}:{created_at}",
         "milestone_id": key,
         "note": note,
         "created_at": created_at,
-        "source": "evaluator:state",
+        "source": source,
         "metadata_json": "{}",
     }
+
+
+def _state_source(conn, source_spec: dict[str, Any]) -> str:
+    if "coworker_state" in source_spec:
+        spec = source_spec["coworker_state"]
+        row = conn.execute(
+            """
+            SELECT source
+            FROM coworker_state
+            WHERE person_id = ? AND key = ?
+            """,
+            (spec["person_id"], spec["key"]),
+        ).fetchone()
+        return row["source"] if row and row["source"] else "state:coworker_state"
+
+    if "fact" in source_spec:
+        row = conn.execute(
+            "SELECT source FROM facts WHERE id = ?",
+            (source_spec["fact"],),
+        ).fetchone()
+        return row["source"] if row and row["source"] else f"state:fact:{source_spec['fact']}"
+
+    if "milestone" in source_spec:
+        row = conn.execute(
+            """
+            SELECT source
+            FROM milestones
+            WHERE milestone_id = ?
+            ORDER BY created_at, id
+            LIMIT 1
+            """,
+            (source_spec["milestone"],),
+        ).fetchone()
+        return row["source"] if row and row["source"] else f"state:milestone:{source_spec['milestone']}"
+
+    if "first_fact_or_milestone" in source_spec:
+        spec = source_spec["first_fact_or_milestone"]
+        candidates = []
+        if spec.get("fact"):
+            row = conn.execute(
+                "SELECT visible_at, source FROM facts WHERE id = ?",
+                (spec["fact"],),
+            ).fetchone()
+            if row and row["visible_at"]:
+                candidates.append((row["visible_at"], row["source"] or f"state:fact:{spec['fact']}"))
+        if spec.get("milestone"):
+            row = conn.execute(
+                """
+                SELECT created_at, source
+                FROM milestones
+                WHERE milestone_id = ?
+                ORDER BY created_at, id
+                LIMIT 1
+                """,
+                (spec["milestone"],),
+            ).fetchone()
+            if row:
+                candidates.append((row["created_at"], row["source"] or f"state:milestone:{spec['milestone']}"))
+        if "coworker_state" in spec:
+            nested = spec["coworker_state"]
+            row = conn.execute(
+                """
+                SELECT updated_at, source
+                FROM coworker_state
+                WHERE person_id = ? AND key = ?
+                """,
+                (nested["person_id"], nested["key"]),
+            ).fetchone()
+            if row:
+                candidates.append((row["updated_at"], row["source"] or "state:coworker_state"))
+        if candidates:
+            candidates.sort(key=lambda item: item[0])
+            return candidates[0][1]
+
+    return "evaluator:state"
 
 
 def _score_milestone_component(
@@ -113,11 +197,11 @@ def _score_milestone_component(
         ]
         if on_time:
             earned += per_key_points
-            used_milestones.append(_public_milestone(on_time[0], "on_time"))
+            used_milestones.append(_public_milestone(conn, on_time[0], "on_time"))
         else:
             earned += per_key_points * LATE_CREDIT
             late.append(milestone_id)
-            used_milestones.append(_public_milestone(matches[0], "late"))
+            used_milestones.append(_public_milestone(conn, matches[0], "late"))
 
     notes = []
     if missing:
@@ -264,6 +348,126 @@ def _final_outcome(conn) -> dict[str, Any] | None:
     return None
 
 
+def _outcome_comparison(
+    conn,
+    scenario: dict[str, Any],
+    current_score: float,
+) -> dict[str, Any]:
+    baseline = scenario.get("baseline") or {}
+    final_outcome = _final_outcome(conn) or {}
+    expected_score = baseline.get("expected_score")
+    improved_over_baseline = (
+        current_score > float(expected_score)
+        if isinstance(expected_score, (int, float))
+        else None
+    )
+    return {
+        "baseline_expected_score": expected_score,
+        "baseline_expected_outcome": baseline.get("expected_outcome"),
+        "actual_outcome": final_outcome.get("outcome"),
+        "actual_summary": final_outcome.get("summary"),
+        "improved_over_baseline": improved_over_baseline,
+        "project_outcomes": _project_outcome_rows(conn, scenario),
+    }
+
+
+def _project_outcome_rows(conn, scenario: dict[str, Any]) -> list[dict[str, Any]]:
+    initial = {project["id"]: project for project in scenario.get("projects", [])}
+    rows = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT id, name, status, risk_level, deadline, metadata_json
+            FROM projects
+            ORDER BY deadline, id
+            """
+        ).fetchall()
+    )
+    outcomes = []
+    for row in rows:
+        before = initial.get(row["id"], {})
+        metadata = loads(row["metadata_json"], {})
+        outcomes.append(
+            {
+                "project_id": row["id"],
+                "name": row["name"],
+                "deadline": row["deadline"],
+                "before": {
+                    "status": before.get("status"),
+                    "risk_level": before.get("risk_level"),
+                    "decision": before.get("decision"),
+                },
+                "after": {
+                    "status": row["status"],
+                    "risk_level": row["risk_level"],
+                    "decision": metadata.get("decision"),
+                    "final_outcome": metadata.get("final_outcome"),
+                },
+            }
+        )
+    return outcomes
+
+
+def _critical_path(conn) -> dict[str, Any]:
+    tasks = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT t.id, t.title, t.project_id, t.status, t.priority, t.due_at,
+                   t.blocked_by, b.status AS blocker_status
+            FROM tasks t
+            LEFT JOIN blockers b ON b.id = t.blocked_by
+            ORDER BY t.due_at, t.id
+            """
+        ).fetchall()
+    )
+    dependencies = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT upstream_task_id, downstream_task_id
+            FROM dependencies
+            ORDER BY upstream_task_id, downstream_task_id
+            """
+        ).fetchall()
+    )
+    downstream_by_upstream: dict[str, list[str]] = {}
+    upstream_by_downstream: dict[str, list[str]] = {}
+    for dependency in dependencies:
+        downstream_by_upstream.setdefault(dependency["upstream_task_id"], []).append(
+            dependency["downstream_task_id"]
+        )
+        upstream_by_downstream.setdefault(dependency["downstream_task_id"], []).append(
+            dependency["upstream_task_id"]
+        )
+
+    task_status = {task["id"]: task["status"] for task in tasks}
+    blocked = []
+    for task in tasks:
+        incomplete_upstreams = [
+            task_id
+            for task_id in upstream_by_downstream.get(task["id"], [])
+            if str(task_status.get(task_id, "")).lower() not in {"complete", "completed", "done", "resolved"}
+        ]
+        if task.get("blocked_by") or incomplete_upstreams:
+            blocked.append(
+                {
+                    "task_id": task["id"],
+                    "title": task["title"],
+                    "status": task["status"],
+                    "priority": task["priority"],
+                    "due_at": task["due_at"],
+                    "blocked_by": task.get("blocked_by"),
+                    "blocker_status": task.get("blocker_status"),
+                    "waiting_on_tasks": incomplete_upstreams,
+                    "unblocks": downstream_by_upstream.get(task["id"], []),
+                }
+            )
+
+    return {
+        "blocked_tasks": blocked,
+        "blocked_count": len(blocked),
+        "dependency_count": len(dependencies),
+    }
+
+
 def _state_delta(conn, scenario: dict[str, Any]) -> list[dict[str, Any]]:
     deltas = []
     deltas.extend(_project_deltas(conn, scenario))
@@ -357,7 +561,7 @@ def _coworker_state_deltas(conn, scenario: dict[str, Any]) -> list[dict[str, Any
     rows = rows_to_dicts(
         conn.execute(
             """
-            SELECT person_id, key, value_json, updated_at
+            SELECT person_id, key, value_json, updated_at, source
             FROM coworker_state
             ORDER BY person_id, key
             """
@@ -377,6 +581,7 @@ def _coworker_state_deltas(conn, scenario: dict[str, Any]) -> list[dict[str, Any
                 "changes": {
                     "value": {"from": before, "to": after},
                     "updated_at": {"from": None, "to": row["updated_at"]},
+                    "source": {"from": None, "to": row["source"]},
                 },
             }
         )
@@ -412,14 +617,69 @@ def _status(points: float, earned: float) -> str:
     return "passed"
 
 
-def _public_milestone(row: dict[str, Any], timing: str) -> dict[str, Any]:
+def _public_milestone(conn, row: dict[str, Any], timing: str) -> dict[str, Any]:
     return {
         "key": row["milestone_id"],
         "note": row["note"],
         "created_at": row["created_at"],
         "source": row["source"],
+        "trace": _source_trace(conn, row["source"]),
         "timing": timing,
     }
+
+
+def _source_trace(conn, source: str) -> dict[str, Any]:
+    if source.startswith("action:"):
+        action_id = source.split(":", 1)[1]
+        row = conn.execute(
+            """
+            SELECT id, actor, action_type, created_at, payload_json, result_json
+            FROM action_log
+            WHERE id = ?
+            """,
+            (action_id,),
+        ).fetchone()
+        if row:
+            return {
+                "source_type": "action",
+                "source_id": row["id"],
+                "actor": row["actor"],
+                "action_type": row["action_type"],
+                "created_at": row["created_at"],
+                "payload": loads(row["payload_json"], {}),
+                "result": loads(row["result_json"], {}),
+            }
+        return {"source_type": "action", "source_id": action_id, "missing": True}
+
+    if source.startswith("event:"):
+        event_id = source.split(":", 1)[1]
+        row = conn.execute(
+            """
+            SELECT id, event_type, scheduled_at, delivered_at, payload_json, result_json
+            FROM events
+            WHERE id = ?
+            """,
+            (event_id,),
+        ).fetchone()
+        if row:
+            return {
+                "source_type": "event",
+                "source_id": row["id"],
+                "event_type": row["event_type"],
+                "scheduled_at": row["scheduled_at"],
+                "delivered_at": row["delivered_at"],
+                "payload": loads(row["payload_json"], {}),
+                "result": loads(row["result_json"], {}),
+            }
+        return {"source_type": "event", "source_id": event_id, "missing": True}
+
+    if source.startswith("actor_behavior:"):
+        return {"source_type": "actor_behavior", "source_id": source.split(":", 1)[1]}
+
+    if source == "seed":
+        return {"source_type": "seed", "source_id": "scenario"}
+
+    return {"source_type": "state", "source_id": source}
 
 
 def _clean_number(value: float) -> int | float:

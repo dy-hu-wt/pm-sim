@@ -36,6 +36,52 @@ projects:
   - Koopa Bank receives a scoped answer before Thursday's security review.
   - The team avoids promising a full self-serve export if only a one-time CSV is feasible.
   - The PR Review Agent launch remains the main engineering focus.
+pressures:
+- id: nimbus_customer_confidence
+  project_id: pr_review_agent
+  owner_id: daisy
+  kind: customer_update
+  intensity: 5
+  min_intensity: 1
+  max_intensity: 10
+  reason: Daisy needs grounded customer-ready wording before her Thursday Nimbus update.
+  due_at: '2026-06-25T10:00:00'
+- id: pr_review_scope_pressure
+  project_id: pr_review_agent
+  owner_id: mario
+  kind: scope_pressure
+  intensity: 5
+  min_intensity: 1
+  max_intensity: 10
+  reason: Mario wants the strongest Friday beta unless technical risk justifies draft mode.
+  due_at: '2026-06-26T15:00:00'
+- id: nimbus_security_review_pressure
+  project_id: pr_review_agent
+  owner_id: daisy
+  kind: security_review
+  intensity: 3
+  min_intensity: 1
+  max_intensity: 10
+  reason: Nimbus may ask private-repo security questions before the Friday beta.
+  due_at: '2026-06-25T12:00:00'
+- id: nimbus_final_readiness_pressure
+  project_id: pr_review_agent
+  owner_id: daisy
+  kind: final_readiness
+  intensity: 3
+  min_intensity: 1
+  max_intensity: 10
+  reason: Daisy needs a consolidated go/no-go before sending the final Nimbus agenda.
+  due_at: '2026-06-25T12:00:00'
+- id: koopa_finance_review_pressure
+  project_id: audit_log_export
+  owner_id: daisy
+  kind: customer_interruption
+  intensity: 4
+  min_intensity: 1
+  max_intensity: 10
+  reason: Koopa needs scoped audit-log export wording before Thursday's security review.
+  due_at: '2026-06-25T16:00:00'
 people:
 - id: mario
   name: Mario

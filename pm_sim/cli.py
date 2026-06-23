@@ -24,6 +24,7 @@ from .formatters import format_agent_progress_console, format_output
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .report import DEFAULT_UI_PATH, generate_report
 from .scenario import ScenarioError
+from .scenario_tools import lint_scenario, scenario_graph
 from .state import action_log, event_log, observe, reset
 from .engine.time import advance_time
 from .timeline import TIMELINE_KINDS, timeline
@@ -92,7 +93,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command")
 
-    reset_parser = subparsers.add_parser("reset", help="Reset DB from scenario JSON.")
+    reset_parser = subparsers.add_parser("reset", help="Reset DB from scenario YAML.")
     reset_parser.add_argument(
         "--scenario",
         type=Path,
@@ -184,6 +185,27 @@ def _build_parser() -> argparse.ArgumentParser:
         help=f"Scenario YAML path. Default: {DEFAULT_SCENARIO_PATH}",
     )
     evaluate_parser.set_defaults(func=_evaluate_command)
+
+    lint_parser = subparsers.add_parser("lint-scenario", help="Validate and summarize scenario authoring.")
+    lint_parser.add_argument(
+        "--scenario",
+        type=Path,
+        default=DEFAULT_SCENARIO_PATH,
+        help=f"Scenario YAML path. Default: {DEFAULT_SCENARIO_PATH}",
+    )
+    lint_parser.set_defaults(func=lambda args: lint_scenario(args.scenario))
+
+    graph_parser = subparsers.add_parser(
+        "graph-scenario",
+        help="Print scenario graph nodes and causal links.",
+    )
+    graph_parser.add_argument(
+        "--scenario",
+        type=Path,
+        default=DEFAULT_SCENARIO_PATH,
+        help=f"Scenario YAML path. Default: {DEFAULT_SCENARIO_PATH}",
+    )
+    graph_parser.set_defaults(func=lambda args: scenario_graph(args.scenario))
 
     ui_parser = subparsers.add_parser("ui", help="Start the live operator UI.")
     ui_parser.add_argument(
@@ -312,6 +334,7 @@ def _evaluate_command(args: argparse.Namespace) -> dict[str, Any]:
 
 def _ui_command(args: argparse.Namespace) -> dict[str, Any]:
     if args.static:
+        _ensure_static_ui_state(args)
         return generate_report(args.db, args.scenario, args.output, args.timeline_limit)
     return serve_ui(
         args.db,
@@ -326,6 +349,39 @@ def _ui_command(args: argparse.Namespace) -> dict[str, Any]:
         max_turns=args.max_turns,
         progress=None if args.as_json else _agent_progress,
     )
+
+
+def _ensure_static_ui_state(args: argparse.Namespace) -> None:
+    if _db_initialized(args.db):
+        return
+    if args.reset_first:
+        reset(args.db, args.scenario)
+        return
+    raise RuntimeError(
+        "Database is not initialized. Run pm-sim reset first or omit --resume "
+        "so pm-sim ui --static can initialize it."
+    )
+
+
+def _db_initialized(db_path: Path) -> bool:
+    import sqlite3
+
+    path = Path(db_path)
+    if not path.exists():
+        return False
+    conn = sqlite3.connect(path)
+    try:
+        row = conn.execute(
+            """
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name = 'sim_state'
+            """
+        ).fetchone()
+        return row is not None
+    finally:
+        conn.close()
 
 
 def _run_agent_command(args: argparse.Namespace) -> dict[str, Any]:

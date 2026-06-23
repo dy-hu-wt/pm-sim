@@ -28,12 +28,12 @@ from pm_sim.coworkers import effects_for_event, replies_for_chat, replies_for_em
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
 from pm_sim.engine.effects import apply_effects
-from pm_sim.formatters import format_agent_progress_html, format_output, format_semantic_progress
+from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
 from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
-from pm_sim import semantic_match as semantic_match_module
+from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset
 from pm_sim.engine.time import advance_time
 from pm_sim.timeline import timeline
@@ -165,6 +165,129 @@ class EffectApplicationTests(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_pressure_effects_mutate_bounded_pressure_state(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            initial = conn.execute(
+                """
+                SELECT intensity
+                FROM pressures
+                WHERE id = 'pressure_nimbus_customer_confidence'
+                """
+            ).fetchone()
+
+            raised = apply_effects(
+                conn,
+                [
+                    {
+                        "type": "increase_pressure",
+                        "pressure_id": "pressure_nimbus_customer_confidence",
+                        "by": 9,
+                        "reason": "Customer update window was missed.",
+                    }
+                ],
+                now="2026-06-25T10:00:00",
+                source="test",
+            )
+            lowered = apply_effects(
+                conn,
+                [
+                    {
+                        "type": "lower_pressure",
+                        "pressure_id": "pressure_nimbus_customer_confidence",
+                        "to": 2,
+                        "reason": "Daisy received grounded wording.",
+                    }
+                ],
+                now="2026-06-25T10:20:00",
+                source="test",
+            )
+            conn.commit()
+
+            row = conn.execute(
+                """
+                SELECT intensity, reason, updated_at
+                FROM pressures
+                WHERE id = 'pressure_nimbus_customer_confidence'
+                """
+            ).fetchone()
+
+            self.assertEqual(initial["intensity"], 5)
+            self.assertEqual(raised[0]["intensity"], 10)
+            self.assertEqual(lowered[0]["previous_intensity"], 10)
+            self.assertEqual(row["intensity"], 2)
+            self.assertEqual(row["reason"], "Daisy received grounded wording.")
+            self.assertEqual(row["updated_at"], "2026-06-25T10:20:00")
+            self.assertTrue(
+                condition_matches(
+                    conn,
+                    {
+                        "pressure_at_most": {
+                            "id": "pressure_nimbus_customer_confidence",
+                            "intensity": 3,
+                        }
+                    },
+                )
+            )
+            self.assertFalse(
+                condition_matches(
+                    conn,
+                    {
+                        "pressure_at_least": {
+                            "id": "pressure_nimbus_customer_confidence",
+                            "intensity": 8,
+                        }
+                    },
+                )
+            )
+        finally:
+            conn.close()
+
+    def test_repeated_coworker_state_value_preserves_first_achievement_time(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "daisy",
+                        "key": "customer_message_ready",
+                        "value": True,
+                    }
+                ],
+                now="2026-06-22T11:00:00",
+                source="first",
+            )
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "daisy",
+                        "key": "customer_message_ready",
+                        "value": True,
+                    }
+                ],
+                now="2026-06-24T11:00:00",
+                source="repeat",
+            )
+            conn.commit()
+
+            row = conn.execute(
+                """
+                SELECT value_json, updated_at
+                FROM coworker_state
+                WHERE person_id = 'daisy'
+                  AND key = 'customer_message_ready'
+                """
+            ).fetchone()
+
+            self.assertTrue(loads(row["value_json"]))
+            self.assertEqual(row["updated_at"], "2026-06-22T11:00:00")
+        finally:
+            conn.close()
+
     def test_actor_runtime_effects_update_schema_tables(self) -> None:
         conn = connect(self.db_path)
         try:
@@ -226,27 +349,27 @@ class EffectApplicationTests(unittest.TestCase):
         finally:
             conn.close()
 
-    def test_llm_semantic_match_failure_fails_closed(self) -> None:
-        original = semantic_match_module._llm_match
-        semantic_match_module._llm_match = lambda text, criteria, *, model=None: (_ for _ in ()).throw(
+    def test_llm_concept_match_failure_fails_closed(self) -> None:
+        original = concept_match_module._llm_match
+        concept_match_module._llm_match = lambda text, criteria, *, model=None: (_ for _ in ()).throw(
             json.JSONDecodeError("Expecting value", "", 0)
         )
         conn = connect(self.db_path)
         try:
             with unittest.mock.patch.dict(
                 "os.environ",
-                {"PM_SIM_SEMANTIC_MATCHER": "llm", "OPENAI_API_KEY": "test-key"},
+                {"OPENAI_API_KEY": "test-key"},
                 clear=False,
             ):
-                result = semantic_match_module.semantic_match(
+                result = concept_match_module.concept_match(
                     conn,
-                    text="Draft mode with human approval.",
+                    text="Use use draft mode with human approval.",
                     criteria={
                         "required": [
                             {
                                 "id": "draft_mode_approval",
-                                "description": "Draft mode with human approval.",
-                                "exemplars": ["draft mode with human approval"],
+                                "description": "Use use draft mode with human approval.",
+                                "exemplars": ["use draft mode with human approval"],
                             }
                         ]
                     },
@@ -254,182 +377,94 @@ class EffectApplicationTests(unittest.TestCase):
                 )
             conn.commit()
             cached = conn.execute(
-                "SELECT value FROM sim_state WHERE key = 'semantic_match_cache_json'"
+                "SELECT value FROM sim_state WHERE key = 'concept_match_cache_json'"
             ).fetchone()
 
             self.assertFalse(result["matches"])
-            self.assertEqual(result["mode"], "llm")
+            self.assertEqual(result["mode"], "concept_match")
+            self.assertEqual(result["matcher"], "llm")
             self.assertIn("JSONDecodeError", result["error"])
             self.assertIsNotNone(cached)
         finally:
-            semantic_match_module._llm_match = original
+            concept_match_module._llm_match = original
             conn.close()
 
-    def test_semantic_match_defaults_to_deterministic_without_openai(self) -> None:
+    def test_concept_match_requires_openai_api_key(self) -> None:
+        original = concept_match_module._llm_match
+        concept_match_module._llm_match = lambda text, criteria, *, model=None: (_ for _ in ()).throw(
+            RuntimeError("Concept matching requires OPENAI_API_KEY.")
+        )
         conn = connect(self.db_path)
         try:
-            with unittest.mock.patch.dict("os.environ", {}, clear=True), unittest.mock.patch.object(
-                semantic_match_module,
-                "_load_dotenv",
-                lambda: None,
-            ):
-                result = semantic_match_module.semantic_match(
+            with unittest.mock.patch.object(concept_match_module, "_load_dotenv", lambda: None):
+                result = concept_match_module.concept_match(
                     conn,
-                    text="Draft mode with human approval.",
+                    text="Use use draft mode with human approval.",
                     criteria={
                         "required": [
                             {
                                 "id": "draft_mode_approval",
-                                "description": "Draft mode with human approval.",
-                                "exemplars": ["draft mode with human approval"],
+                                "description": "Use use draft mode with human approval.",
+                                "exemplars": ["use draft mode with human approval"],
                             }
                         ]
                     },
-                    rule_id="test_default_mode",
+                    rule_id="test_missing_key",
                 )
 
-            self.assertTrue(result["matches"])
-            self.assertEqual(result["mode"], "deterministic")
+            self.assertFalse(result["matches"])
+            self.assertEqual(result["matcher"], "llm")
+            self.assertIn("OPENAI_API_KEY", result["error"])
         finally:
+            concept_match_module._llm_match = original
             conn.close()
 
-    def test_semantic_cache_separates_mode_and_model(self) -> None:
+    def test_concept_cache_uses_model(self) -> None:
         conn = connect(self.db_path)
-        original = semantic_match_module._llm_match
+        original = concept_match_module._llm_match
         try:
-            deterministic = semantic_match_module.semantic_match(
-                conn,
-                text="Draft mode with human approval.",
-                criteria={
-                    "required": [
-                        {
-                            "id": "draft_mode_approval",
-                            "description": "Draft mode with human approval.",
-                            "exemplars": ["draft mode with human approval"],
-                        }
-                    ]
-                },
-                rule_id="test_cache_key",
-            )
-            semantic_match_module._llm_match = lambda text, criteria, *, model=None: {
-                "matches": False,
-                "mode": "llm",
+            concept_match_module._llm_match = lambda text, criteria, *, model=None: {
+                "matches": True,
+                "mode": "concept_match",
+                "matcher": "llm",
                 "model": model,
-                "required": [],
+                "required": [{"id": "draft_mode_approval", "matched": True, "rationale": "ok"}],
                 "forbidden": [],
             }
-            with unittest.mock.patch.dict(
-                "os.environ",
-                {
-                    "PM_SIM_SEMANTIC_MATCHER": "llm",
-                    "PM_SIM_SEMANTIC_MODEL": "cache-model",
-                    "OPENAI_API_KEY": "test-key",
-                },
-                clear=False,
-            ):
-                llm = semantic_match_module.semantic_match(
+            with unittest.mock.patch.dict("os.environ", {"PM_SIM_CONCEPT_MODEL": "model-a"}, clear=False):
+                first = concept_match_module.concept_match(
                     conn,
-                    text="Draft mode with human approval.",
+                    text="Use draft mode with human approval.",
                     criteria={
                         "required": [
                             {
                                 "id": "draft_mode_approval",
-                                "description": "Draft mode with human approval.",
-                                "exemplars": ["draft mode with human approval"],
+                                "description": "Use draft mode with human approval.",
+                            }
+                        ]
+                    },
+                    rule_id="test_cache_key",
+                )
+            with unittest.mock.patch.dict("os.environ", {"PM_SIM_CONCEPT_MODEL": "model-b"}, clear=False):
+                second = concept_match_module.concept_match(
+                    conn,
+                    text="Use draft mode with human approval.",
+                    criteria={
+                        "required": [
+                            {
+                                "id": "draft_mode_approval",
+                                "description": "Use draft mode with human approval.",
                             }
                         ]
                     },
                     rule_id="test_cache_key",
                 )
 
-            self.assertEqual(deterministic["mode"], "deterministic")
-            self.assertEqual(llm["mode"], "llm")
-            self.assertNotEqual(deterministic["cache_key"], llm["cache_key"])
+            self.assertEqual(first["matcher"], "llm")
+            self.assertEqual(second["matcher"], "llm")
+            self.assertNotEqual(first["cache_key"], second["cache_key"])
         finally:
-            semantic_match_module._llm_match = original
-            conn.close()
-
-    def test_concept_match_rejects_keyword_stuffing(self) -> None:
-        conn = connect(self.db_path)
-        try:
-            result = semantic_match_module.semantic_match(
-                conn,
-                text="Nimbus Friday beta repo sync risk draft mode human approval.",
-                criteria={
-                    "required": [
-                        {
-                            "id": "repo_sync_stale_risk",
-                            "description": "Repo sync can cause stale commit reviews.",
-                            "exemplars": ["repo sync can cause stale commit reviews"],
-                        },
-                        {
-                            "id": "human_approval_before_posting",
-                            "description": "A human must approve before posting.",
-                            "exemplars": ["comments require human approval before posting"],
-                        },
-                    ]
-                },
-                rule_id="test_keyword_soup",
-            )
-
-            self.assertFalse(result["matches"])
-            self.assertEqual(result["mode"], "deterministic")
-        finally:
-            conn.close()
-
-    def test_concept_match_handles_forbidden_negation(self) -> None:
-        conn = connect(self.db_path)
-        try:
-            result = semantic_match_module.semantic_match(
-                conn,
-                text=(
-                    "Friday beta is draft mode. Comments require human approval before posting. "
-                    "Auto-commenting is not in scope for Friday."
-                ),
-                criteria={
-                    "required": [
-                        {
-                            "id": "human_approval_before_posting",
-                            "description": "A human must approve before posting.",
-                            "exemplars": ["comments require human approval before posting"],
-                        }
-                    ],
-                    "forbidden": [
-                        {
-                            "id": "unsafe_auto_commenting",
-                            "description": "The message promises automatic comment posting.",
-                            "exemplars": ["auto-commenting is in scope for Friday"],
-                        }
-                    ],
-                },
-                rule_id="test_forbidden_negation",
-            )
-
-            self.assertTrue(result["matches"])
-            self.assertFalse(result["forbidden"][0]["matched"])
-        finally:
-            conn.close()
-
-    def test_deterministic_concept_match_fails_closed_on_paraphrase(self) -> None:
-        conn = connect(self.db_path)
-        try:
-            result = semantic_match_module.semantic_match(
-                conn,
-                text="Use the cautious review-only path so nothing gets published without a person checking it.",
-                criteria={
-                    "required": [
-                        {
-                            "id": "human_approval_before_posting",
-                            "description": "A human must approve before posting.",
-                            "exemplars": ["comments require human approval before posting"],
-                        }
-                    ]
-                },
-                rule_id="test_paraphrase_fail_closed",
-            )
-
-            self.assertFalse(result["matches"])
-        finally:
+            concept_match_module._llm_match = original
             conn.close()
 
     def test_llm_result_requires_authored_ids_and_rationales(self) -> None:
@@ -444,10 +479,11 @@ class EffectApplicationTests(unittest.TestCase):
             "forbidden": [],
         }
 
-        result = semantic_match_module._validate_llm_result(
+        result = concept_match_module._validate_llm_result(
             {
                 "matches": True,
-                "mode": "llm",
+                "mode": "concept_match",
+                "matcher": "llm",
                 "model": "test-model",
                 "required": [{"id": "wrong_id", "matched": True, "rationale": "Looks close."}],
                 "forbidden": [],

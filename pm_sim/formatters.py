@@ -24,6 +24,10 @@ def format_output(command: str | None, value: Any) -> str:
         return _format_advance_time(value)
     if command == "evaluate":
         return _format_evaluate(value)
+    if command == "lint-scenario":
+        return _format_lint_scenario(value)
+    if command == "graph-scenario":
+        return _format_scenario_graph(value)
     if command == "log":
         return _format_log(value)
     if command == "timeline":
@@ -45,18 +49,21 @@ def format_agent_tool_progress(name: str, args: dict[str, Any], result: Any) -> 
     return action
 
 
-def format_semantic_progress(match: dict[str, Any]) -> str:
-    rule_id = str(match.get("rule_id") or "semantic_check")
+def format_concept_progress(match: dict[str, Any]) -> str:
+    rule_id = str(match.get("rule_id") or "concept_check")
     mode = str(match.get("mode") or "unknown")
+    matcher_name = str(match.get("matcher") or "")
     model = str(match.get("model") or "")
-    matcher = f"{mode}:{model}" if model else mode
+    matcher = matcher_name or mode
+    if model:
+        matcher = f"{matcher}:{model}"
     required = match.get("required") if isinstance(match.get("required"), list) else []
     matched_required = sum(1 for item in required if item.get("matched"))
     required_summary = f"{matched_required}/{len(required)} required" if required else "required n/a"
     if match.get("error"):
-        return f"SEMANTIC {rule_id} {matcher} failed closed: {_short(match.get('error'), 100)}"
+        return f"CONCEPT {rule_id} {matcher} failed closed: {_short(match.get('error'), 100)}"
     status = "matched" if match.get("matches") else "failed"
-    return f"SEMANTIC {rule_id} {matcher} {status} {required_summary}"
+    return f"CONCEPT {rule_id} {matcher} {status} {required_summary}"
 
 
 def format_agent_progress_console(message: str, *, color: bool) -> str:
@@ -185,7 +192,7 @@ def _highlight_agent_progress(message: str, *, mode: str) -> str:
     )
     message = _highlight_agent_people(message, mode=mode)
     for label, css_class, ansi_code in (
-        ("SEMANTIC", "tool-semantic", "95"),
+        ("CONCEPT", "tool-concept", "95"),
         ("READ", "tool-read", "34"),
         ("UPDATE_DOC", "tool-read", "34"),
         ("CHAT", "tool-chat", "35"),
@@ -246,7 +253,7 @@ _AGENT_ANSI_BY_CLASS = {
     "tool-meeting": "33",
     "tool-task": "33",
     "tool-wait": "32",
-    "tool-semantic": "95",
+    "tool-concept": "95",
 }
 
 
@@ -266,6 +273,10 @@ def _format_reset(value: dict[str, Any]) -> str:
 
 
 def _format_observe(value: dict[str, Any]) -> str:
+    pressures_by_project: dict[str, list[dict[str, Any]]] = {}
+    for pressure in value.get("pressures", []):
+        pressures_by_project.setdefault(pressure.get("project_id", ""), []).append(pressure)
+
     lines = [
         "Simulation",
         f"  Time:     {_pretty_time(value.get('current_time'))}",
@@ -281,6 +292,15 @@ def _format_observe(value: dict[str, Any]) -> str:
             lines.append(f"  Deadline: {_pretty_time(project['deadline'])}")
         if project.get("stakeholder_pressure"):
             lines.append(f"  Pressure: {project['stakeholder_pressure']}")
+        for pressure in pressures_by_project.get(project["id"], []):
+            owner = f" · {pressure['owner_name']}" if pressure.get("owner_name") else ""
+            due = f" · due {_pretty_time(pressure['due_at'])}" if pressure.get("due_at") else ""
+            lines.append(
+                f"  Live Pressure: {pressure['kind']} {pressure['intensity']}/10"
+                f"{owner}{due}"
+            )
+            if pressure.get("reason"):
+                lines.append(f"       {pressure['reason']}")
         conflict = _project_conflict(project)
         if conflict:
             lines.append(
@@ -696,6 +716,56 @@ def _format_evaluate(value: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _format_lint_scenario(value: dict[str, Any]) -> str:
+    lines = [
+        "Scenario Lint",
+        f"  Scenario: {value.get('scenario_id')}",
+        f"  Status:   {'passed' if value.get('ok') else 'warnings'}",
+        "",
+        "Counts",
+    ]
+    for key, count in (value.get("counts") or {}).items():
+        lines.append(f"  {key}: {count}")
+
+    primitives = value.get("behavior_primitives") or {}
+    lines.extend(["", "Actor Behavior Primitives"])
+    lines.append(f"  reply rules:  {primitives.get('reply', 0)}")
+    lines.append(f"  policy rules: {primitives.get('policy', 0)}")
+
+    warnings = value.get("warnings") or []
+    lines.extend(["", "Warnings"])
+    if warnings:
+        for warning in warnings:
+            lines.append(f"  - {warning}")
+    else:
+        lines.append("  None")
+
+    links = value.get("score_links") or []
+    lines.extend(["", "Score Links"])
+    for link in links:
+        suffix = f" via {link['grading_rule']}" if link.get("grading_rule") else ""
+        lines.append(f"  - {link['component']} <- {link['milestone']}{suffix}")
+    return "\n".join(lines)
+
+
+def _format_scenario_graph(value: dict[str, Any]) -> str:
+    nodes = value.get("nodes") or []
+    edges = value.get("edges") or []
+    lines = [
+        "Scenario Graph",
+        f"  Scenario: {value.get('scenario_id')}",
+        f"  Nodes:    {len(nodes)}",
+        f"  Edges:    {len(edges)}",
+        "",
+        "Edges",
+    ]
+    for edge in edges[:80]:
+        lines.append(f"  - {edge['from']} --{edge['type']}--> {edge['to']}")
+    if len(edges) > 80:
+        lines.append(f"  - ... {len(edges) - 80} more edge(s)")
+    return "\n".join(lines)
+
+
 def _format_evaluate_explain(value: dict[str, Any]) -> str:
     lines = [
         "Evaluation Explanation",
@@ -707,6 +777,33 @@ def _format_evaluate_explain(value: dict[str, Any]) -> str:
         if final_outcome.get("summary"):
             lines.append(f"  {final_outcome.get('summary')}")
     lines.append("")
+
+    comparison = value.get("outcome_comparison") or {}
+    if comparison:
+        improved = comparison.get("improved_over_baseline")
+        improved_text = "unknown" if improved is None else ("yes" if improved else "no")
+        lines.append("Outcome Comparison:")
+        lines.append(f"  Baseline score: {comparison.get('baseline_expected_score')}")
+        if comparison.get("baseline_expected_outcome"):
+            lines.append(f"  Baseline outcome: {comparison.get('baseline_expected_outcome')}")
+        lines.append(f"  Actual outcome: {comparison.get('actual_outcome')}")
+        lines.append(f"  Improved over baseline: {improved_text}")
+        lines.append("")
+
+    critical_path = value.get("critical_path") or {}
+    if critical_path:
+        lines.append("Critical Path:")
+        lines.append(
+            f"  Blocked tasks: {critical_path.get('blocked_count', 0)}; "
+            f"dependencies: {critical_path.get('dependency_count', 0)}"
+        )
+        for task in (critical_path.get("blocked_tasks") or [])[:5]:
+            waiting = ", ".join(task.get("waiting_on_tasks") or [])
+            blocker = task.get("blocked_by") or "none"
+            suffix = f"; waiting on {waiting}" if waiting else ""
+            lines.append(f"  - {task['task_id']} blocked by {blocker}{suffix}")
+        lines.append("")
+
     state_delta = value.get("state_delta") or []
     if state_delta:
         lines.append("State Improvements:")

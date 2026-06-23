@@ -7,11 +7,11 @@ behaviors:
     channel: chat
     sender_id: mario
     recipient_id: agent
-    body: Sales is asking whether we can say Atlas is fully cut over on Friday. Please call out any data-quality
-      risk before we promise that.
-  - type: update_project
-    project_id: billing_migration
-    stakeholder_pressure_delta: 1
+    body: Sales is asking whether we can say Atlas is fully cut over on Friday. Please call out any data-quality risk before we promise that.
+  - type: increase_pressure
+    pressure_id: atlas_cutover_scope_pressure
+    by: 1
+    reason: Product and Sales are pushing for a full Atlas cutover story.
 - kind: event
   id: meridian_export_request
   event_type: meridian_export_request
@@ -21,8 +21,7 @@ behaviors:
     sender_id: daisy
     recipient_id: agent
     subject: Meridian invoice export request
-    body: Meridian asked whether they can get invoice export data before Thursday's finance review. Please
-      keep this scoped so it does not derail Atlas billing migration.
+    body: Meridian asked whether they can get invoice export data before Thursday's finance review. Please keep this scoped so it does not derail Atlas billing migration.
   - type: discover_fact
     fact_id: meridian_needs_invoice_export
     source: meridian_export_request
@@ -31,9 +30,10 @@ behaviors:
   - type: update_blocker
     blocker_id: invoice_export_scope
     status: surfaced
-  - type: update_project
-    project_id: invoice_export
-    stakeholder_pressure_delta: 1
+  - type: increase_pressure
+    pressure_id: meridian_finance_review_pressure
+    by: 1
+    reason: Meridian needs invoice export clarity before Thursday's finance review.
 - kind: event
   id: daisy_final_readiness_check
   event_type: daisy_final_readiness_check
@@ -42,8 +42,39 @@ behaviors:
     channel: chat
     sender_id: daisy
     recipient_id: agent
-    body: 'Before I send the Thursday Atlas note, I need one final go/no-go by email: migration mode,
-      data-risk rationale, and whether Meridian stayed scoped away from Atlas work.'
+    body: 'Before I send the Thursday Atlas note, I need one final go/no-go by email: migration mode, data-risk rationale, and whether Meridian stayed scoped away from Atlas work.'
+- kind: policy
+  id: daisy_autonomous_atlas_wording_followup
+  person_id: daisy
+  priority: 45
+  trigger:
+    at: '2026-06-25T10:30:00'
+  when:
+  - not:
+      coworker_state:
+        person_id: daisy
+        key: atlas_update_received
+        equals: true
+  - not:
+      coworker_state:
+        person_id: daisy
+        key: autonomous_atlas_wording_followup_sent
+        equals: true
+  effects:
+  - type: create_message
+    channel: email
+    sender_id: daisy
+    recipient_id: agent
+    subject: Atlas customer wording still needed
+    body: I still do not have customer-safe Atlas wording. If I do not get it today, I will tell Atlas that migration scope is still uncertain.
+  - type: update_coworker_state
+    person_id: daisy
+    key: autonomous_atlas_wording_followup_sent
+    value: true
+  - type: increase_pressure
+    pressure_id: atlas_customer_confidence
+    by: 3
+    reason: Daisy still lacks customer-safe Atlas wording before her Thursday update.
 - id: luigi_email_invoice_export_feasibility
   kind: reply
   person_id: luigi
@@ -67,8 +98,7 @@ behaviors:
   when: []
   reply:
     subject: 'Re: Meridian invoice export feasibility'
-    body: For Meridian, a one-time invoice export is feasible for the finance review. A self-serve export
-      feature is larger work and should stay follow-up after Atlas.
+    body: For Meridian, a one-time invoice export is feasible for the finance review. A self-serve export feature is larger work and should stay follow-up after Atlas.
   effects:
   - type: discover_fact
     fact_id: invoice_export_feasible
@@ -107,9 +137,7 @@ behaviors:
       equals: false
   reply:
     subject: 'Re: billing migration risk'
-    body: The blocker is backfill parity. Checksums disagree for enterprise discount invoices, so full
-      cutover could create incorrect invoice totals. I recommend read-only shadow mode this week while
-      I keep fixing parity.
+    body: The blocker is backfill parity. Checksums disagree for enterprise discount invoices, so full cutover could create incorrect invoice totals. I recommend read-only shadow mode this week while I keep fixing parity.
   effects:
   - type: discover_fact
     fact_id: backfill_checksum_mismatch
@@ -152,8 +180,7 @@ behaviors:
     mode: deterministic
   when: []
   reply:
-    body: For Meridian, a one-time invoice export is feasible for the finance review. A self-serve export
-      feature is larger work and should stay follow-up after Atlas.
+    body: For Meridian, a one-time invoice export is feasible for the finance review. A self-serve export feature is larger work and should stay follow-up after Atlas.
   effects:
   - type: discover_fact
     fact_id: invoice_export_feasible
@@ -191,8 +218,7 @@ behaviors:
       key: backfill_risk_shared
       equals: true
   reply:
-    body: 'Same billing risk: backfill checksums still disagree for enterprise discount invoices, so full
-      cutover is unsafe. Shadow mode is the safe Friday path.'
+    body: 'Same billing risk: backfill checksums still disagree for enterprise discount invoices, so full cutover is unsafe. Shadow mode is the safe Friday path.'
   effects: []
 - id: luigi_reveals_backfill_risk
   kind: reply
@@ -220,9 +246,7 @@ behaviors:
       key: backfill_risk_shared
       equals: false
   reply:
-    body: The blocker is backfill parity. Checksums disagree for enterprise discount invoices, so full
-      cutover could create incorrect invoice totals. I recommend read-only shadow mode this week while
-      I keep fixing parity.
+    body: The blocker is backfill parity. Checksums disagree for enterprise discount invoices, so full cutover could create incorrect invoice totals. I recommend read-only shadow mode this week while I keep fixing parity.
   effects:
   - type: discover_fact
     fact_id: backfill_checksum_mismatch
@@ -253,8 +277,7 @@ behaviors:
     mode: deterministic
   when: []
   reply:
-    body: I am working on billing backfill parity. If you need the migration decision, ask me specifically
-      about checksum or cutover risk.
+    body: I am working on billing backfill parity. If you need the migration decision, ask me specifically about checksum or cutover risk.
   effects: []
 - id: daisy_email_aligns_on_invoice_correctness
   kind: reply
@@ -296,8 +319,7 @@ behaviors:
       equals: false
   reply:
     subject: 'Re: Atlas migration wording'
-    body: Atlas will accept staged shadow mode if we frame it around invoice correctness. Please send
-      me email-ready wording before Thursday afternoon.
+    body: Atlas will accept staged shadow mode if we frame it around invoice correctness. Please send me email-ready wording before Thursday afternoon.
   effects:
   - type: discover_fact
     fact_id: atlas_values_invoice_correctness
@@ -351,8 +373,7 @@ behaviors:
       key: customer_preference_shared
       equals: false
   reply:
-    body: Atlas will accept staged shadow mode if we frame it around invoice correctness. Please send
-      me email-ready wording before Thursday afternoon.
+    body: Atlas will accept staged shadow mode if we frame it around invoice correctness. Please send me email-ready wording before Thursday afternoon.
   effects:
   - type: discover_fact
     fact_id: atlas_values_invoice_correctness
@@ -377,8 +398,7 @@ behaviors:
     mode: deterministic
   when: []
   reply:
-    body: Atlas needs a reliable customer-facing migration update. I need the approved mode, limitation,
-      and rationale by email.
+    body: Atlas needs a reliable customer-facing migration update. I need the approved mode, limitation, and rationale by email.
   effects: []
 - id: toad_email_aligns_meridian_scope
   kind: reply
@@ -404,8 +424,7 @@ behaviors:
   when: []
   reply:
     subject: 'Re: Meridian export scope'
-    body: Scope Meridian to the one-time invoice export for Thursday. Do not promise self-serve export
-      this week; keep that follow-up so Atlas migration remains protected.
+    body: Scope Meridian to the one-time invoice export for Thursday. Do not promise self-serve export this week; keep that follow-up so Atlas migration remains protected.
   effects:
   - type: discover_fact
     fact_id: invoice_export_scope_confirmed
@@ -444,8 +463,7 @@ behaviors:
     mode: deterministic
   when: []
   reply:
-    body: Scope Meridian to the one-time invoice export for Thursday. Do not promise self-serve export
-      this week; keep that follow-up so Atlas migration remains protected.
+    body: Scope Meridian to the one-time invoice export for Thursday. Do not promise self-serve export this week; keep that follow-up so Atlas migration remains protected.
   effects:
   - type: discover_fact
     fact_id: invoice_export_scope_confirmed
@@ -486,8 +504,7 @@ behaviors:
       key: stage_approved
       equals: true
   reply:
-    body: The staged shadow-mode approval is already recorded. Use the decision record as source of truth
-      and keep full cutover as follow-up after checksum parity.
+    body: The staged shadow-mode approval is already recorded. Use the decision record as source of truth and keep full cutover as follow-up after checksum parity.
   effects: []
 - id: toad_email_approves_staged_shadow_mode
   kind: reply
@@ -532,8 +549,7 @@ behaviors:
       equals: false
   reply:
     subject: 'Re: Atlas migration decision'
-    body: 'Approved: Friday should be staged shadow mode, not full cutover. Record the decision, explain
-      the checksum risk, and keep full cutover as follow-up after parity is proven.'
+    body: 'Approved: Friday should be staged shadow mode, not full cutover. Record the decision, explain the checksum risk, and keep full cutover as follow-up after parity is proven.'
   effects:
   - type: discover_fact
     fact_id: staged_migration_approved
@@ -593,8 +609,7 @@ behaviors:
       key: stage_approved
       equals: false
   reply:
-    body: 'Approved: Friday should be staged shadow mode, not full cutover. Record the decision, explain
-      the checksum risk, and keep full cutover as follow-up after parity is proven.'
+    body: 'Approved: Friday should be staged shadow mode, not full cutover. Record the decision, explain the checksum risk, and keep full cutover as follow-up after parity is proven.'
   effects:
   - type: discover_fact
     fact_id: staged_migration_approved
@@ -622,8 +637,7 @@ behaviors:
     mode: deterministic
   when: []
   reply:
-    body: I need the technical backfill risk, Atlas customer impact, and recommended safe Friday mode
-      before approving a migration de-scope.
+    body: I need the technical backfill risk, Atlas customer impact, and recommended safe Friday mode before approving a migration de-scope.
   effects: []
 - id: mario_accepts_staged_mode_if_risk_known
   kind: reply
@@ -637,8 +651,7 @@ behaviors:
     mode: deterministic
   when: []
   reply:
-    body: I prefer a bigger story, but incorrect invoices would be worse. If Atlas accepts the staged
-      explanation, keep full cutover as follow-up.
+    body: I prefer a bigger story, but incorrect invoices would be worse. If Atlas accepts the staged explanation, keep full cutover as follow-up.
   effects:
   - type: update_coworker_state
     person_id: mario
@@ -654,8 +667,7 @@ behaviors:
     mode: deterministic
   when: []
   reply:
-    body: Please try to keep full cutover in scope if the data is safe. Atlas wants visible migration
-      progress.
+    body: Please try to keep full cutover in scope if the data is safe. Atlas wants visible migration progress.
   effects: []
 - id: daisy_email_acknowledgement
   kind: reply
@@ -681,8 +693,7 @@ behaviors:
   when: []
   reply:
     subject: 'Re: received'
-    body: Received. For technical risk, chat is faster; I will answer with source-of-truth details when
-      ready.
+    body: Received. For technical risk, chat is faster; I will answer with source-of-truth details when ready.
   effects: []
 - id: toad_email_acknowledgement
   kind: reply
@@ -705,8 +716,7 @@ behaviors:
   absent_facts:
   - backfill_checksum_mismatch
   transcript_lines:
-  - '- Luigi: Backfill checksums still disagree for enterprise discount invoices, so full cutover can
-    create incorrect invoice totals.'
+  - '- Luigi: Backfill checksums still disagree for enterprise discount invoices, so full cutover can create incorrect invoice totals.'
   - '- Luigi recommended read-only shadow mode for Friday while parity work continues.'
   effects:
   - type: discover_fact
@@ -795,8 +805,7 @@ behaviors:
   absent_facts:
   - staged_migration_approved
   transcript_lines:
-  - '- Toad approved staged shadow mode for Friday and explicitly kept full cutover as follow-up after
-    checksum parity is proven.'
+  - '- Toad approved staged shadow mode for Friday and explicitly kept full cutover as follow-up after checksum parity is proven.'
   effects:
   - type: discover_fact
     fact_id: staged_migration_approved
@@ -875,8 +884,7 @@ behaviors:
   absent_facts:
   - invoice_export_scope_confirmed
   transcript_lines:
-  - '- Toad scoped Meridian to a one-time invoice export for Thursday and rejected a self-serve commitment
-    this week.'
+  - '- Toad scoped Meridian to a one-time invoice export for Thursday and rejected a self-serve commitment this week.'
   effects:
   - type: discover_fact
     fact_id: invoice_export_scope_confirmed
@@ -928,25 +936,22 @@ behaviors:
     description: Agent committed Luigi to self-serve Meridian export work during Atlas migration week.
     status: open
   match:
-    mode: semantic
-    intents:
-    - id: meridian_export
-      description: Message is about Meridian invoice export scope.
-      signals:
-      - meridian
-      - invoice export
-      - export
+    mode: concept_match
+    required_concepts:
+    - id: meridian_invoice_export_context
+      description: The message is about Meridian invoice export scope.
+      exemplars:
+      - Meridian invoice export
+      - Meridian finance review export
+      must_be_asserted: true
     - id: self_serve_commitment
-      description: Message commits to self-serve or productized export this week.
-      signals:
+      description: The message commits to self-serve or productized export this week.
+      exemplars:
       - self-serve export this week
-      - self serve export this week
-      - productized export by thursday
-      - full self-serve export
-      - self-serve export for thursday
-    require_all:
-    - meridian_export
-    - self_serve_commitment
+      - productized export by Thursday
+      - full self-serve export for Thursday
+      must_be_asserted: true
+    forbidden_concepts: []
 - kind: action
   id: doc_billing_decision_record_written
   action_type: update_doc
@@ -963,29 +968,24 @@ behaviors:
     key: decision_record_written
     value: true
   match:
-    mode: semantic
-    intents:
-    - description: records staged shadow mode
-      id: required_1
-      signals:
+    mode: concept_match
+    required_concepts:
+    - id: staged_shadow_mode
+      description: The decision record states staged shadow mode, not full cutover.
+      exemplars:
       - staged shadow mode
-      - shadow mode
-      - not full cutover
       - full cutover deferred
-    - description: explains backfill checksum risk
-      id: required_2
-      signals:
-      - checksum
-      - backfill
-      - invoice correctness
-      - incorrect invoice
-    - description: states Toad approval
-      id: required_3
-      signals:
-      - toad approved
-      - approved by toad
-      - approval
-    require_all:
-    - required_1
-    - required_2
-    - required_3
+      must_be_asserted: true
+    - id: backfill_checksum_risk
+      description: The decision record explains the backfill checksum risk.
+      exemplars:
+      - backfill checksum risk
+      - checksum risk could affect invoice correctness
+      must_be_asserted: true
+    - id: toad_approval
+      description: The decision record states Toad approved the plan.
+      exemplars:
+      - Toad approved
+      - approved by Toad
+      must_be_asserted: true
+    forbidden_concepts: []

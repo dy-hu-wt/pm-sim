@@ -224,6 +224,7 @@ RESOURCE_PREFIXES = {
     "blockers": "blocker_",
     "docs": "doc_",
     "tasks": "task_",
+    "pressures": "pressure_",
 }
 
 RESOURCE_REF_KEYS = {
@@ -241,12 +242,15 @@ RESOURCE_REF_KEYS = {
     "task_id": "tasks",
     "upstream_task_id": "tasks",
     "downstream_task_id": "tasks",
+    "pressure_id": "pressures",
 }
 
 CONDITION_REF_SECTIONS = {
     "project_decision": "projects",
     "blocker_status": "blockers",
     "task_status": "tasks",
+    "pressure_at_least": "pressures",
+    "pressure_at_most": "pressures",
 }
 
 
@@ -342,7 +346,7 @@ def copy_object(data: dict[str, Any]) -> dict[str, Any]:
 def _match_for_grading_action(action: dict[str, Any]) -> dict[str, Any]:
     match = action.get("match")
     if isinstance(match, dict):
-        return {"mode": "semantic", **match}
+        return {"mode": "concept_match", **match}
     raise ScenarioError("grading rule action must include match.")
 
 
@@ -379,6 +383,7 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
     tasks = _ids(data, "tasks")
     blockers = _ids(data, "blockers")
     docs = _ids(data, "docs")
+    pressures = _ids(data, "pressures")
     _ids(data, "dependencies")
     _ids(data, "messages")
     _ids(data, "calendar_events")
@@ -457,6 +462,11 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         _require_project(blocker, "blocker", projects)
         _validate_owner(blocker, "blocker", valid_actors)
 
+    for pressure in data.get("pressures", []):
+        _require_project(pressure, "pressure", projects)
+        _validate_owner(pressure, "pressure", valid_actors)
+        _validate_pressure(pressure)
+
     for doc in data.get("docs", []):
         metadata = doc.get("metadata", {})
         owner_id = doc.get("owner_id") or (
@@ -520,6 +530,7 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         projects,
         blockers,
         tasks,
+        pressures,
         valid_actors,
         response_delays,
     )
@@ -537,6 +548,7 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         projects,
         blockers,
         tasks,
+        pressures,
         valid_actors,
     )
     _validate_meeting_rules(
@@ -547,6 +559,7 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         projects,
         blockers,
         tasks,
+        pressures,
         valid_actors,
     )
     _validate_action_rules(
@@ -557,8 +570,10 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         projects,
         blockers,
         tasks,
+        pressures,
         valid_actors,
     )
+    _validate_condition_rule_sets(data, facts, pressures, valid_actors)
     _validate_scored_milestones_are_state_derived(data)
     _validate_scripted_policy(data.get("scripted_policy", []), people, docs, tasks)
 
@@ -592,6 +607,30 @@ def _validate_owner(item: dict[str, Any], label: str, valid_actors: set[str]) ->
         raise ScenarioError(f"{label.title()} {item.get('id')} references unknown owner_id: {owner_id}")
 
 
+def _validate_pressure(pressure: dict[str, Any]) -> None:
+    pressure_id = pressure.get("id")
+    if not isinstance(pressure.get("kind"), str) or not pressure["kind"]:
+        raise ScenarioError(f"Pressure {pressure_id} must define string kind.")
+    if not isinstance(pressure.get("intensity"), int):
+        raise ScenarioError(f"Pressure {pressure_id} must define integer intensity.")
+    for key in ("intensity", "min_intensity", "max_intensity"):
+        value = pressure.get(key, 1 if key == "min_intensity" else 10)
+        if not isinstance(value, int) or value < 1 or value > 10:
+            raise ScenarioError(f"Pressure {pressure_id} {key} must be an integer from 1 to 10.")
+    min_intensity = int(pressure.get("min_intensity", 1))
+    max_intensity = int(pressure.get("max_intensity", 10))
+    intensity = int(pressure["intensity"])
+    if min_intensity > max_intensity:
+        raise ScenarioError(f"Pressure {pressure_id} min_intensity cannot exceed max_intensity.")
+    if intensity < min_intensity or intensity > max_intensity:
+        raise ScenarioError(
+            f"Pressure {pressure_id} intensity must be between min_intensity and max_intensity."
+        )
+    due_at = pressure.get("due_at")
+    if due_at is not None:
+        _parse_datetime(due_at, f"pressure {pressure_id} due_at")
+
+
 def _validate_actor_reply_behavior(
     rule: dict[str, Any],
     people: set[str],
@@ -600,6 +639,7 @@ def _validate_actor_reply_behavior(
     projects: set[str],
     blockers: set[str],
     tasks: set[str],
+    pressures: set[str],
     valid_actors: set[str],
     response_delays: dict[str, Any],
 ) -> None:
@@ -631,6 +671,7 @@ def _validate_actor_reply_behavior(
         rule.get("when", []),
         label=f"Actor behavior {rule_id}",
         facts=facts,
+        pressures=pressures,
         valid_actors=valid_actors,
     )
 
@@ -652,6 +693,7 @@ def _validate_actor_reply_behavior(
         projects=projects,
         blockers=blockers,
         tasks=tasks,
+        pressures=pressures,
         valid_actors=valid_actors,
     )
 
@@ -664,6 +706,7 @@ def _validate_event_rules(
     projects: set[str],
     blockers: set[str],
     tasks: set[str],
+    pressures: set[str],
     valid_actors: set[str],
 ) -> None:
     seen = set()
@@ -678,6 +721,13 @@ def _validate_event_rules(
         event_type = rule.get("event_type")
         if event_type not in event_types:
             raise ScenarioError(f"Event rule {rule_id} references unknown event_type: {event_type}")
+        _validate_conditions(
+            rule.get("when", []),
+            label=f"Event rule {rule_id}",
+            facts=facts,
+            pressures=pressures,
+            valid_actors=valid_actors,
+        )
         effects = rule.get("effects", [])
         if not isinstance(effects, list) or not effects:
             raise ScenarioError(f"Event rule {rule_id} effects must be a non-empty list.")
@@ -689,6 +739,7 @@ def _validate_event_rules(
             projects=projects,
             blockers=blockers,
             tasks=tasks,
+            pressures=pressures,
             valid_actors=valid_actors,
         )
 
@@ -701,6 +752,7 @@ def _validate_actor_policy_behavior(
     projects: set[str],
     blockers: set[str],
     tasks: set[str],
+    pressures: set[str],
     valid_actors: set[str],
 ) -> None:
     behavior_id = behavior["id"]
@@ -724,6 +776,7 @@ def _validate_actor_policy_behavior(
         behavior.get("when", []),
         label=f"Actor behavior {behavior_id}",
         facts=facts,
+        pressures=pressures,
         valid_actors=valid_actors,
     )
 
@@ -738,6 +791,7 @@ def _validate_actor_policy_behavior(
         projects=projects,
         blockers=blockers,
         tasks=tasks,
+        pressures=pressures,
         valid_actors=valid_actors,
     )
 
@@ -750,6 +804,7 @@ def _validate_actor_behaviors(
     projects: set[str],
     blockers: set[str],
     tasks: set[str],
+    pressures: set[str],
     valid_actors: set[str],
     response_delays: dict[str, Any],
 ) -> None:
@@ -774,6 +829,7 @@ def _validate_actor_behaviors(
                 projects,
                 blockers,
                 tasks,
+                pressures,
                 valid_actors,
                 response_delays,
             )
@@ -787,6 +843,7 @@ def _validate_actor_behaviors(
                 projects,
                 blockers,
                 tasks,
+                pressures,
                 valid_actors,
             )
             continue
@@ -801,6 +858,7 @@ def _validate_meeting_rules(
     projects: set[str],
     blockers: set[str],
     tasks: set[str],
+    pressures: set[str],
     valid_actors: set[str],
 ) -> None:
     seen = set()
@@ -850,6 +908,7 @@ def _validate_meeting_rules(
                 projects=projects,
                 blockers=blockers,
                 tasks=tasks,
+                pressures=pressures,
                 valid_actors=valid_actors,
             )
 
@@ -862,6 +921,7 @@ def _validate_action_rules(
     projects: set[str],
     blockers: set[str],
     tasks: set[str],
+    pressures: set[str],
     valid_actors: set[str],
 ) -> None:
     seen = set()
@@ -896,6 +956,7 @@ def _validate_action_rules(
             rule.get("when", []),
             label=f"Action rule {rule_id}",
             facts=facts,
+            pressures=pressures,
             valid_actors=valid_actors,
         )
 
@@ -910,14 +971,19 @@ def _validate_action_rules(
             projects=projects,
             blockers=blockers,
             tasks=tasks,
+            pressures=pressures,
             valid_actors=valid_actors,
         )
 
 
 def _validate_match_spec(spec: dict[str, Any], label: str, *, facts: set[str]) -> None:
     mode = spec.get("mode", "deterministic")
-    if mode not in {"deterministic", "semantic", "llm"}:
-        raise ScenarioError(f"{label} match.mode must be deterministic, semantic, or llm.")
+    if mode not in {"deterministic", "concept_match"}:
+        raise ScenarioError(f"{label} match.mode must be deterministic or concept_match.")
+
+    matcher = spec.get("matcher")
+    if matcher is not None and matcher != "llm":
+        raise ScenarioError(f"{label} match.matcher must be llm when provided.")
 
     for key in ("required_facts", "required_facts_any", "absent_facts"):
         _validate_string_list(spec.get(key, []), f"{label} {key}")
@@ -974,6 +1040,43 @@ def _validate_match_spec(spec: dict[str, Any], label: str, *, facts: set[str]) -
             if not isinstance(exemplars, list) or not exemplars:
                 raise ScenarioError(f"{concept_label} must include non-empty exemplars.")
             _validate_string_list(exemplars, f"{concept_label} exemplars")
+
+
+def _validate_condition_rule_sets(
+    data: dict[str, Any],
+    facts: set[str],
+    pressures: set[str],
+    valid_actors: set[str],
+) -> None:
+    for section, key in (
+        ("milestone_rules", "when"),
+        ("task_gate_rules", "requires"),
+        ("outcome_rules", "when"),
+    ):
+        for rule in data.get(section, []):
+            if not isinstance(rule, dict):
+                continue
+            _validate_conditions(
+                rule.get(key, []),
+                label=f"{section} {rule.get('id', rule.get('task_id', '<unknown>'))}",
+                facts=facts,
+                pressures=pressures,
+                valid_actors=valid_actors,
+            )
+
+    for component_id, component in data.get("score_components", {}).items():
+        if not isinstance(component, dict):
+            continue
+        for rule in component.get("harm_rules", []):
+            if not isinstance(rule, dict):
+                continue
+            _validate_conditions(
+                rule.get("when", []),
+                label=f"score component {component_id} harm rule",
+                facts=facts,
+                pressures=pressures,
+                valid_actors=valid_actors,
+            )
 
 
 def _validate_scored_milestones_are_state_derived(data: dict[str, Any]) -> None:
@@ -1071,12 +1174,19 @@ def _validate_conditions(
     *,
     label: str,
     facts: set[str],
+    pressures: set[str],
     valid_actors: set[str],
 ) -> None:
     if not isinstance(conditions, list):
         raise ScenarioError(f"{label} when must be a list.")
     for condition in conditions:
-        _validate_condition(condition, label=label, facts=facts, valid_actors=valid_actors)
+        _validate_condition(
+            condition,
+            label=label,
+            facts=facts,
+            pressures=pressures,
+            valid_actors=valid_actors,
+        )
 
 
 def _validate_condition(
@@ -1084,6 +1194,7 @@ def _validate_condition(
     *,
     label: str,
     facts: set[str],
+    pressures: set[str],
     valid_actors: set[str],
 ) -> None:
     if not isinstance(condition, dict):
@@ -1094,6 +1205,7 @@ def _validate_condition(
                 condition[key],
                 label=label,
                 facts=facts,
+                pressures=pressures,
                 valid_actors=valid_actors,
             )
     if "not" in condition:
@@ -1101,6 +1213,7 @@ def _validate_condition(
             condition["not"],
             label=label,
             facts=facts,
+            pressures=pressures,
             valid_actors=valid_actors,
         )
     if "fact_discovered" in condition and condition["fact_discovered"] not in facts:
@@ -1123,6 +1236,18 @@ def _validate_condition(
             if not isinstance(match, dict):
                 raise ScenarioError(f"{label} message_exists match must be an object.")
             _validate_match_spec(match, f"{label} message_exists", facts=facts)
+    for key in ("pressure_at_least", "pressure_at_most"):
+        if key not in condition:
+            continue
+        spec = condition[key]
+        if not isinstance(spec, dict):
+            raise ScenarioError(f"{label} {key} condition must be an object.")
+        pressure_id = spec.get("id")
+        if pressure_id not in pressures:
+            raise ScenarioError(f"{label} references unknown {key} pressure: {pressure_id}")
+        intensity = spec.get("intensity")
+        if not isinstance(intensity, int) or intensity < 1 or intensity > 10:
+            raise ScenarioError(f"{label} {key}.intensity must be an integer from 1 to 10.")
 
 
 def _validate_effects(
@@ -1134,6 +1259,7 @@ def _validate_effects(
     projects: set[str],
     blockers: set[str],
     tasks: set[str],
+    pressures: set[str],
     valid_actors: set[str],
 ) -> None:
     for effect in effects:
@@ -1191,6 +1317,29 @@ def _validate_effects(
             raise ScenarioError(
                 f"{label} references unknown update_task task_id: {effect.get('task_id')}"
             )
+        if effect_type in {"increase_pressure", "lower_pressure"}:
+            pressure_id = effect.get("pressure_id")
+            if pressure_id not in pressures:
+                raise ScenarioError(
+                    f"{label} references unknown {effect_type} pressure_id: {pressure_id}"
+                )
+            if effect_type == "increase_pressure":
+                by = effect.get("by")
+                if not isinstance(by, int) or by < 0:
+                    raise ScenarioError(f"{label} increase_pressure.by must be a non-negative integer.")
+            if effect_type == "lower_pressure":
+                has_to = "to" in effect
+                has_by = "by" in effect
+                if has_to == has_by:
+                    raise ScenarioError(f"{label} lower_pressure must include exactly one of to or by.")
+                if has_to and (
+                    not isinstance(effect.get("to"), int)
+                    or effect["to"] < 1
+                    or effect["to"] > 10
+                ):
+                    raise ScenarioError(f"{label} lower_pressure.to must be an integer from 1 to 10.")
+                if has_by and (not isinstance(effect.get("by"), int) or effect["by"] < 0):
+                    raise ScenarioError(f"{label} lower_pressure.by must be a non-negative integer.")
         if effect_type == "create_message":
             sender_id = effect.get("sender_id")
             recipient_id = effect.get("recipient_id")

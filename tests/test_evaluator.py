@@ -28,12 +28,12 @@ from pm_sim.coworkers import effects_for_event, replies_for_chat, replies_for_em
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
 from pm_sim.engine.effects import apply_effects
-from pm_sim.formatters import format_agent_progress_html, format_output, format_semantic_progress
+from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
 from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
-from pm_sim import semantic_match as semantic_match_module
+from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset
 from pm_sim.engine.time import advance_time
 from pm_sim.timeline import timeline
@@ -530,6 +530,8 @@ class EvaluatorTests(unittest.TestCase):
 
         self.assertIn("Evaluation Explanation", output)
         self.assertIn("Score:", output)
+        self.assertIn("Outcome Comparison:", output)
+        self.assertIn("Critical Path:", output)
         self.assertIn("blocker_discovery", output)
         self.assertIn("stakeholder_communication", output)
         self.assertIn("task_state_improvement", output)
@@ -543,6 +545,28 @@ class EvaluatorTests(unittest.TestCase):
         self.assertIn("Daisy has received grounded customer-ready Nimbus beta wording.", output)
         self.assertIn("Toad has recorded approval for draft mode.", output)
         self.assertIn("Luigi has shared the private repo security baseline.", output)
+
+    def test_evaluator_includes_outcome_comparison_and_critical_path(self) -> None:
+        result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+
+        comparison = result["outcome_comparison"]
+        critical_path = result["critical_path"]
+
+        self.assertIsNone(comparison["baseline_expected_score"])
+        self.assertEqual(comparison["actual_outcome"], None)
+        self.assertIsNone(comparison["improved_over_baseline"])
+        self.assertGreaterEqual(critical_path["blocked_count"], 1)
+        self.assertGreaterEqual(critical_path["dependency_count"], 1)
+
+    def test_scored_milestone_trace_points_to_action_log(self) -> None:
+        self._drive_happy_path()
+        result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        risk = next(component for component in result["components"] if component["key"] == "risk_handling")
+        milestone = next(item for item in risk["milestones"] if item["key"] == "decision_record_written")
+
+        self.assertEqual(milestone["trace"]["source_type"], "action")
+        self.assertEqual(milestone["trace"]["action_type"], "update_doc")
+        self.assertEqual(milestone["trace"]["actor"], "agent")
 
     def test_evaluate_explain_prints_missing_milestones(self) -> None:
         output = self._run_cli("evaluate", "--explain")

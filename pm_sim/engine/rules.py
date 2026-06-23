@@ -7,13 +7,13 @@ from typing import Any, Callable
 from .conditions import all_conditions_match
 
 
-SemanticMatcher = Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]
+ConceptMatcher = Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]
 
 
 @dataclass(frozen=True)
 class RuleMatch:
     matches: bool
-    semantic: dict[str, Any] | None = None
+    concept: dict[str, Any] | None = None
 
 
 def normalize_text(value: str) -> str:
@@ -33,7 +33,7 @@ def match_rule(
     conn: sqlite3.Connection | None = None,
     state: dict[str, Any] | None = None,
     project_id: str | None = None,
-    semantic_matcher: SemanticMatcher | None = None,
+    concept_matcher: ConceptMatcher | None = None,
 ) -> RuleMatch:
     context = context or {}
     for key in context_keys:
@@ -44,13 +44,13 @@ def match_rule(
     match_spec = rule.get("match")
     if not isinstance(match_spec, dict):
         return RuleMatch(False)
-    semantic_match_spec = _match_semantic_criteria(match_spec)
+    concept_match_spec = _match_concept_criteria(match_spec)
 
     if not match_text_and_facts(
         match_spec,
         normalized_text,
         state=state,
-        include_intents=semantic_match_spec is None,
+        include_intents=concept_match_spec is None,
     ):
         return RuleMatch(False)
 
@@ -60,13 +60,13 @@ def match_rule(
     if conn is None and state is not None and not state_conditions_match(conditions, state):
         return RuleMatch(False)
 
-    if semantic_match_spec:
-        if semantic_matcher is None:
+    if concept_match_spec:
+        if concept_matcher is None:
             return RuleMatch(False)
-        semantic_result = semantic_matcher(semantic_match_spec, rule)
-        if not semantic_result.get("matches"):
-            return RuleMatch(False, semantic_result)
-        return RuleMatch(True, semantic_result)
+        concept_result = concept_matcher(concept_match_spec, rule)
+        if not concept_result.get("matches"):
+            return RuleMatch(False, concept_result)
+        return RuleMatch(True, concept_result)
 
     return RuleMatch(True)
 
@@ -97,12 +97,13 @@ def match_text_and_facts(
     return True
 
 
-def _match_semantic_criteria(match: dict[str, Any]) -> dict[str, Any] | None:
+def _match_concept_criteria(match: dict[str, Any]) -> dict[str, Any] | None:
     mode = str(match.get("mode", "deterministic")).lower()
-    if mode not in {"semantic", "llm"}:
+    if mode != "concept_match":
         return None
     criteria = _criteria_from_intents(match)
-    criteria["matcher_mode"] = "llm" if mode == "llm" else "deterministic"
+    criteria["mode"] = "concept_match"
+    criteria["matcher"] = "llm"
     return criteria if criteria["required"] or criteria["forbidden"] else None
 
 
@@ -117,19 +118,19 @@ def _criteria_from_intents(match: dict[str, Any]) -> dict[str, Any]:
     forbidden_ids = _forbidden_intent_ids(match)
     return {
         "required": [
-            _semantic_item_from_intent(intents[intent_id])
+            _concept_item_from_intent(intents[intent_id])
             for intent_id in required_ids
             if intent_id in intents
         ],
         "forbidden": [
-            _semantic_item_from_intent(intents[intent_id])
+            _concept_item_from_intent(intents[intent_id])
             for intent_id in forbidden_ids
             if intent_id in intents
         ],
     }
 
 
-def _semantic_item_from_intent(intent: dict[str, Any]) -> dict[str, Any]:
+def _concept_item_from_intent(intent: dict[str, Any]) -> dict[str, Any]:
     return dict(intent)
 
 

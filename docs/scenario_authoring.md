@@ -83,6 +83,40 @@ projects:
     deadline_at: "2026-06-26T15:00:00"
 ```
 
+Use `stakeholder_pressure` as static context only. Mutable pressure should be modeled with `pressures`, so background events, coworker policies, and outcome rules all read the same state.
+
+```yaml
+pressures:
+  - id: nimbus_customer_confidence
+    project_id: pr_review_agent
+    owner_id: daisy
+    kind: customer_update
+    intensity: 5
+    min_intensity: 1
+    max_intensity: 10
+    reason: Daisy needs grounded customer-ready wording before her Thursday update.
+    due_at: "2026-06-25T10:00:00"
+```
+
+Pressure intensity is a `1-10` scale. Scenario effects can raise or recover pressure, and the condition language can branch on pressure state.
+
+```yaml
+effects:
+  - type: increase_pressure
+    pressure_id: nimbus_customer_confidence
+    by: 3
+    reason: Customer-ready wording missed Daisy's Thursday update window.
+  - type: lower_pressure
+    pressure_id: nimbus_customer_confidence
+    to: 2
+    reason: Daisy received grounded customer-ready wording.
+
+when:
+  - pressure_at_most:
+      id: nimbus_customer_confidence
+      intensity: 3
+```
+
 Facts are pieces of knowledge. Hidden or private facts should not be visible until a coworker, document, meeting, or event reveals them.
 
 ```yaml
@@ -131,7 +165,7 @@ actor_behaviors:
     person_id: luigi
     channels: [chat, email]
     match:
-      mode: semantic
+      mode: deterministic
       intents:
         - id: asks_repo_sync_risk
           description: The agent asks whether repo sync is safe for Friday launch.
@@ -227,28 +261,32 @@ grading_rules:
       type: send_email
       recipient_id: daisy
       match:
-        mode: semantic
+        mode: concept_match
         required_concepts:
           - id: friday_draft_mode
             description: Friday launch mode is draft mode or queued draft suggestions.
             exemplars:
               - use draft mode for the Friday beta
               - the agent queues draft suggestions for Friday
+            must_be_asserted: true
           - id: human_approval_before_posting
             description: A human or reviewer must approve before anything is posted.
             exemplars:
               - a reviewer approves before posting
               - comments require human approval before posting
+            must_be_asserted: true
           - id: repo_sync_stale_risk
             description: Repo sync can make the agent review stale code.
             exemplars:
               - repo sync can cause stale commit reviews
               - webhook ordering can leave the agent reviewing an older commit
+            must_be_asserted: true
         forbidden_concepts:
           - id: unsafe_auto_posting
             description: The message promises automatic posting for Friday.
             exemplars:
               - comments will post automatically on Friday
+            must_be_asserted: true
     state:
       person_id: daisy
       key: customer_update_received
@@ -258,18 +296,18 @@ grading_rules:
       note: Daisy received grounded customer-ready launch wording.
 ```
 
-This rule is causal. The agent must discover the risk and get the decision before the email can update Daisy's state. The semantic matcher only checks narrow authored concepts in the action text; the evaluator later scores `customer_message_ready` from Daisy's state, not from the raw email body. Prefer `required_concepts` and `forbidden_concepts` with a few exemplars over long keyword lists for grading rules.
+This rule is causal. The agent must discover the risk and get the decision before the email can update Daisy's state. The concept matcher only checks narrow authored concepts in the action text; the evaluator later scores `customer_message_ready` from Daisy's state, not from the raw email body. Prefer `required_concepts` and `forbidden_concepts` with a few exemplars over long keyword lists for grading rules.
 
-`mode: semantic` uses deterministic exemplar matching. It is intentionally narrow and fail-closed, so broad paraphrases should not score unless the scenario author adds an exemplar. `mode: llm` is reserved for optional model-based matching; it still receives only the authored criteria and message text, caches by mode/model/criteria/text, and rejects responses that do not return every authored concept id with a rationale. The LLM never decides facts, task state, outcome state, or points.
+`mode: concept_match` makes this text check explicit. Concept matching is LLM-backed and requires `OPENAI_API_KEY` for full scoring. It receives only the authored criteria and message text, caches by model/criteria/text/rule id, and rejects responses that do not return every authored concept id with a rationale. The LLM never decides facts, task state, outcome state, or points.
 
 ## Reusable Patterns
 
 Use these patterns before inventing a one-off structure:
 
-- Grounded communication: prerequisites in `requires`, semantic `action.match`, a state mutation, then a derived `milestone`. Scenario-specific fields are the recipient, required facts, concepts/exemplars, state key, and note; engine-generic fields are `requires`, `action`, `state`, and `milestone`.
+- Grounded communication: prerequisites in `requires`, `mode: concept_match` action text criteria, a state mutation, then a derived `milestone`. Scenario-specific fields are the recipient, required facts, concepts/exemplars, state key, and note; engine-generic fields are `requires`, `action`, `state`, and `milestone`.
 - Blocker discovery: hidden/private fact plus `update_blocker` to `surfaced`, usually from an actor reply, event, or meeting. Scenario-specific fields are the fact, owner, blocker, and wording; engine-generic fields are fact visibility, blocker status, and effects.
 - Stakeholder approval: decision-maker reply or meeting rule records a fact/project decision and coworker state. Scenario-specific fields are who can approve and what evidence they need; engine-generic fields are `project_decision`, `update_project`, `update_coworker_state`, and task gates.
-- Interruption scoping: outside event creates pressure, reveals a scoped fact, and records a commitment or project decision that protects the main project. Scenario-specific fields are customer/project names and tradeoff; engine-generic fields are event delivery, effects, commitments, and harmful-action rules.
+- Interruption scoping: outside event creates or raises a `pressures` row, reveals a scoped fact, and records a commitment or project decision that protects the main project. Scenario-specific fields are customer/project names, pressure kind, and tradeoff; engine-generic fields are event delivery, pressure effects, commitments, and harmful-action rules.
 - Final readiness: late-week event asks for a consolidated written update. The grading rule should require prior decisions/facts so a guessed status note cannot score. Scenario-specific fields are required content and deadline; engine-generic fields are scheduled events, causal prerequisites, and derived milestones.
 
 State-derived milestones look like this:
@@ -376,10 +414,14 @@ Before calling a scenario done, run these commands:
 
 ```bash
 pm-sim reset --scenario scenarios/<scenario_id>
+pm-sim lint-scenario --scenario scenarios/<scenario_id>
+pm-sim graph-scenario --scenario scenarios/<scenario_id>
 pm-sim advance-time to:2026-06-26T15:00:00
 pm-sim evaluate --scenario scenarios/<scenario_id> --explain
 pm-sim run-agent --policy scripted --reset --scenario scenarios/<scenario_id>
 python -m unittest discover -s tests
 ```
+
+`lint-scenario` gives counts, warnings, actor behavior primitive counts, and score links. `graph-scenario` prints the project/task/blocker/dependency/grading graph so you can see whether a milestone is actually connected to the state it claims to measure.
 
 Then inspect the no-op score and the scripted score. The no-op path should be clearly worse. The scripted path should pass. If both paths score well, the evaluator is too loose. If the scripted path only works by following one exact sequence, add alternate chat, email, or meeting paths that produce the same state.

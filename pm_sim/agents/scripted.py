@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -20,8 +18,7 @@ def run_scripted_agent(
     *,
     reset_first: bool = False,
 ) -> dict[str, Any]:
-    with _scripted_semantic_matcher():
-        return _run_scripted_agent(db_path, scenario_path, reset_first=reset_first)
+    return _run_scripted_agent(db_path, scenario_path, reset_first=reset_first)
 
 
 def _run_scripted_agent(
@@ -86,16 +83,3 @@ def _step(name: str, result: dict[str, Any]) -> dict[str, Any]:
         "ok": result.get("ok", True),
         "result": result,
     }
-
-
-@contextmanager
-def _scripted_semantic_matcher():
-    previous = os.environ.get("PM_SIM_SEMANTIC_MATCHER")
-    os.environ["PM_SIM_SEMANTIC_MATCHER"] = "deterministic"
-    try:
-        yield
-    finally:
-        if previous is None:
-            os.environ.pop("PM_SIM_SEMANTIC_MATCHER", None)
-        else:
-            os.environ["PM_SIM_SEMANTIC_MATCHER"] = previous

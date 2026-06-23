@@ -51,6 +51,18 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
                     """
                 ).fetchall()
             ),
+            "pressures": rows_to_dicts(
+                conn.execute(
+                    """
+                    SELECT pr.id, pr.project_id, pr.owner_id, p.name AS owner_name,
+                           pr.kind, pr.intensity, pr.min_intensity, pr.max_intensity,
+                           pr.reason, pr.due_at, pr.updated_at, pr.metadata_json
+                    FROM pressures pr
+                    LEFT JOIN people p ON p.id = pr.owner_id
+                    ORDER BY pr.intensity DESC, pr.due_at, pr.id
+                    """
+                ).fetchall()
+            ),
             "discovered_facts": rows_to_dicts(
                 conn.execute(
                     """
@@ -287,6 +299,7 @@ def _load_scenario(conn: sqlite3.Connection, scenario: dict[str, Any]) -> None:
     _insert_coworker_state(conn, scenario.get("coworker_state", []), scenario["start_time"])
     _insert_facts(conn, scenario.get("facts", []))
     _insert_projects(conn, scenario.get("projects", []))
+    _insert_pressures(conn, scenario.get("pressures", []), scenario["start_time"])
     _insert_actor_runtime_state(conn, scenario, scenario["start_time"])
     _insert_tasks(conn, scenario.get("tasks", []))
     _insert_dependencies(conn, scenario.get("dependencies", []))
@@ -337,14 +350,15 @@ def _insert_coworker_state(
     for row in rows:
         conn.execute(
             """
-            INSERT INTO coworker_state (person_id, key, value_json, updated_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO coworker_state (person_id, key, value_json, updated_at, source)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (
                 row["person_id"],
                 row["key"],
                 dumps(row.get("value")),
                 row.get("updated_at", start_time),
+                row.get("source", "seed"),
             ),
         )
 
@@ -477,6 +491,35 @@ def _insert_projects(conn: sqlite3.Connection, projects: list[dict[str, Any]]) -
                         }
                     }
                 ),
+            ),
+        )
+
+
+def _insert_pressures(
+    conn: sqlite3.Connection,
+    pressures: list[dict[str, Any]],
+    start_time: str,
+) -> None:
+    for pressure in pressures:
+        conn.execute(
+            """
+            INSERT INTO pressures
+              (id, project_id, owner_id, kind, intensity, min_intensity,
+               max_intensity, reason, due_at, updated_at, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                pressure["id"],
+                pressure["project_id"],
+                pressure.get("owner_id"),
+                pressure["kind"],
+                int(pressure["intensity"]),
+                int(pressure.get("min_intensity", 1)),
+                int(pressure.get("max_intensity", 10)),
+                pressure.get("reason", ""),
+                pressure.get("due_at"),
+                pressure.get("updated_at", start_time),
+                dumps(pressure.get("metadata", {})),
             ),
         )
 

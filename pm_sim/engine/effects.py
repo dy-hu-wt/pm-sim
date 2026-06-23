@@ -33,8 +33,12 @@ def apply_effects(
             result = _apply_update_task(conn, effect)
         elif effect_type == "update_project":
             result = _apply_update_project(conn, effect)
+        elif effect_type == "increase_pressure":
+            result = _apply_increase_pressure(conn, effect, now=now)
+        elif effect_type == "lower_pressure":
+            result = _apply_lower_pressure(conn, effect, now=now)
         elif effect_type == "update_coworker_state":
-            result = _apply_update_coworker_state(conn, effect, now=now)
+            result = _apply_update_coworker_state(conn, effect, now=now, source=source)
         elif effect_type == "update_actor_workload":
             result = _apply_update_actor_workload(conn, effect, now=now)
         elif effect_type == "add_actor_commitment":
@@ -277,11 +281,92 @@ def _apply_update_project(conn: sqlite3.Connection, effect: dict[str, Any]) -> d
     return {"project_id": project_id}
 
 
+def _apply_increase_pressure(
+    conn: sqlite3.Connection,
+    effect: dict[str, Any],
+    *,
+    now: str,
+) -> dict[str, Any]:
+    pressure_id = _required(effect, "pressure_id")
+    by = int(_required(effect, "by"))
+    if by < 0:
+        raise ValueError("increase_pressure.by must be non-negative.")
+    row = _pressure_row(conn, pressure_id)
+    updated = min(int(row["max_intensity"]), int(row["intensity"]) + by)
+    reason = effect.get("reason", row["reason"])
+    conn.execute(
+        """
+        UPDATE pressures
+        SET intensity = ?,
+            reason = ?,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (updated, reason, now, pressure_id),
+    )
+    return {
+        "pressure_id": pressure_id,
+        "previous_intensity": int(row["intensity"]),
+        "intensity": updated,
+    }
+
+
+def _apply_lower_pressure(
+    conn: sqlite3.Connection,
+    effect: dict[str, Any],
+    *,
+    now: str,
+) -> dict[str, Any]:
+    pressure_id = _required(effect, "pressure_id")
+    row = _pressure_row(conn, pressure_id)
+    if "to" in effect:
+        requested = int(effect["to"])
+    elif "by" in effect:
+        by = int(effect["by"])
+        if by < 0:
+            raise ValueError("lower_pressure.by must be non-negative.")
+        requested = int(row["intensity"]) - by
+    else:
+        raise ValueError("lower_pressure effect must include to or by.")
+    updated = max(int(row["min_intensity"]), min(int(row["max_intensity"]), requested))
+    reason = effect.get("reason", row["reason"])
+    conn.execute(
+        """
+        UPDATE pressures
+        SET intensity = ?,
+            reason = ?,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (updated, reason, now, pressure_id),
+    )
+    return {
+        "pressure_id": pressure_id,
+        "previous_intensity": int(row["intensity"]),
+        "intensity": updated,
+    }
+
+
+def _pressure_row(conn: sqlite3.Connection, pressure_id: str) -> sqlite3.Row:
+    row = conn.execute(
+        """
+        SELECT id, intensity, min_intensity, max_intensity, reason
+        FROM pressures
+        WHERE id = ?
+        """,
+        (pressure_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"Cannot update unknown pressure: {pressure_id}")
+    return row
+
+
 def _apply_update_coworker_state(
     conn: sqlite3.Connection,
     effect: dict[str, Any],
     *,
     now: str,
+    source: str,
 ) -> dict[str, Any]:
     person_id = _required(effect, "person_id")
     person = conn.execute("SELECT 1 FROM people WHERE id = ?", (person_id,)).fetchone()
@@ -299,16 +384,35 @@ def _apply_update_coworker_state(
     for key, value in updates.items():
         if not isinstance(key, str) or not key:
             raise ValueError("update_coworker_state keys must be non-empty strings.")
-        conn.execute(
+        value_json = dumps(value)
+        existing = conn.execute(
             """
-            INSERT INTO coworker_state (person_id, key, value_json, updated_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(person_id, key) DO UPDATE SET
-              value_json = excluded.value_json,
-              updated_at = excluded.updated_at
+            SELECT value_json
+            FROM coworker_state
+            WHERE person_id = ? AND key = ?
             """,
-            (person_id, key, dumps(value), now),
-        )
+            (person_id, key),
+        ).fetchone()
+        if existing is not None and existing["value_json"] == value_json:
+            changed.append(key)
+            continue
+        if existing is None:
+            conn.execute(
+                """
+                INSERT INTO coworker_state (person_id, key, value_json, updated_at, source)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (person_id, key, value_json, now, source),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE coworker_state
+                SET value_json = ?, updated_at = ?, source = ?
+                WHERE person_id = ? AND key = ?
+                """,
+                (value_json, now, source, person_id, key),
+            )
         changed.append(key)
 
     return {"person_id": person_id, "keys": sorted(changed)}

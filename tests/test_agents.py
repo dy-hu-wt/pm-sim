@@ -36,12 +36,12 @@ from pm_sim.coworkers import effects_for_event, replies_for_chat, replies_for_em
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
 from pm_sim.engine.effects import apply_effects
-from pm_sim.formatters import format_agent_progress_html, format_output, format_semantic_progress
+from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
 from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
-from pm_sim import semantic_match as semantic_match_module
+from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset
 from pm_sim.engine.time import advance_time
 from pm_sim.timeline import timeline
@@ -80,17 +80,6 @@ class ScriptedAgentTests(unittest.TestCase):
             ).fetchone()
         self.assertEqual(json.loads(row["metadata_json"])["final_outcome"], "draft_mode_beta_shipped")
 
-    def test_scripted_agent_forces_deterministic_semantic_matching(self) -> None:
-        with unittest.mock.patch.dict(
-            os.environ,
-            {"PM_SIM_SEMANTIC_MATCHER": "llm", "OPENAI_API_KEY": "test-key"},
-        ):
-            result = run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
-
-            self.assertTrue(result["ok"])
-            self.assertEqual(result["evaluation"]["score"], result["evaluation"]["max_score"])
-            self.assertEqual(os.environ["PM_SIM_SEMANTIC_MATCHER"], "llm")
-
     def test_cli_ui_static_writes_html_summary(self) -> None:
         run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
         output_path = Path(self.tmpdir.name) / "ui.html"
@@ -106,6 +95,42 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertIn("Playback", html)
         self.assertIn("Timeline", html)
         self.assertIn("Debug Logs", html)
+
+    def test_cli_ui_static_initializes_fresh_db(self) -> None:
+        output_path = Path(self.tmpdir.name) / "fresh_ui.html"
+
+        output = self._run_cli("ui", "--static", "--output", str(output_path))
+        html = output_path.read_text(encoding="utf-8")
+
+        self.assertIn("UI written", output)
+        self.assertIn("PM Sim Operator UI", html)
+        self.assertTrue(self.db_path.exists())
+        with connect(self.db_path) as conn:
+            row = conn.execute("SELECT value FROM sim_state WHERE key = 'scenario_id'").fetchone()
+        self.assertEqual(row["value"], "launch_readiness")
+
+    def test_cli_ui_static_resume_fresh_db_gives_clean_error(self) -> None:
+        output_path = Path(self.tmpdir.name) / "fresh_ui.html"
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            exit_code = cli_main(
+                [
+                    "--db",
+                    str(self.db_path),
+                    "ui",
+                    "--static",
+                    "--resume",
+                    "--output",
+                    str(output_path),
+                ]
+            )
+
+        self.assertEqual(exit_code, 2)
+        self.assertFalse(output_path.exists())
+        self.assertIn("Database is not initialized", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_scripted_agent_uses_public_tool_actions(self) -> None:
         run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
@@ -164,11 +189,12 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertIn("Missing Evaluation", output)
         self.assertIn("security_interruption: security_doc_found, security_question_answered", output)
 
-    def test_semantic_progress_line_is_compact_and_highlighted(self) -> None:
-        line = format_semantic_progress(
+    def test_concept_progress_line_is_compact_and_highlighted(self) -> None:
+        line = format_concept_progress(
             {
                 "rule_id": "final_readiness_confirmed_email",
-                "mode": "llm",
+                "mode": "concept_match",
+                "matcher": "llm",
                 "model": "gpt-4.1-mini",
                 "matches": True,
                 "required": [{"matched": True}, {"matched": True}],
@@ -178,15 +204,16 @@ class ScriptedAgentTests(unittest.TestCase):
 
         self.assertEqual(
             line,
-            "SEMANTIC final_readiness_confirmed_email llm:gpt-4.1-mini matched 2/2 required",
+            "CONCEPT final_readiness_confirmed_email llm:gpt-4.1-mini matched 2/2 required",
         )
-        self.assertIn("agent-tool-semantic", html)
+        self.assertIn("agent-tool-concept", html)
 
-    def test_semantic_progress_line_shows_fail_closed_error(self) -> None:
-        line = format_semantic_progress(
+    def test_concept_progress_line_shows_fail_closed_error(self) -> None:
+        line = format_concept_progress(
             {
                 "rule_id": "customer_message_ready",
-                "mode": "llm",
+                "mode": "concept_match",
+                "matcher": "llm",
                 "matches": False,
                 "error": "JSONDecodeError: Expecting value",
                 "required": [],

@@ -7,7 +7,7 @@ The intended chain is:
 ```text
 agent action
   -> deterministic causal gates
-  -> optional semantic text check
+  -> optional concept text check
   -> world/coworker state mutation
   -> state-derived milestone
   -> component score
@@ -26,9 +26,9 @@ Scored milestones should be represented as state:
 
 The evaluator derives scored milestones from `milestone_rules`. Direct `record_milestone` effects are rejected for scored keys by scenario validation.
 
-## Semantic Matching
+## Concept Matching
 
-Semantic matching is intentionally narrow. It answers: "does this already-grounded action communicate the authored required ideas and avoid forbidden claims?"
+Concept matching is intentionally narrow. It answers: "does this already-grounded action communicate the authored required ideas and avoid forbidden claims?"
 
 It does not decide whether the PM deserves credit by itself. Causal gates run first:
 
@@ -37,7 +37,7 @@ It does not decide whether the PM deserves credit by itself. Causal gates run fi
 - required customer interruptions must already be visible
 - required coworker state must already exist
 
-The default matcher is deterministic so the documented CLI path works in a fresh clone without OpenAI credentials. `PM_SIM_SEMANTIC_MATCHER=llm` enables cached, fail-closed model-backed phrasing equivalence when an operator wants broader paraphrase handling, but the evaluator still scores database state. The semantic cache key includes the matcher mode and model so deterministic and LLM results cannot contaminate each other inside the same SQLite DB.
+Concept matching is LLM-backed and requires `OPENAI_API_KEY` for full scoring. The matcher receives only the authored criteria and the candidate action text, returns per-concept booleans and rationales, and fails closed on missing credentials, invalid output, missing concept IDs, or contradictory top-level results. The evaluator still scores database state. The concept-match cache key includes model, criteria, text, and rule id, so model changes cannot reuse stale results.
 
 ## Anti-Cheat Matrix
 
@@ -50,6 +50,6 @@ The tests cover these failure modes:
 | Fake task completion without required blockers/facts | Rejected by task gates or ignored by outcome |
 | Unsafe promise while blocker remains unresolved | Harmful-action component loses credit |
 | Busywork outreach and task churn | Does not satisfy state-derived milestones |
-| Semantic matcher failure | Fails closed and does not mutate scoring state |
+| Concept matcher failure | Fails closed and does not mutate scoring state |
 
 This keeps scoring inspectable: reviewers can trace every point back to state in SQLite.

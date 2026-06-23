@@ -217,7 +217,7 @@ The evaluator should point to concrete evidence:
 
 The score should not depend on vague style judgments. Any communication penalty should be tied to observable counts or state, and should be small compared with outcome evidence.
 
-Model-based verification, when enabled, is deliberately narrow. The evaluator still inspects the database, event log, coworker state, and final project state directly. A lightweight semantic matcher may be used only to decide whether an action's text communicates authored required ideas without forbidden claims. Deterministic causal gates run first, matcher results are cached, and malformed or low-confidence model output fails closed.
+Model-based verification, when enabled, is deliberately narrow. The evaluator still inspects the database, event log, coworker state, and final project state directly. A lightweight concept matcher may be used only to decide whether an action's text communicates authored required ideas without forbidden claims. Deterministic causal gates run first, matcher results are cached, and malformed or low-confidence model output fails closed.
 
 ## Core Building Blocks
 
@@ -285,7 +285,7 @@ Scenario data should define most of the setup:
 - outcome rules
 - actor behaviors
 
-Python owns reusable interpreters and mutation semantics, while scenario-specific scoring, outcomes, actor behaviors, proactive events, action-derived effects, and meeting semantics should be data-authored. The current implementation uses a small reusable condition language for task gates, action rules, state-derived evidence rows, harmful-action rules, actor behaviors, background event rules, meeting rules, and outcome classification. Actor routing and action scoring both use the shared `match` object: deterministic mode routes stable coworker behavior, while semantic mode validates phrasing before state mutation.
+Python owns reusable interpreters and mutation semantics, while scenario-specific scoring, outcomes, actor behaviors, proactive events, action-derived effects, and meeting semantics should be data-authored. The current implementation uses a small reusable condition language for task gates, action rules, state-derived evidence rows, harmful-action rules, actor behaviors, background event rules, meeting rules, and outcome classification. Actor routing and action scoring both use the shared `match` object: deterministic mode routes stable coworker behavior, while `mode: concept_match` validates authored required and forbidden concepts before state mutation.
 
 The defensible split is:
 

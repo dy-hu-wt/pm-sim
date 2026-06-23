@@ -15,7 +15,7 @@ from .engine.rules import match_rule, normalize_text
 from .engine.time import consume_action_time
 from .jsonutil import dumps, loads
 from .paths import DEFAULT_DB_PATH
-from .semantic_match import semantic_match
+from .concept_match import concept_match
 from .state import AGENT_ID, get_current_time, log_action
 
 COMPLETED_STATUSES = {"complete", "completed", "done", "resolved"}
@@ -112,6 +112,7 @@ def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
             return {"ok": False, "error": f"Doc is not visible: {doc_id}"}
 
         revision_id = _next_id(conn, "doc_revisions", "doc_revision")
+        action_id = _next_id(conn, "action_log", "action_update_doc")
         conn.execute(
             """
             INSERT INTO doc_revisions
@@ -134,7 +135,7 @@ def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
             conn,
             doc_effects,
             now=current_time,
-            source=f"action:{revision_id}",
+            source=f"action:{action_id}",
         )
         time_cost = consume_action_time(
             conn,
@@ -143,20 +144,20 @@ def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
         )
         log_action(
             conn,
-            action_id=_next_id(conn, "action_log", "action_update_doc"),
+            action_id=action_id,
             actor=AGENT_ID,
             action_type="update_doc",
             created_at=current_time,
             payload={
                 "doc_id": doc_id,
                 "body": body,
-                "semantic_matches": action_context.get("semantic_matches", []),
+                "concept_matches": action_context.get("concept_matches", []),
             },
             result={
                 "doc_id": doc_id,
                 "revision_id": revision_id,
                 "applied_effects": applied_effects,
-                "semantic_matches": action_context.get("semantic_matches", []),
+                "concept_matches": action_context.get("concept_matches", []),
                 "time_cost": time_cost,
             },
         )
@@ -166,7 +167,7 @@ def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
             "doc_id": doc_id,
             "revision_id": revision_id,
             "applied_effects": applied_effects,
-            "semantic_matches": action_context.get("semantic_matches", []),
+            "concept_matches": action_context.get("concept_matches", []),
             "time_cost": time_cost,
         }
     finally:
@@ -188,6 +189,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
             return {"ok": False, "error": f"Person not found: {person_id}"}
 
         message_id = _next_id(conn, "messages", "msg_agent_chat")
+        action_id = _next_id(conn, "action_log", "action_send_chat")
         conn.execute(
             """
             INSERT INTO messages
@@ -212,7 +214,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
             conn,
             chat_effects,
             now=current_time,
-            source=f"action:{message_id}",
+            source=f"action:{action_id}",
         )
         time_cost = consume_action_time(
             conn,
@@ -222,20 +224,20 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
 
         log_action(
             conn,
-            action_id=_next_id(conn, "action_log", "action_send_chat"),
+            action_id=action_id,
             actor=AGENT_ID,
             action_type="send_chat",
             created_at=current_time,
             payload={
                 "person_id": person_id,
                 "body": body,
-                "semantic_matches": action_context.get("semantic_matches", []),
+                "concept_matches": action_context.get("concept_matches", []),
             },
             result={
                 "message_id": message_id,
                 "scheduled_reply_ids": scheduled_reply_ids,
                 "applied_effects": applied_effects,
-                "semantic_matches": action_context.get("semantic_matches", []),
+                "concept_matches": action_context.get("concept_matches", []),
                 "time_cost": time_cost,
             },
         )
@@ -246,7 +248,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
             "message_id": message_id,
             "scheduled_reply_ids": scheduled_reply_ids,
             "applied_effects": applied_effects,
-            "semantic_matches": action_context.get("semantic_matches", []),
+            "concept_matches": action_context.get("concept_matches", []),
             "time_cost": time_cost,
         }
     finally:
@@ -275,6 +277,7 @@ def send_email(
             return {"ok": False, "error": f"Person not found: {person_id}"}
 
         message_id = _next_id(conn, "messages", "msg_agent_email")
+        action_id = _next_id(conn, "action_log", "action_send_email")
         conn.execute(
             """
             INSERT INTO messages
@@ -299,7 +302,7 @@ def send_email(
             conn,
             email_effects,
             now=current_time,
-            source=f"action:{message_id}",
+            source=f"action:{action_id}",
         )
         time_cost = consume_action_time(
             conn,
@@ -308,7 +311,7 @@ def send_email(
         )
         log_action(
             conn,
-            action_id=_next_id(conn, "action_log", "action_send_email"),
+            action_id=action_id,
             actor=AGENT_ID,
             action_type="send_email",
             created_at=current_time,
@@ -316,13 +319,13 @@ def send_email(
                 "person_id": person_id,
                 "subject": subject,
                 "body": body,
-                "semantic_matches": action_context.get("semantic_matches", []),
+                "concept_matches": action_context.get("concept_matches", []),
             },
             result={
                 "message_id": message_id,
                 "scheduled_reply_ids": scheduled_reply_ids,
                 "applied_effects": applied_effects,
-                "semantic_matches": action_context.get("semantic_matches", []),
+                "concept_matches": action_context.get("concept_matches", []),
                 "time_cost": time_cost,
             },
         )
@@ -333,7 +336,7 @@ def send_email(
             "message_id": message_id,
             "scheduled_reply_ids": scheduled_reply_ids,
             "applied_effects": applied_effects,
-            "semantic_matches": action_context.get("semantic_matches", []),
+            "concept_matches": action_context.get("concept_matches", []),
             "time_cost": time_cost,
         }
     finally:
@@ -575,7 +578,7 @@ def _effects_for_action(
             context=context,
             context_keys=("person_id", "recipient_id", "doc_id"),
             conn=conn,
-            semantic_matcher=lambda criteria, matched_rule: semantic_match(
+            concept_matcher=lambda criteria, matched_rule: concept_match(
                 conn,
                 text=str(context.get("text", "")),
                 criteria=criteria,
@@ -584,18 +587,19 @@ def _effects_for_action(
         )
         if not match_result.matches:
             continue
-        semantic_result = match_result.semantic
-        if semantic_result is not None:
-            context.setdefault("semantic_matches", []).append(
+        concept_result = match_result.concept
+        if concept_result is not None:
+            context.setdefault("concept_matches", []).append(
                 {
                     "rule_id": rule.get("id"),
-                    "mode": semantic_result.get("mode"),
-                    "model": semantic_result.get("model"),
-                    "matches": semantic_result.get("matches"),
-                    "required": semantic_result.get("required", []),
-                    "forbidden": semantic_result.get("forbidden", []),
-                    "error": semantic_result.get("error"),
-                    "cache_key": semantic_result.get("cache_key"),
+                    "mode": concept_result.get("mode"),
+                    "matcher": concept_result.get("matcher"),
+                    "model": concept_result.get("model"),
+                    "matches": concept_result.get("matches"),
+                    "required": concept_result.get("required", []),
+                    "forbidden": concept_result.get("forbidden", []),
+                    "error": concept_result.get("error"),
+                    "cache_key": concept_result.get("cache_key"),
                 }
             )
         effects.extend(dict(effect) for effect in rule.get("effects", []))

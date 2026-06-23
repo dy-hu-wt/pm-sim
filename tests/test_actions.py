@@ -30,12 +30,12 @@ from pm_sim.coworkers import effects_for_event, replies_for_chat, replies_for_em
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
 from pm_sim.engine.effects import apply_effects
-from pm_sim.formatters import format_agent_progress_html, format_output, format_semantic_progress
+from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
 from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
-from pm_sim import semantic_match as semantic_match_module
+from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset
 from pm_sim.engine.time import advance_time
 from pm_sim.timeline import timeline
@@ -508,16 +508,46 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
                 for effect in result["applied_effects"]
             )
         )
-        self.assertTrue(result["semantic_matches"])
+        self.assertTrue(result["concept_matches"])
         self.assertIn(
             "grading_customer_message_ready_action",
-            {match["rule_id"] for match in result["semantic_matches"]},
+            {match["rule_id"] for match in result["concept_matches"]},
         )
         self.assertTrue(loads(row["value_json"]))
         self.assertIn(
             "customer_message_ready",
             {evidence["key"] for evidence in stakeholder_component["milestones"]},
         )
+
+    def test_customer_message_keyword_soup_does_not_mutate_customer_state(self) -> None:
+        self._drive_to_draft_approval()
+
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus words",
+            "Nimbus Friday beta repo sync risk draft mode human approval.",
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(self._coworker_state_value("daisy", "customer_message_ready"))
+
+    def test_customer_message_with_unsafe_auto_post_promise_does_not_score(self) -> None:
+        self._drive_to_draft_approval()
+
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus Friday draft-mode status",
+            (
+                "For the Friday Nimbus beta, use draft mode and have a reviewer approve before posting. "
+                "Repo sync webhook ordering can review an older commit. Also tell Nimbus we will "
+                "post comments automatically during Friday because auto-commenting is in scope."
+            ),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(self._coworker_state_value("daisy", "customer_message_ready"))
 
     def test_guessed_customer_message_before_discovery_is_not_customer_ready(self) -> None:
         result = send_email(
@@ -647,6 +677,57 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertTrue(loads(row["value_json"]))
         self.assertEqual(evidence["key"], "security_question_answered")
         self.assertIn("private repo source handling", evidence["note"])
+
+    def test_security_answer_with_raw_source_retention_promise_does_not_score(self) -> None:
+        self._seed_security_prerequisites()
+
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus private repo security answer",
+            (
+                "Nimbus private repo source code is processed transiently and raw source is not retained "
+                "long term. Generated draft suggestions and metadata are retained for the 30 days beta "
+                "audit. But also say raw source is stored long term for debugging."
+            ),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(self._coworker_state_value("daisy", "security_answer_received"))
+
+    def test_koopa_update_with_self_serve_promise_does_not_score(self) -> None:
+        self._seed_koopa_prerequisites()
+
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Koopa audit log export scope",
+            (
+                "Koopa can receive a one-time CSV export of admin audit logs for the security review, "
+                "and self-serve export should stay follow-up after Nimbus launch. Also promise self-serve "
+                "is ready for Thursday."
+            ),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(self._coworker_state_value("daisy", "koopa_update_received"))
+
+    def test_final_readiness_with_unsafe_promise_does_not_score(self) -> None:
+        self._seed_final_readiness_prerequisites()
+
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Thursday final readiness",
+            (
+                "Final readiness is go for the Nimbus Friday beta in draft mode with human approval. "
+                "Private repo security wording is covered, and Koopa gets a one-time CSV export. "
+                "Also commit to self-serve export this week and say auto-commenting is in scope."
+            ),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(self._coworker_state_value("daisy", "final_readiness_confirmed"))
 
     def test_schedule_meeting_creates_future_meeting_event(self) -> None:
         result = schedule_meeting(
@@ -914,6 +995,113 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
             "Repo sync can review stale commits. Approve draft mode for Friday?",
         )
         advance_time(self.db_path, "90m")
+
+    def _seed_security_prerequisites(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "create_message",
+                        "channel": "email",
+                        "sender_id": "daisy",
+                        "recipient_id": "agent",
+                        "subject": "Nimbus private repo security question",
+                        "body": "Nimbus asks about private repo source code security.",
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "luigi",
+                        "key": "security_doc_shared",
+                        "value": True,
+                    },
+                ],
+                now="2026-06-24T16:00:00",
+                source="test",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def _seed_koopa_prerequisites(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "discover_fact",
+                        "fact_id": "fact_audit_log_one_time_export_feasible",
+                    },
+                    {
+                        "type": "discover_fact",
+                        "fact_id": "fact_audit_export_scope_confirmed",
+                    },
+                    {
+                        "type": "update_project",
+                        "project_id": "project_audit_log_export",
+                        "decision": "one_time_csv_for_review",
+                    },
+                ],
+                now="2026-06-24T12:00:00",
+                source="test",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def _seed_final_readiness_prerequisites(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "create_message",
+                        "channel": "chat",
+                        "sender_id": "daisy",
+                        "recipient_id": "agent",
+                        "body": "Can you give me the final Nimbus agenda go/no-go?",
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "toad",
+                        "key": "decision_record_written",
+                        "value": True,
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "daisy",
+                        "values": {
+                            "customer_message_ready": True,
+                            "security_answer_received": True,
+                            "koopa_update_received": True,
+                        },
+                    },
+                ],
+                now="2026-06-25T12:00:00",
+                source="test",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def _coworker_state_value(self, person_id: str, key: str) -> Any:
+        conn = connect(self.db_path)
+        try:
+            row = conn.execute(
+                """
+                SELECT value_json
+                FROM coworker_state
+                WHERE person_id = ?
+                  AND key = ?
+                """,
+                (person_id, key),
+            ).fetchone()
+            return None if row is None else loads(row["value_json"])
+        finally:
+            conn.close()
 
     def _task_state(self, task_id: str) -> dict[str, str]:
         conn = connect(self.db_path)

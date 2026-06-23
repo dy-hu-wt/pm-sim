@@ -47,16 +47,14 @@ Then run the tests:
 python -m unittest discover -s tests
 ```
 
-Optional LLM settings are only needed for the model-driven agent policy:
+Install the LLM extra and configure an OpenAI key. The simulator can load scenarios and exercise basic tools without a key, but full scoring uses LLM-backed concept matching for authored communication rules.
 
 ```bash
 cp .env.example .env
 python -m pip install -e ".[llm]"
 ```
 
-By default the simulator and manual happy path run fully offline. The LLM policy uses
-`OPENAI_MODEL` from `.env`; `.env.example` sets a demo-friendly default model. Override
-`OPENAI_MODEL` or pass `--model` when you want a different model.
+Set `OPENAI_API_KEY` in `.env`. The model-driven agent policy uses `OPENAI_MODEL`; concept matching uses `PM_SIM_CONCEPT_MODEL` if set, then `OPENAI_MODEL`, then its built-in default. `.env.example` sets demo-friendly model names. Override `OPENAI_MODEL`, `PM_SIM_CONCEPT_MODEL`, or pass `--model` when you want a different agent model.
 
 ## Start
 
@@ -270,7 +268,7 @@ Open the operator UI:
 pm-sim ui
 ```
 
-This resets the scenario, starts a local UI, and opens it in your browser. The Play button runs the deterministic scripted PM demo one workplace action at a time, using the same backend tools and event queue as the CLI. Use `pm-sim ui --resume` only when you intentionally want to inspect the current DB instead of starting fresh. To write a static HTML snapshot of the current DB, use `pm-sim ui --static --output tmp/demo_ui.html`; that file is a report-style snapshot, not a live run.
+This resets the scenario, starts a local UI, and opens it in your browser. The Play button runs the scripted PM demo one workplace action at a time, using the same backend tools and event queue as the CLI. Concept-scored communication still uses the configured LLM matcher. Use `pm-sim ui --resume` only when you intentionally want to inspect the current DB instead of starting fresh. To write a static HTML snapshot of the current DB, use `pm-sim ui --static --output tmp/demo_ui.html`; that file is a report-style snapshot, not a live run.
 
 To watch the model-driven agent in the same UI, install the LLM extra, set `OPENAI_API_KEY`, and run:
 
@@ -278,7 +276,7 @@ To watch the model-driven agent in the same UI, install the LLM extra, set `OPEN
 pm-sim ui --policy llm --max-turns 80
 ```
 
-In LLM mode, each Play tick runs one model turn and then renders the tool calls/events that landed in SQLite. The scripted UI mode remains the default because it is deterministic and does not require network access.
+In LLM policy mode, each Play tick runs one model turn and then renders the tool calls/events that landed in SQLite. The scripted UI mode remains the default for repeatable demos, but scored concept matching still requires `OPENAI_API_KEY`.
 
 Advance simulated time without using wall-clock time:
 
@@ -296,7 +294,7 @@ pm-sim events
 pm-sim log
 ```
 
-Run the deterministic scripted agent:
+Run the scripted agent:
 
 ```bash
 pm-sim run-agent --policy scripted --reset
@@ -317,7 +315,7 @@ If an LLM run stops below full score, the operator summary prints the missing ev
 
 ## Evaluation
 
-Run the deterministic evaluator against the current SQLite state:
+Run the evaluator against the current SQLite state:
 
 ```bash
 pm-sim evaluate
@@ -331,7 +329,7 @@ Task updates are checked against the surrounding world state to resist reward ha
 
 After the Friday deadline event is delivered, `evaluate` also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
-The scenario is split across `scenarios/launch_readiness/scenario.yaml`, `world.yaml`, `interactions.yaml`, and `evaluation.yaml`. Most scenario semantics now live in data: task gates, coworker memory, actor behaviors, chat/email/doc-derived effects, state-derived evidence, harmful-action rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger intents, transcript lines, semantic criteria, and effects. `actor_behaviors` is the single behavior authoring and runtime surface: `kind: "reply"` handles chat/email replies, and `kind: "policy"` handles proactive timed/state-driven nudges. Matching now uses one `match` object: deterministic actor routing uses `mode: "deterministic"` and authored intents/signals, while action-derived scoring uses `mode: "semantic"` after causal `when` conditions pass. Semantic communication checks default to deterministic matching so a clone can run the documented path without OpenAI. Set `PM_SIM_SEMANTIC_MATCHER=llm` only when you want cached, fail-closed model-backed phrasing equivalence. The semantic cache key includes matcher mode and model so deterministic and LLM checks cannot contaminate each other. The `ui` command is an operator surface over the same SQLite state; its live playback advances time through the same backend event queue rather than replaying separate UI state.
+The scenario is split across `scenarios/launch_readiness/scenario.yaml`, `world.yaml`, `interactions.yaml`, and `evaluation.yaml`. Most scenario semantics now live in data: task gates, coworker memory, actor behaviors, chat/email/doc-derived effects, pressure rows, state-derived evidence, harmful-action rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger intents, transcript lines, concept criteria, pressure kinds, and effects. Static `stakeholder_pressure` text is only project context; mutable pressure uses `pressures` rows with `1-10` intensity plus `increase_pressure`, `lower_pressure`, `pressure_at_least`, and `pressure_at_most`. `actor_behaviors` is the single behavior authoring and runtime surface: `kind: "reply"` handles chat/email replies, and `kind: "policy"` handles proactive timed/state-driven nudges. Matching uses one `match` object: deterministic actor routing uses `mode: "deterministic"` with authored intents/signals, while action-derived scoring uses `mode: "concept_match"` after causal `when` conditions pass. Concept communication checks are LLM-backed, cached, and fail closed. The LLM receives only the action text and authored concept criteria; it never decides facts, task state, outcome state, or points. The concept-match cache key includes model, criteria, text, and rule id. The `ui` command is an operator surface over the same SQLite state; its live playback advances time through the same backend event queue rather than replaying separate UI state.
 
 Coworkers are deterministic autonomous actors, not freeform LLM NPCs. Their distinct roles come from authored personas, agenda fields (`current_focus`, `needs_from_pm`, `known_constraints`), private facts, mutable `coworker_state`, schema-backed actor goals/workload/commitments, response-delay/availability windows, proactive scheduled events, and prioritized actor behaviors. Direct chat/email goes through an actor decision step: the simulator gathers matched behavior candidates, actor workload constraints, open commitments, agenda/clarification needs, and contradictions with recorded decisions, ranks them, then composes one delayed reply. Actor behaviors use the shared condition language through `when`, so behavior can depend on actor memory, project decisions, blocker status, milestones, or time. Meetings also check attendee availability and existing calendar conflicts before scheduling. This keeps grading reproducible while still modeling PM-relevant behavior such as delayed answers, private owner knowledge, stakeholder pressure, escalation, workload changes, explicit commitments, and different responses after someone has already answered or approved something.
 

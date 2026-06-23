@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS coworker_state (
   key TEXT NOT NULL,
   value_json TEXT NOT NULL DEFAULT 'null',
   updated_at TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'seed',
   PRIMARY KEY (person_id, key)
 );
 
@@ -75,6 +76,25 @@ CREATE TABLE IF NOT EXISTS projects (
   deadline TEXT,
   metadata_json TEXT NOT NULL DEFAULT '{}'
 );
+
+CREATE TABLE IF NOT EXISTS pressures (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  owner_id TEXT REFERENCES people(id),
+  kind TEXT NOT NULL,
+  intensity INTEGER NOT NULL CHECK (intensity BETWEEN 1 AND 10),
+  min_intensity INTEGER NOT NULL DEFAULT 1 CHECK (min_intensity BETWEEN 1 AND 10),
+  max_intensity INTEGER NOT NULL DEFAULT 10 CHECK (max_intensity BETWEEN 1 AND 10),
+  reason TEXT NOT NULL DEFAULT '',
+  due_at TEXT,
+  updated_at TEXT NOT NULL,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  CHECK (min_intensity <= max_intensity),
+  CHECK (intensity >= min_intensity AND intensity <= max_intensity)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pressures_project
+  ON pressures(project_id, intensity DESC, due_at, id);
 
 CREATE TABLE IF NOT EXISTS facts (
   id TEXT PRIMARY KEY,

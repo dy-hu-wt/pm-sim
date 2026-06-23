@@ -7,17 +7,17 @@ behaviors:
     channel: chat
     sender_id: mario
     recipient_id: agent
-    body: I still want auto-commenting in the Friday beta if we can make it work. Please call out any
-      launch risk clearly before we cut scope.
+    body: I still want auto-commenting in the Friday beta if we can make it work. Please call out any launch risk clearly before we cut scope.
   - type: update_project
     project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
         product_pressure_acknowledged: true
-  - type: update_project
-    project_id: pr_review_agent
-    scope_pressure_delta: 1
+  - type: increase_pressure
+    pressure_id: pr_review_scope_pressure
+    by: 1
+    reason: Mario is still pushing to keep auto-commenting in Friday scope.
 - kind: event
   id: peach_design_blocked_escalation
   event_type: peach_design_blocked_escalation
@@ -29,8 +29,7 @@ behaviors:
     channel: chat
     sender_id: peach
     recipient_id: agent
-    body: I am blocked on onboarding until someone confirms whether auto-commenting or draft mode is in
-      scope for Friday.
+    body: I am blocked on onboarding until someone confirms whether auto-commenting or draft mode is in scope for Friday.
   - type: update_project
     project_id: pr_review_agent
     launch_conflict:
@@ -54,17 +53,17 @@ behaviors:
     channel: chat
     sender_id: daisy
     recipient_id: agent
-    body: Nimbus asked whether Friday's coding-agent beta is still on track. I need a confidence update
-      before I talk to them.
+    body: Nimbus asked whether Friday's coding-agent beta is still on track. I need a confidence update before I talk to them.
   - type: update_project
     project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
         customer_constraint_known: true
-  - type: update_project
-    project_id: pr_review_agent
-    stakeholder_pressure_delta: 1
+  - type: increase_pressure
+    pressure_id: nimbus_customer_confidence
+    by: 1
+    reason: Daisy needs a confidence update before talking to Nimbus.
 - kind: event
   id: daisy_private_repo_security_question
   event_type: daisy_private_repo_security_question
@@ -80,11 +79,11 @@ behaviors:
     sender_id: daisy
     recipient_id: agent
     subject: Nimbus private repo security question
-    body: Nimbus's security reviewer asked whether the PR Review Agent stores source code from private
-      repos. I need a safe answer before Friday's beta call.
-  - type: update_project
-    project_id: pr_review_agent
-    stakeholder_pressure_delta: 1
+    body: Nimbus's security reviewer asked whether the PR Review Agent stores source code from private repos. I need a safe answer before Friday's beta call.
+  - type: increase_pressure
+    pressure_id: nimbus_security_review_pressure
+    by: 1
+    reason: Nimbus raised a private-repo security question before the beta call.
 - kind: event
   id: nimbus_launch_mode_question
   event_type: nimbus_launch_mode_question
@@ -100,17 +99,17 @@ behaviors:
     sender_id: daisy
     recipient_id: agent
     subject: Nimbus launch mode question
-    body: Nimbus asked whether the beta agent will post comments automatically or queue draft suggestions
-      for approval. I need a clear answer before I update them Thursday morning.
+    body: Nimbus asked whether the beta agent will post comments automatically or queue draft suggestions for approval. I need a clear answer before I update them Thursday morning.
   - type: update_project
     project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
         customer_constraint_known: true
-  - type: update_project
-    project_id: pr_review_agent
-    stakeholder_pressure_delta: 1
+  - type: increase_pressure
+    pressure_id: nimbus_customer_confidence
+    by: 1
+    reason: Nimbus needs a clear launch-mode answer before Daisy's Thursday update.
 - kind: event
   id: luigi_proactive_repo_risk
   event_type: luigi_proactive_repo_risk
@@ -122,9 +121,7 @@ behaviors:
     channel: chat
     sender_id: luigi
     recipient_id: agent
-    body: I do not think auto-commenting is safe for Friday. The repo sync worker can process webhook
-      events out of order, so the agent may review a stale commit. We should ship draft mode unless Toad
-      explicitly accepts the risk.
+    body: I do not think auto-commenting is safe for Friday. The repo sync worker can process webhook events out of order, so the agent may review a stale commit. We should ship draft mode unless Toad explicitly accepts the risk.
   - type: discover_fact
     fact_id: repo_sync_stale
     source: luigi_proactive_repo_risk
@@ -155,9 +152,7 @@ behaviors:
     channel: chat
     sender_id: daisy
     recipient_id: agent
-    body: Koopa Bank asked whether admin audit logs can be exported before their Thursday security review.
-      I need the scoped customer-facing answer by email so I can forward exact wording, but please do
-      not derail the Nimbus launch path.
+    body: Koopa Bank asked whether admin audit logs can be exported before their Thursday security review. I need the scoped customer-facing answer by email so I can forward exact wording, but please do not derail the Nimbus launch path.
   - type: discover_fact
     fact_id: koopa_needs_audit_csv
     source: koopa_audit_export_request
@@ -192,12 +187,11 @@ behaviors:
     channel: chat
     sender_id: daisy
     recipient_id: agent
-    body: Before I send the final Nimbus agenda, can you email me a Thursday go/no-go? I need one concise
-      readiness note covering launch mode, private-repo security wording, and whether Koopa stayed scoped
-      away from the Friday beta.
-  - type: update_project
-    project_id: pr_review_agent
-    stakeholder_pressure_delta: 1
+    body: Before I send the final Nimbus agenda, can you email me a Thursday go/no-go? I need one concise readiness note covering launch mode, private-repo security wording, and whether Koopa stayed scoped away from the Friday beta.
+  - type: increase_pressure
+    pressure_id: nimbus_final_readiness_pressure
+    by: 1
+    reason: Daisy requested a final Nimbus go/no-go before sending the agenda.
   - type: update_coworker_state
     person_id: daisy
     key: final_readiness_requested
@@ -224,15 +218,15 @@ behaviors:
     channel: chat
     sender_id: peach
     recipient_id: agent
-    body: I am still missing the Friday launch-mode decision. If this is not draft-mode with human approval
-      soon, onboarding will be thin for the Nimbus beta.
+    body: I am still missing the Friday launch-mode decision. If this is not draft-mode with human approval soon, onboarding will be thin for the Nimbus beta.
   - type: update_coworker_state
     person_id: peach
     key: autonomous_onboarding_risk_sent
     value: true
-  - type: update_project
-    project_id: pr_review_agent
-    stakeholder_pressure_delta: 1
+  - type: increase_pressure
+    pressure_id: pr_review_scope_pressure
+    by: 1
+    reason: Peach remains blocked on onboarding scope as the Nimbus deadline approaches.
 - id: daisy_autonomous_customer_wording_nudge
   kind: policy
   person_id: daisy
@@ -256,8 +250,7 @@ behaviors:
     sender_id: daisy
     recipient_id: agent
     subject: Nimbus wording risk
-    body: I still do not have written Nimbus-ready wording. If I do not get a grounded launch-mode note
-      soon, I will have to send a conservative placeholder and mark Friday scope as not fully confirmed.
+    body: I still do not have written Nimbus-ready wording. If I do not get a grounded launch-mode note soon, I will have to send a conservative placeholder and mark Friday scope as not fully confirmed.
   - type: update_coworker_state
     person_id: daisy
     key: autonomous_customer_update_sent
@@ -267,14 +260,141 @@ behaviors:
     current_focus: recover Nimbus wording before customer update
     load_level: high
     metadata:
-      pressure_reason: customer wording missing near Thursday update threshold
+      workload_reason: customer wording missing near Thursday update threshold
   - type: update_project
     project_id: pr_review_agent
-    stakeholder_pressure_delta: 1
     launch_conflict:
       status: investigated
       inputs:
         customer_wording_at_risk: true
+  - type: increase_pressure
+    pressure_id: nimbus_customer_confidence
+    by: 3
+    reason: Customer-ready wording is missing near Daisy's Thursday update window.
+- id: daisy_autonomous_security_followup
+  kind: policy
+  person_id: daisy
+  priority: 42
+  trigger:
+    at: '2026-06-24T16:30:00'
+  when:
+  - coworker_state:
+      person_id: daisy
+      key: customer_message_ready
+      equals: true
+  - not:
+      coworker_state:
+        person_id: daisy
+        key: security_answer_received
+        equals: true
+  - not:
+      coworker_state:
+        person_id: daisy
+        key: autonomous_security_followup_sent
+        equals: true
+  effects:
+  - type: create_message
+    channel: email
+    sender_id: daisy
+    recipient_id: agent
+    subject: Nimbus security answer still needed
+    body: The launch-mode wording is usable, but Nimbus security still needs the private-repo source handling answer. Please send me the source-of-truth wording before I finalize Thursday's customer agenda.
+  - type: update_coworker_state
+    person_id: daisy
+    key: autonomous_security_followup_sent
+    value: true
+  - type: update_actor_workload
+    person_id: daisy
+    current_focus: waiting on private repo security wording
+    load_level: high
+    metadata:
+      workload_reason: customer wording ready but security answer missing
+- id: luigi_autonomous_repo_hardening_update
+  kind: policy
+  person_id: luigi
+  priority: 44
+  trigger:
+    at: '2026-06-25T09:15:00'
+  when:
+  - fact_discovered: repo_sync_stale
+  - not:
+      coworker_state:
+        person_id: luigi
+        key: repo_hardening_update_sent
+        equals: true
+  effects:
+  - type: create_message
+    channel: chat
+    sender_id: luigi
+    recipient_id: agent
+    body: 'Quick repo-sync hardening update: I reduced one retry race but latest-commit guarantees are still not strong enough for Friday auto-commenting. Draft mode remains the safe launch path.'
+  - type: update_coworker_state
+    person_id: luigi
+    key: repo_hardening_update_sent
+    value: true
+  - type: update_actor_workload
+    person_id: luigi
+    current_focus: repo sync hardening for follow-up auto-commenting
+    load_level: high
+    metadata:
+      workload_reason: technical risk remains after discovery
+- id: mario_autonomous_scope_acceptance
+  kind: policy
+  person_id: mario
+  priority: 46
+  trigger:
+    at: '2026-06-25T09:45:00'
+  when:
+  - project_decision:
+      project_id: pr_review_agent
+      equals: draft_mode_approved
+  - not:
+      coworker_state:
+        person_id: mario
+        key: accepted_draft_mode
+        equals: true
+  effects:
+  - type: create_message
+    channel: chat
+    sender_id: mario
+    recipient_id: agent
+    body: I saw the draft-mode decision. I still want auto-commenting later, but I am aligned that Friday should stay draft suggestions with human approval.
+  - type: update_coworker_state
+    person_id: mario
+    key: accepted_draft_mode
+    value: true
+  - type: update_actor_goal
+    id: actor_goal_mario_1
+    status: deferred
+- id: toad_autonomous_followup_scope_note
+  kind: policy
+  person_id: toad
+  priority: 48
+  trigger:
+    at: '2026-06-25T13:00:00'
+  when:
+  - coworker_state:
+      person_id: daisy
+      key: koopa_update_received
+      equals: true
+  - not:
+      coworker_state:
+        person_id: toad
+        key: koopa_followup_scope_recorded
+        equals: true
+  effects:
+  - type: create_message
+    channel: chat
+    sender_id: toad
+    recipient_id: agent
+    body: Koopa should stay at one-time CSV for the review. I recorded self-serve audit export as follow-up so it does not compete with the Nimbus launch this week.
+  - type: update_coworker_state
+    person_id: toad
+    key: koopa_followup_scope_recorded
+    value: true
+  - type: update_task
+    task_id: self_serve_audit_export_followup
+    status: ready
 - id: luigi_email_acknowledgement
   kind: reply
   person_id: luigi
@@ -286,8 +406,7 @@ behaviors:
   when: []
   reply:
     subject: 'Re: received'
-    body: Received. If you need a technical decision, chat is faster; I will respond here when I have
-      source-of-truth detail.
+    body: Received. If you need a technical decision, chat is faster; I will respond here when I have source-of-truth detail.
   effects: []
 - id: toad_email_acknowledgement
   kind: reply
@@ -352,8 +471,7 @@ behaviors:
   when: []
   reply:
     delay_minutes: 120
-    body: For Koopa, a one-time CSV export of admin audit logs is feasible for the security review. A
-      full self-serve export is a bigger feature and should be follow-up after the PR Review Agent launch.
+    body: For Koopa, a one-time CSV export of admin audit logs is feasible for the security review. A full self-serve export is a bigger feature and should be follow-up after the PR Review Agent launch.
   effects:
   - type: discover_fact
     fact_id: audit_log_one_time_export_feasible
@@ -391,8 +509,7 @@ behaviors:
   when: []
   reply:
     delay_minutes: 90
-    body: Scope Koopa to a one-time CSV for Thursday's security review. Do not commit the team to full
-      self-serve export this week; keep that as follow-up so Nimbus launch readiness stays protected.
+    body: Scope Koopa to a one-time CSV for Thursday's security review. Do not commit the team to full self-serve export this week; keep that as follow-up so Nimbus launch readiness stays protected.
   effects:
   - type: discover_fact
     fact_id: audit_export_scope_confirmed
@@ -438,9 +555,7 @@ behaviors:
   when: []
   reply:
     delay_minutes: 120
-    body: 'Use the private repo security baseline doc before answering Daisy. Short version: we process
-      source snippets transiently for review generation, do not store raw source long term, and retain
-      generated draft suggestions plus metadata for the beta audit window.'
+    body: 'Use the private repo security baseline doc before answering Daisy. Short version: we process source snippets transiently for review generation, do not store raw source long term, and retain generated draft suggestions plus metadata for the beta audit window.'
   effects:
   - type: reveal_doc
     doc_id: private_repo_security_baseline
@@ -485,9 +600,7 @@ behaviors:
       equals: true
   reply:
     delay_minutes: 120
-    body: 'Same repo sync risk as before: the review context pipeline is solid, but webhook ordering can
-      still make the agent review a stale commit. I still recommend draft mode unless Toad accepts the
-      auto-commenting risk.'
+    body: 'Same repo sync risk as before: the review context pipeline is solid, but webhook ordering can still make the agent review a stale commit. I still recommend draft mode unless Toad accepts the auto-commenting risk.'
   effects: []
 - id: luigi_reveals_repo_sync_risk
   kind: reply
@@ -526,9 +639,7 @@ behaviors:
       equals: false
   reply:
     delay_minutes: 120
-    body: The risky part is repo sync. The review context pipeline is solid, but webhook events can arrive
-      out of order, so the agent may review a stale commit on Friday. I can keep hardening the worker,
-      but I recommend draft mode unless Toad accepts the auto-commenting risk.
+    body: The risky part is repo sync. The review context pipeline is solid, but webhook events can arrive out of order, so the agent may review a stale commit on Friday. I can keep hardening the worker, but I recommend draft mode unless Toad accepts the auto-commenting risk.
   effects:
   - type: discover_fact
     fact_id: repo_sync_stale
@@ -560,8 +671,7 @@ behaviors:
   when: []
   reply:
     delay_minutes: 120
-    body: I am working on repo sync hardening. If you need launch confidence, ask me specifically about
-      stale-code or auto-commenting risk.
+    body: I am working on repo sync hardening. If you need launch confidence, ask me specifically about stale-code or auto-commenting risk.
   effects: []
 - id: mario_accepts_draft_if_risk_known
   kind: reply
@@ -576,9 +686,7 @@ behaviors:
   when: []
   reply:
     delay_minutes: 60
-    body: Auto-commenting is still the strongest product story, but I do not want a Friday demo failure.
-      If Luigi's stale-code risk is real, align Daisy and Toad on draft mode and keep auto-commenting
-      as a follow-up.
+    body: Auto-commenting is still the strongest product story, but I do not want a Friday demo failure. If Luigi's stale-code risk is real, align Daisy and Toad on draft mode and keep auto-commenting as a follow-up.
   effects:
   - type: update_project
     project_id: pr_review_agent
@@ -614,9 +722,7 @@ behaviors:
   when: []
   reply:
     delay_minutes: 60
-    body: Auto-commenting is still the strongest product story, but I do not want a Friday demo failure.
-      If Luigi's stale-code risk is real, align Daisy and Toad on draft mode and keep auto-commenting
-      as a follow-up.
+    body: Auto-commenting is still the strongest product story, but I do not want a Friday demo failure. If Luigi's stale-code risk is real, align Daisy and Toad on draft mode and keep auto-commenting as a follow-up.
   effects:
   - type: update_project
     project_id: pr_review_agent
@@ -639,8 +745,7 @@ behaviors:
   when: []
   reply:
     delay_minutes: 60
-    body: Please push for the auto-commenting beta. Nimbus needs to see the agent comment on pull requests
-      if we can possibly ship it.
+    body: Please push for the auto-commenting beta. Nimbus needs to see the agent comment on pull requests if we can possibly ship it.
   effects:
   - type: update_project
     project_id: pr_review_agent
@@ -648,9 +753,10 @@ behaviors:
       status: investigated
       inputs:
         product_pressure_acknowledged: true
-  - type: update_project
-    project_id: pr_review_agent
-    scope_pressure_delta: 1
+  - type: increase_pressure
+    pressure_id: pr_review_scope_pressure
+    by: 1
+    reason: Mario continues pushing for auto-commenting in Friday scope.
 - id: daisy_already_has_customer_update
   kind: reply
   person_id: daisy
@@ -678,8 +784,7 @@ behaviors:
       equals: true
   reply:
     delay_minutes: 45
-    body: I have the Nimbus update. Unless the launch mode, security wording, or Koopa scope changes,
-      I do not need another chat; send any final customer-ready wording by email.
+    body: I have the Nimbus update. Unless the launch mode, security wording, or Koopa scope changes, I do not need another chat; send any final customer-ready wording by email.
   effects: []
 - id: daisy_aligns_on_customer_safe_draft_mode
   kind: reply
@@ -726,8 +831,7 @@ behaviors:
       equals: false
   reply:
     delay_minutes: 45
-    body: For Nimbus, reliability matters more than auto-posting comments. I can message draft mode as
-      a safer beta if you give me clear language by Thursday morning.
+    body: For Nimbus, reliability matters more than auto-posting comments. I can message draft mode as a safer beta if you give me clear language by Thursday morning.
   effects:
   - type: discover_fact
     fact_id: nimbus_values_reliability
@@ -772,8 +876,7 @@ behaviors:
   when: []
   reply:
     delay_minutes: 45
-    body: 'I understand there is launch risk, but I still need customer-safe wording: what Nimbus will
-      see Friday, whether comments post automatically, and what limitation remains.'
+    body: 'I understand there is launch risk, but I still need customer-safe wording: what Nimbus will see Friday, whether comments post automatically, and what limitation remains.'
   effects: []
 - id: daisy_default_confidence_request
   kind: reply
@@ -786,8 +889,7 @@ behaviors:
   when: []
   reply:
     delay_minutes: 45
-    body: Nimbus expects the beta on Friday. I need to know what we can confidently show them and what
-      language I should use with their team.
+    body: Nimbus expects the beta on Friday. I need to know what we can confidently show them and what language I should use with their team.
   effects: []
 - id: peach_already_unblocked
   kind: reply
@@ -814,8 +916,7 @@ behaviors:
       equals: true
   reply:
     delay_minutes: 90
-    body: 'I am already unblocked on onboarding and am using the draft-mode scope: human approval before
-      posting, with auto-commenting left out of Friday.'
+    body: 'I am already unblocked on onboarding and am using the draft-mode scope: human approval before posting, with auto-commenting left out of Friday.'
   effects: []
 - id: peach_unblocks_draft_mode_docs
   kind: reply
@@ -865,8 +966,7 @@ behaviors:
       equals: false
   reply:
     delay_minutes: 90
-    body: That unblocks the onboarding work. I will finalize the draft-mode flow with human approval before
-      comments are posted and a clear note that auto-commenting is follow-up.
+    body: That unblocks the onboarding work. I will finalize the draft-mode flow with human approval before comments are posted and a clear note that auto-commenting is follow-up.
   effects:
   - type: discover_fact
     fact_id: draft_mode_scope_confirmed
@@ -898,8 +998,7 @@ behaviors:
   when: []
   reply:
     delay_minutes: 90
-    body: I am still blocked on onboarding. I need the Friday launch mode, human-approval requirement,
-      and auto-commenting limitation made explicit before I can finish the draft-mode flow.
+    body: I am still blocked on onboarding. I need the Friday launch mode, human-approval requirement, and auto-commenting limitation made explicit before I can finish the draft-mode flow.
   effects:
   - type: update_blocker
     blocker_id: scope_unclear
@@ -937,8 +1036,7 @@ behaviors:
       equals: true
   reply:
     delay_minutes: 90
-    body: 'The approval is already recorded: Friday is draft mode with human approval, and auto-commenting
-      stays follow-up. Use the decision record as the source of truth.'
+    body: 'The approval is already recorded: Friday is draft mode with human approval, and auto-commenting stays follow-up. Use the decision record as the source of truth.'
   effects: []
 - id: toad_approves_friday_draft_mode
   kind: reply
@@ -988,9 +1086,7 @@ behaviors:
       equals: false
   reply:
     delay_minutes: 90
-    body: Approved to de-scope auto-commenting for Friday. Ship draft mode with human approval, keep Luigi
-      on repo sync hardening, and update the Friday Launch Decision Record with auto-commenting as the
-      follow-up.
+    body: Approved to de-scope auto-commenting for Friday. Ship draft mode with human approval, keep Luigi on repo sync hardening, and update the Friday Launch Decision Record with auto-commenting as the follow-up.
   effects:
   - type: discover_fact
     fact_id: draft_mode_approved
@@ -1022,8 +1118,7 @@ behaviors:
   when: []
   reply:
     delay_minutes: 90
-    body: I need the concrete launch risk, customer impact, and safer Friday scope before approving any
-      de-scope. Bring me Luigi's blocker and Daisy's customer-facing constraint.
+    body: I need the concrete launch risk, customer impact, and safer Friday scope before approving any de-scope. Bring me Luigi's blocker and Daisy's customer-facing constraint.
   effects: []
 - kind: meeting
   id: meeting_luigi_surfaces_repo_sync_risk
@@ -1235,11 +1330,14 @@ behaviors:
   effects:
   - type: update_project
     project_id: pr_review_agent
-    scope_pressure_delta: 1
     launch_conflict:
       status: investigated
       inputs:
         product_pressure_acknowledged: true
+  - type: increase_pressure
+    pressure_id: pr_review_scope_pressure
+    by: 1
+    reason: Mario kept pressure on auto-commenting until technical risk was concrete.
   topic_match:
     mode: deterministic
     intents:
@@ -1320,110 +1418,37 @@ behaviors:
     key: decision_record_written
     value: true
   match:
-    mode: semantic
-    intents:
+    mode: concept_match
+    required_concepts:
     - id: draft_mode
       description: Friday launch mode is draft mode or queued draft suggestions.
-      signals:
-      - draft mode
-      - draft-mode
-      - draft suggestions
-      - queue draft
-      - queues draft
-      - queued draft
-    - id: human_approval
+      exemplars:
+      - 'Friday launch decision: Toad approved draft mode'
+      - Friday launch mode is draft mode
+      must_be_asserted: true
+    - id: human_approval_before_posting
       description: A human or reviewer must approve before anything is posted.
-      signals:
-      - human approval
-      - approval before posting
-      - approve before posting
-      - review before posting
-      - reviewer approves
-      - human approves
-      - human review
-      - human-in-the-loop
-      - human in the loop
-      - before posting
-      - before anything is posted
-      - approve suggestions
-      - approve before anything is posted
-    - id: human_approval_group_1
-      description: A human or reviewer must approve before anything is posted. signal group 1.
-      signals:
-      - human
-      - reviewer
-    - id: human_approval_group_2
-      description: A human or reviewer must approve before anything is posted. signal group 2.
-      signals:
-      - approve
-      - approval
-      - review
-    - id: human_approval_group_3
-      description: A human or reviewer must approve before anything is posted. signal group 3.
-      signals:
-      - posted
-      - posting
-      - post
-      - comments
-      - suggestions
-    - id: auto_commenting_deferred_group_1
-      description: Auto-commenting is out of Friday scope or deferred to follow-up. signal group 1.
-      signals:
-      - auto-commenting
-      - auto commenting
-      - automatic comments
-      - automatically post
-      - post comments automatically
-      - not post comments automatically
-    - id: auto_commenting_deferred_group_2
-      description: Auto-commenting is out of Friday scope or deferred to follow-up. signal group 2.
-      signals:
-      - out
-      - deferred
-      - follow-up
-      - follow up
-      - not in friday
-      - 'no'
-      - will not
-      - must not
-      - friday scope
-      - out of friday scope
-    - id: repo_sync_risk_group_1
-      description: Repo sync or webhook ordering can make the agent review a stale or older commit. signal
-        group 1.
-      signals:
-      - repo sync
-      - repo-sync
-      - webhook
-      - stale
-      - older commit
-      - older diff
-    - id: repo_sync_risk_group_2
-      description: Repo sync or webhook ordering can make the agent review a stale or older commit. signal
-        group 2.
-      signals:
-      - risk
-      - stale
-      - older commit
-      - older diff
-      - commit
-    - id: toad_approval_group_1
-      description: Toad approved or signed off on the decision. signal group 1.
-      signals:
-      - toad
-    - id: toad_approval_group_2
-      description: Toad approved or signed off on the decision. signal group 2.
-      signals:
-      - approved
-      - approval
-      - sign-off
-      - signed off
-    require_all:
-    - draft_mode
-    - human_approval
-    - auto_commenting_deferred_group_1
-    - auto_commenting_deferred_group_2
-    - repo_sync_risk_group_1
-    - repo_sync_risk_group_2
-    - toad_approval_group_1
-    - toad_approval_group_2
+      exemplars:
+      - draft suggestions require human approval before posting
+      - a reviewer approves before comments are posted
+      - a human must review and approve suggestions before anything is posted
+      must_be_asserted: true
+    - id: auto_commenting_deferred
+      description: Auto-commenting is out of Friday scope or deferred to follow-up.
+      exemplars:
+      - auto-commenting is out of Friday scope
+      - auto-commenting remains follow-up work
+      must_be_asserted: true
+    - id: repo_sync_stale_risk
+      description: Repo sync or webhook ordering can make the agent review a stale or older commit.
+      exemplars:
+      - repo sync can review stale commits
+      - webhook events arrive out of order
+      must_be_asserted: true
+    - id: toad_approval
+      description: Toad approved or signed off on the decision.
+      exemplars:
+      - Toad approved draft mode
+      - Toad signed off on draft mode
+      must_be_asserted: true
+    forbidden_concepts: []

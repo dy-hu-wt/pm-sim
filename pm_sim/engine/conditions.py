@@ -41,6 +41,10 @@ def condition_matches(
         return _task_status_matches(conn, condition["task_status"])
     if "project_decision" in condition:
         return _project_decision_matches(conn, condition["project_decision"], project_id)
+    if "pressure_at_least" in condition:
+        return _pressure_matches(conn, condition["pressure_at_least"], comparator="at_least")
+    if "pressure_at_most" in condition:
+        return _pressure_matches(conn, condition["pressure_at_most"], comparator="at_most")
     if "coworker_state" in condition:
         return _coworker_state_matches(conn, condition["coworker_state"])
     if "message_exists" in condition:
@@ -148,6 +152,19 @@ def condition_description(conn: sqlite3.Connection, condition: dict[str, Any]) -
         return (
             f"project {project_id} decision == {spec.get('equals')!r} "
             f"(current={metadata.get('decision')!r})"
+        )
+    if "pressure_at_least" in condition or "pressure_at_most" in condition:
+        key = "pressure_at_least" if "pressure_at_least" in condition else "pressure_at_most"
+        spec = condition[key]
+        intensity = _single_value(
+            conn,
+            "SELECT intensity FROM pressures WHERE id = ?",
+            (spec.get("id"),),
+        )
+        operator = ">=" if key == "pressure_at_least" else "<="
+        return (
+            f"pressure {spec.get('id')} intensity {operator} {spec.get('intensity')} "
+            f"(current={intensity!r})"
         )
     if "message_exists" in condition:
         spec = condition["message_exists"]
@@ -361,6 +378,27 @@ def _project_decision_matches(
     if "not_in" in spec:
         return decision not in set(spec["not_in"])
     raise ValueError(f"Unsupported project_decision condition: {spec}")
+
+
+def _pressure_matches(
+    conn: sqlite3.Connection,
+    spec: dict[str, Any],
+    *,
+    comparator: str,
+) -> bool:
+    row = conn.execute(
+        "SELECT intensity FROM pressures WHERE id = ?",
+        (spec["id"],),
+    ).fetchone()
+    if row is None:
+        return False
+    current = int(row["intensity"])
+    expected = int(spec["intensity"])
+    if comparator == "at_least":
+        return current >= expected
+    if comparator == "at_most":
+        return current <= expected
+    raise ValueError(f"Unsupported pressure comparator: {comparator}")
 
 
 def _coworker_state_matches(conn: sqlite3.Connection, spec: dict[str, Any]) -> bool:

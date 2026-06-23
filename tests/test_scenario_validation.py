@@ -29,12 +29,13 @@ from pm_sim.coworkers import effects_for_event, replies_for_chat, replies_for_em
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
 from pm_sim.engine.effects import apply_effects
-from pm_sim.formatters import format_agent_progress_html, format_output, format_semantic_progress
+from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
 from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
-from pm_sim import semantic_match as semantic_match_module
+from pm_sim.scenario_tools import lint_scenario, scenario_graph
+from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset
 from pm_sim.engine.time import advance_time
 from pm_sim.timeline import timeline
@@ -156,7 +157,7 @@ class ScenarioValidationTests(unittest.TestCase):
     def test_invalid_action_match_intent_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.base)
         scenario["grading_rules"][0]["action"]["match"] = {
-            "mode": "semantic",
+            "mode": "concept_match",
             "intents": [{"id": "missing_description"}],
             "require_all": ["missing_description"],
         }
@@ -215,6 +216,29 @@ class ScenarioValidationTests(unittest.TestCase):
 
         loaded_from_dir = load_scenario(root)
         self.assertEqual(loaded_from_dir["id"], "launch_readiness")
+
+    def test_scenario_lint_summarizes_authoring_surface(self) -> None:
+        result = lint_scenario(DEFAULT_SCENARIO_PATH)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["scenario_id"], "launch_readiness")
+        self.assertGreater(result["counts"]["actor_behaviors"], 0)
+        self.assertGreater(result["behavior_primitives"]["policy"], 0)
+        self.assertTrue(result["score_links"])
+
+    def test_scenario_graph_links_score_to_state_and_dependencies(self) -> None:
+        result = scenario_graph(DEFAULT_SCENARIO_PATH)
+        edges = {(edge["from"], edge["type"], edge["to"]) for edge in result["edges"]}
+
+        self.assertTrue(result["ok"])
+        self.assertIn(
+            ("milestone:customer_message_ready", "scores", "score:stakeholder_communication"),
+            edges,
+        )
+        self.assertIn(
+            ("task_launch_decision", "depends_on", "task_draft_mode_docs"),
+            edges,
+        )
 
     def test_missing_manifest_include_raises_scenario_error(self) -> None:
         path = Path(self.tmpdir.name) / "scenario.yaml"

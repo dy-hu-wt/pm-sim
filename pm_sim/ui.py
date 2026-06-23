@@ -18,7 +18,7 @@ from .formatters import (
     format_agent_progress_html,
     format_agent_tool_progress,
     format_output,
-    format_semantic_progress,
+    format_concept_progress,
 )
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .scenario import load_scenario
@@ -447,10 +447,10 @@ def _log_lines(entries: list[dict[str, Any]], llm_state: dict[str, Any]) -> list
             f"[{_pretty_time(entry.get('time'))}] "
             f"{format_agent_tool_progress(action_type, payload, result)}"
         )
-        for match in result.get("semantic_matches", []):
+        for match in result.get("concept_matches", []):
             if isinstance(match, dict):
                 lines.append(
-                    f"[{_pretty_time(entry.get('time'))}] {format_semantic_progress(match)}"
+                    f"[{_pretty_time(entry.get('time'))}] {format_concept_progress(match)}"
                 )
     return lines[-80:]
 
