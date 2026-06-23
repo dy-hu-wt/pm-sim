@@ -599,7 +599,7 @@ section { margin:14px 0; overflow:hidden; }
 .calendar-event.message .tool-badge { background:#e7f6f0; color:#136c50; }
 .calendar-event.event .tool-badge { background:#f2ebff; color:var(--purple); }
 .calendar-time { font-size:12px; font-weight:800; color:var(--muted); flex:0 0 auto; }
-.calendar-title { font-size:14px; font-weight:800; color:var(--ink); }
+.calendar-title { font-size:14px; font-weight:800; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .calendar-detail { display:none; }
 .calendar-event button.card-open { all:unset; display:grid; gap:6px; cursor:pointer; width:100%; }
 .calendar-event button.card-open:focus-visible { outline:2px solid rgba(37,92,153,.35); outline-offset:2px; border-radius:8px; }
