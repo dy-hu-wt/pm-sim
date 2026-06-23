@@ -265,7 +265,7 @@ Scenario data should define most of the setup:
 
 - a `scenario.yaml` manifest with `include` entries
 - a `world.yaml` starting-state file
-- an `interactions.yaml` behavior file
+- authored behavior files for events, policies, replies, meetings, and action checks
 - an `evaluation.yaml` grading/outcome file
 - people
 - coworker state

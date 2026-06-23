@@ -13,7 +13,11 @@ scenarios/<scenario_id>/
   scenario.md
   scenario.yaml
   world.yaml
-  interactions.yaml
+  events.yaml
+  policies.yaml
+  replies.yaml
+  meetings.yaml
+  actions.yaml
   evaluation.yaml
 ```
 
@@ -27,11 +31,15 @@ start_time: "2026-06-22T09:00:00"
 timezone: America/New_York
 include:
   - world.yaml
-  - interactions.yaml
+  - events.yaml
+  - policies.yaml
+  - replies.yaml
+  - meetings.yaml
+  - actions.yaml
   - evaluation.yaml
 ```
 
-`world.yaml` seeds the company state. `interactions.yaml` says how coworkers, events, meetings, and agent actions mutate that state. `evaluation.yaml` explains what good project management means for this scenario.
+`world.yaml` seeds the company state. The authored behavior files say how coworkers, events, meetings, and agent actions mutate that state. `evaluation.yaml` explains what good project management means for this scenario.
 
 Run this early and often:
 
@@ -155,7 +163,7 @@ Use `visible_at: null` for docs, facts, and blockers that exist in the world but
 
 ## Interactions
 
-`interactions.yaml` is where the week moves. The engine advances time, delivers events, records actions, and applies effects. The scenario decides which facts are revealed and which state changes happen.
+The behavior files are where the week moves. The engine advances time, delivers events, records actions, and applies effects. The scenario decides which facts are revealed and which state changes happen.
 
 Coworker behavior is split by authoring purpose. `reply_behaviors` are direct replies to chat or email from the agent. `policy_behaviors` are proactive: a coworker reaches out because time passed or some state was missing. `event_behaviors` say what happens when a scheduled event is delivered. `meeting_behaviors` define transcript/effect rules for useful meetings. `action_behaviors` define action-derived effects that are not grading templates.
 

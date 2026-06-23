@@ -1,0 +1,51 @@
+action_behaviors:
+- id: doc_launch_decision_record_written
+  action_type: update_doc
+  priority: 100
+  doc_id: launch_decision_record
+  when:
+  - any:
+    - fact_discovered: draft_mode_approved
+    - project_decision:
+        project_id: pr_review_agent
+        equals: draft_mode_approved
+  effects:
+  - type: update_coworker_state
+    person_id: toad
+    key: decision_record_written
+    value: true
+  match:
+    mode: concept_match
+    required_concepts:
+    - id: draft_mode
+      description: Friday launch mode is draft mode or queued draft suggestions.
+      exemplars:
+      - 'Friday launch decision: Toad approved draft mode'
+      - Friday launch mode is draft mode
+      must_be_asserted: true
+    - id: human_approval_before_posting
+      description: A human or reviewer must approve before anything is posted.
+      exemplars:
+      - draft suggestions require human approval before posting
+      - a reviewer approves before comments are posted
+      - a human must review and approve suggestions before anything is posted
+      must_be_asserted: true
+    - id: auto_commenting_deferred
+      description: Auto-commenting is out of Friday scope or deferred to follow-up.
+      exemplars:
+      - auto-commenting is out of Friday scope
+      - auto-commenting remains follow-up work
+      must_be_asserted: true
+    - id: repo_sync_stale_risk
+      description: Repo sync or webhook ordering can make the agent review a stale or older commit.
+      exemplars:
+      - repo sync can review stale commits
+      - webhook events arrive out of order
+      must_be_asserted: true
+    - id: toad_approval
+      description: Toad approved or signed off on the decision.
+      exemplars:
+      - Toad approved draft mode
+      - Toad signed off on draft mode
+      must_be_asserted: true
+    forbidden_concepts: []

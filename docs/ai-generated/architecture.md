@@ -4,7 +4,7 @@ This generated note is kept in `docs/ai-generated/` as reviewer-facing scaffoldi
 
 ## Core Shape
 
-`pm-sim` is a single-node simulation backend. A scenario manifest includes `world.yaml`, `interactions.yaml`, and `evaluation.yaml`; SQLite stores the mutable state, CLI commands expose the tools, scheduled events advance background activity, deterministic actor behaviors emit effects, and the evaluator scores the resulting state.
+`pm-sim` is a single-node simulation backend. A scenario manifest includes `world.yaml`, authored behavior files, and `evaluation.yaml`; SQLite stores the mutable state, CLI commands expose the tools, scheduled events advance background activity, deterministic actor behaviors emit effects, and the evaluator scores the resulting state.
 
 The main backend flow is:
 
@@ -17,7 +17,11 @@ The authored launch scenario lives in four files:
 ```text
 scenarios/launch_readiness/scenario.yaml      # id, start time, include list
 scenarios/launch_readiness/world.yaml         # starting world state and coworker memory
-scenarios/launch_readiness/interactions.yaml  # coworker, event, meeting, and action behavior
+scenarios/launch_readiness/events.yaml        # scheduled event behavior
+scenarios/launch_readiness/policies.yaml      # proactive coworker behavior
+scenarios/launch_readiness/replies.yaml       # direct reply behavior
+scenarios/launch_readiness/meetings.yaml      # meeting behavior
+scenarios/launch_readiness/actions.yaml       # action-triggered behavior
 scenarios/launch_readiness/evaluation.yaml    # scoring, gates, outcomes, baseline, scripted path
 ```
 

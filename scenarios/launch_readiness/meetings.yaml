@@ -1,0 +1,275 @@
+meeting_behaviors:
+- id: meeting_luigi_surfaces_repo_sync_risk
+  priority: 100
+  required_attendees:
+  - luigi
+  transcript_lines:
+  - '- Luigi stated that repo sync can still make the agent review stale commits.'
+  - '- Luigi noted that draft mode keeps suggestions behind human approval.'
+  effects:
+  - type: discover_fact
+    fact_id: repo_sync_stale
+    source: meeting_occurs
+  - type: discover_fact
+    fact_id: draft_mode_limits_customer_visible_risk
+    source: meeting_occurs
+  - type: update_blocker
+    blocker_id: repo_sync_stale
+    status: surfaced
+  - type: update_project
+    project_id: pr_review_agent
+    launch_conflict:
+      status: investigated
+      inputs:
+        technical_risk_substantiated: true
+  - type: update_coworker_state
+    person_id: luigi
+    values:
+      risk_surfaced: true
+  topic_match:
+    mode: deterministic
+    intents:
+    - id: meeting_topic
+      description: Meeting title contains one authored topic signal.
+      signals:
+      - blocker
+      - blocked
+      - risk
+      - risks
+      - launch
+      - ready
+      - readiness
+      - repo
+      - repository
+      - sync
+      - webhook
+      - webhooks
+      - commit
+      - stale
+      - diff
+      - pr
+      - review
+      - agent
+      - auto-comment
+      - auto-commenting
+      - nimbus
+      - fallback
+      - draft
+    require_all:
+    - meeting_topic
+- id: meeting_daisy_customer_context
+  priority: 90
+  required_attendees:
+  - daisy
+  transcript_lines:
+  - '- Daisy asked for reliable Friday beta messaging for Nimbus Labs.'
+  effects:
+  - type: discover_fact
+    fact_id: nimbus_values_reliability
+    source: meeting_occurs
+  - type: update_project
+    project_id: pr_review_agent
+    launch_conflict:
+      status: investigated
+      inputs:
+        customer_constraint_known: true
+  - type: update_coworker_state
+    person_id: daisy
+    values:
+      reliability_preference_shared: true
+  topic_match:
+    mode: deterministic
+    intents:
+    - id: meeting_topic
+      description: Meeting title contains one authored topic signal.
+      signals:
+      - risk
+      - risks
+      - launch
+      - readiness
+      - friday
+      - nimbus
+      - beta
+      - fallback
+      - draft
+      - draft-mode
+      - scope
+    require_all:
+    - meeting_topic
+- id: meeting_peach_clarifies_draft_scope
+  priority: 80
+  required_attendees:
+  - peach
+  transcript_lines:
+  - '- Peach can proceed once draft-mode scope is confirmed.'
+  effects:
+  - type: discover_fact
+    fact_id: draft_mode_scope_confirmed
+    source: meeting_occurs
+  - type: update_task
+    task_id: draft_mode_docs
+    status: in_progress
+  - type: update_blocker
+    blocker_id: scope_unclear
+    status: resolved
+  - type: update_project
+    project_id: pr_review_agent
+    launch_conflict:
+      status: investigated
+      inputs:
+        implementation_scope_clear: true
+  - type: update_coworker_state
+    person_id: peach
+    values:
+      scope_unblocked: true
+  topic_match:
+    mode: deterministic
+    intents:
+    - id: meeting_topic
+      description: Meeting title contains one authored topic signal.
+      signals:
+      - fallback
+      - draft
+      - draft-mode
+      - de-scope
+      - descope
+      - scope
+    require_all:
+    - meeting_topic
+- id: meeting_daisy_aligned_after_risk
+  priority: 70
+  required_attendees:
+  - daisy
+  required_facts:
+  - repo_sync_stale
+  effects: []
+  topic_match:
+    mode: deterministic
+    intents:
+    - id: meeting_topic
+      description: Meeting title contains one authored topic signal.
+      signals:
+      - risk
+      - repo
+      - sync
+      - stale
+      - fallback
+      - draft
+      - draft-mode
+    require_all:
+    - meeting_topic
+- id: meeting_mario_accepts_draft_after_risk
+  priority: 60
+  required_attendees:
+  - mario
+  required_facts:
+  - repo_sync_stale
+  transcript_lines:
+  - '- Mario agreed auto-commenting is valuable but should not create demo failure risk.'
+  effects:
+  - type: update_project
+    project_id: pr_review_agent
+    launch_conflict:
+      status: investigated
+      inputs:
+        product_pressure_acknowledged: true
+  - type: update_coworker_state
+    person_id: mario
+    values:
+      accepted_draft_mode: true
+  topic_match:
+    mode: deterministic
+    intents:
+    - id: meeting_topic
+      description: Meeting title contains one authored topic signal.
+      signals:
+      - risk
+      - repo
+      - sync
+      - stale
+      - fallback
+      - draft
+      - draft-mode
+    require_all:
+    - meeting_topic
+- id: meeting_mario_keeps_auto_comment_pressure_without_risk
+  priority: 50
+  required_attendees:
+  - mario
+  absent_facts:
+  - repo_sync_stale
+  transcript_lines:
+  - '- Mario kept pressure on auto-commenting until the technical risk is concrete.'
+  effects:
+  - type: update_project
+    project_id: pr_review_agent
+    launch_conflict:
+      status: investigated
+      inputs:
+        product_pressure_acknowledged: true
+  - type: increase_pressure
+    pressure_id: pr_review_scope_pressure
+    by: 1
+    reason: Mario kept pressure on auto-commenting until technical risk was concrete.
+  topic_match:
+    mode: deterministic
+    intents:
+    - id: meeting_topic
+      description: Meeting title contains one authored topic signal.
+      signals:
+      - risk
+      - risks
+      - launch
+      - readiness
+      - friday
+      - nimbus
+      - beta
+      - fallback
+      - draft
+      - draft-mode
+      - scope
+    require_all:
+    - meeting_topic
+- id: meeting_toad_approves_draft_mode
+  priority: 40
+  required_attendees:
+  - toad
+  required_facts:
+  - repo_sync_stale
+  - draft_mode_scope_confirmed
+  transcript_lines:
+  - '- Toad approved draft mode if auto-commenting is unsafe for Friday.'
+  effects:
+  - type: discover_fact
+    fact_id: draft_mode_approved
+    source: meeting_occurs
+  - type: update_project
+    project_id: pr_review_agent
+    decision: draft_mode_approved
+  - type: update_project
+    project_id: pr_review_agent
+    launch_conflict:
+      status: resolved
+      final_launch_mode: draft_mode
+      resolution: draft_mode
+  - type: update_blocker
+    blocker_id: launch_scope_decision
+    status: resolved
+  - type: update_coworker_state
+    person_id: toad
+    values:
+      approval_recorded: true
+  topic_match:
+    mode: deterministic
+    intents:
+    - id: meeting_topic
+      description: Meeting title contains one authored topic signal.
+      signals:
+      - fallback
+      - draft
+      - draft-mode
+      - de-scope
+      - descope
+      - scope
+    require_all:
+    - meeting_topic

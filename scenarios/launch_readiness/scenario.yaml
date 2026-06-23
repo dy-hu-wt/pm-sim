@@ -6,5 +6,9 @@ timezone: America/New_York
 summary: Fireflower is trying to launch a PR Review Agent beta for Nimbus Labs by Friday.
 include:
 - world.yaml
-- interactions.yaml
+- events.yaml
+- policies.yaml
+- replies.yaml
+- meetings.yaml
+- actions.yaml
 - evaluation.yaml
