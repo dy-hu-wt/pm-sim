@@ -1927,6 +1927,49 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
             {evidence["key"] for evidence in stakeholder_component["evidence"]},
         )
 
+    def test_guessed_customer_message_before_discovery_is_not_customer_ready(self) -> None:
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus Friday draft-mode update",
+            (
+                "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has "
+                "stale-commit risk, so comments should require human approval before posting."
+            ),
+        )
+        conn = connect(self.db_path)
+        try:
+            evidence = conn.execute(
+                """
+                SELECT evidence_key
+                FROM evaluation_evidence
+                WHERE evidence_key = 'customer_message_ready'
+                """
+            ).fetchone()
+            coworker_state = conn.execute(
+                """
+                SELECT value_json
+                FROM coworker_state
+                WHERE person_id = 'daisy'
+                  AND key = 'customer_message_ready'
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+        evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        stakeholder_component = next(
+            component
+            for component in evaluation["components"]
+            if component["key"] == "stakeholder_communication"
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["applied_effects"], [])
+        self.assertIsNone(evidence)
+        self.assertFalse(loads(coworker_state["value_json"]))
+        self.assertIn("customer_message_ready", stakeholder_component["missing_evidence"])
+        self.assertEqual(stakeholder_component["earned"], 0)
+
     def test_security_answer_email_before_daisy_question_does_not_score(self) -> None:
         result = send_email(
             self.db_path,
