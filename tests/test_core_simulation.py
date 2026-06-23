@@ -74,6 +74,17 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertFalse(coworker_state[("peach", "scope_unblocked")])
         self.assertFalse(coworker_state[("toad", "approval_recorded")])
         self.assertFalse(coworker_state[("daisy", "koopa_update_received")])
+        self.assertFalse(coworker_state[("daisy", "autonomous_customer_update_sent")])
+        conn = connect(self.db_path)
+        try:
+            row = conn.execute(
+                "SELECT value FROM sim_state WHERE key = 'actor_behaviors_json'"
+            ).fetchone()
+            actor_behaviors = loads(row["value"])
+        finally:
+            conn.close()
+        self.assertTrue(any(behavior["kind"] == "reply" for behavior in actor_behaviors))
+        self.assertTrue(any(behavior["kind"] == "policy" for behavior in actor_behaviors))
         obligations = {row["title"] for row in state["calendar_obligations"]}
         self.assertIn("Daisy final Nimbus go/no-go", obligations)
         self.assertIn("Admin Audit Log Export deadline", obligations)
@@ -157,6 +168,50 @@ class CoreSimulationTests(unittest.TestCase):
         followup = advance_time(self.db_path, "1h")
 
         self.assertEqual(followup["applied_coworker_policies"], [])
+
+    def test_autonomous_daisy_policy_fires_only_without_customer_wording(self) -> None:
+        result = advance_time(self.db_path, "to:2026-06-25T09:30:00")
+        state = observe(self.db_path)
+
+        applied_policy_ids = {
+            policy["id"] for policy in result["applied_coworker_policies"]
+        }
+        coworker_state = {
+            (row["person_id"], row["key"]): loads(row["value_json"])
+            for row in state["coworker_state"]
+        }
+        recent_bodies = [message["body"] for message in state["recent_messages"]]
+
+        self.assertIn("daisy_autonomous_customer_wording_nudge", applied_policy_ids)
+        self.assertTrue(coworker_state[("daisy", "autonomous_customer_update_sent")])
+        self.assertTrue(any("conservative placeholder" in body for body in recent_bodies))
+
+    def test_autonomous_daisy_policy_skips_when_customer_wording_ready(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "daisy",
+                        "key": "customer_message_ready",
+                        "value": True,
+                    }
+                ],
+                now="2026-06-22T09:00:00",
+                source="test",
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        result = advance_time(self.db_path, "to:2026-06-25T09:30:00")
+
+        applied_policy_ids = {
+            policy["id"] for policy in result["applied_coworker_policies"]
+        }
+        self.assertNotIn("daisy_autonomous_customer_wording_nudge", applied_policy_ids)
 
     def test_agent_path_moves_launch_conflict_to_resolved_draft_mode(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")

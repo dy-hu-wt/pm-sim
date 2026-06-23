@@ -71,12 +71,12 @@ def _structured_replies_for_channel(
 ) -> list[CoworkerReply]:
     replies = []
     rules = sorted(
-        state.get("coworker_rules", []),
+        _reply_behaviors(state),
         key=lambda rule: int(rule.get("priority", 0)),
         reverse=True,
     )
     for rule in rules:
-        if rule.get("channel", "chat") != channel:
+        if rule.get("channel", "chat").lower() != channel:
             continue
         if rule.get("person_id", "").lower() != person_id:
             continue
@@ -99,6 +99,17 @@ def _structured_replies_for_channel(
             )
         )
     return replies
+
+
+def _reply_behaviors(state: dict[str, Any]) -> list[dict[str, Any]]:
+    actor_behaviors = state.get("actor_behaviors")
+    if isinstance(actor_behaviors, list) and actor_behaviors:
+        return [
+            behavior
+            for behavior in actor_behaviors
+            if isinstance(behavior, dict) and behavior.get("kind") == "reply"
+        ]
+    return state.get("coworker_rules", [])
 
 
 def _reply_delay_minutes(person_id: str, reply: dict[str, Any], state: dict[str, Any]) -> int:

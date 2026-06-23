@@ -346,6 +346,61 @@
           "stakeholder_pressure_delta": 1
         }
       ]
+    },
+    {
+      "id": "daisy_autonomous_customer_wording_nudge",
+      "person_id": "daisy",
+      "priority": 45,
+      "trigger": {
+        "at": "2026-06-25T09:30:00"
+      },
+      "when": [
+        {
+          "not": {
+            "coworker_state": {
+              "person_id": "daisy",
+              "key": "customer_message_ready",
+              "equals": true
+            }
+          }
+        },
+        {
+          "not": {
+            "coworker_state": {
+              "person_id": "daisy",
+              "key": "autonomous_customer_update_sent",
+              "equals": true
+            }
+          }
+        }
+      ],
+      "effects": [
+        {
+          "type": "create_message",
+          "channel": "email",
+          "sender_id": "daisy",
+          "recipient_id": "agent",
+          "subject": "Nimbus wording risk",
+          "body": "I still do not have written Nimbus-ready wording. If I do not get a grounded launch-mode note soon, I will have to send a conservative placeholder and mark Friday scope as not fully confirmed."
+        },
+        {
+          "type": "update_coworker_state",
+          "person_id": "daisy",
+          "key": "autonomous_customer_update_sent",
+          "value": true
+        },
+        {
+          "type": "update_project",
+          "project_id": "project_pr_review_agent",
+          "stakeholder_pressure_delta": 1,
+          "launch_conflict": {
+            "status": "investigated",
+            "inputs": {
+              "customer_wording_at_risk": true
+            }
+          }
+        }
+      ]
     }
   ],
   "coworker_rules": [

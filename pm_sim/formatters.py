@@ -686,6 +686,13 @@ def _format_evaluate_explain(value: dict[str, Any]) -> str:
 
         if missing:
             lines.append(f"    Missing: {', '.join(missing)}")
+        failed_gates = component.get("failed_gates") or []
+        if failed_gates:
+            lines.append("    Failed gates:")
+            for gate in failed_gates:
+                lines.append(f"      - {gate.get('evidence_key')}")
+                for failed in gate.get("failed", []):
+                    lines.append(f"        - {failed}")
 
         if harms:
             lines.append("    Harms:")

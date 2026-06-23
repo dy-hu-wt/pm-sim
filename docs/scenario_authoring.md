@@ -47,13 +47,52 @@ Visibility is standardized with nullable `visible_at`: if it is `null`, the item
 
 ## Interactions
 
-`interactions.json` defines how coworkers and background dynamics change the world:
+`interactions.json` defines how coworkers and background dynamics change the world. At runtime,
+reply behavior and proactive coworker behavior are normalized into one `actor_behaviors` list:
 
-- `coworker_rules`: deterministic replies by person and channel. Rules can depend on hidden facts, visible facts, and coworker state.
-- `coworker_policies`: autonomous deterministic coworker behavior that fires from time and state.
-- `event_rules`: effects applied when scheduled events are delivered.
+- `actor_behaviors`: the reusable actor model. `kind: "reply"` entries respond to chat/email;
+  `kind: "policy"` entries fire from time plus state. Both use the shared condition and effect
+  languages.
+- `coworker_rules`: compatibility authoring shorthand for `actor_behaviors` reply entries.
+- `coworker_policies`: compatibility authoring shorthand for `actor_behaviors` policy entries.
+- `event_rules`: effects applied when scheduled non-actor events are delivered.
 - `meeting_rules`: transcript lines and effects applied when a meeting resolves.
-- `action_rules`: effects applied when an agent action matches causal conditions and optional semantic criteria.
+- `action_rules`: effects applied when an agent action matches causal conditions and optional
+  semantic criteria.
+
+Prefer `actor_behaviors` for new scenarios. The older `coworker_rules` and `coworker_policies`
+keys are still accepted and compiled into `actor_behaviors`, so existing scenarios remain readable
+while the engine has one actor path.
+
+```json
+{
+  "id": "daisy_customer_wording_nudge",
+  "kind": "policy",
+  "person_id": "daisy",
+  "trigger": {"at": "2026-06-25T09:30:00"},
+  "when": [
+    {
+      "not": {
+        "coworker_state": {
+          "person_id": "daisy",
+          "key": "customer_message_ready",
+          "equals": true
+        }
+      }
+    }
+  ],
+  "effects": [
+    {
+      "type": "create_message",
+      "channel": "email",
+      "sender_id": "daisy",
+      "recipient_id": "agent",
+      "subject": "Customer wording risk",
+      "body": "I still need written customer-ready wording."
+    }
+  ]
+}
+```
 
 ## Evaluation
 
@@ -160,7 +199,7 @@ Not allowed for scored keys:
 
 1. Create `scenarios/<id>/scenario.json`, `world.json`, `interactions.json`, and `evaluation.json`.
 2. Seed at least one project, several coworkers, hidden facts, blockers, tasks, docs, messages, and deadline events.
-3. Add coworker rules that reveal private facts and mutate coworker state.
+3. Add actor behaviors that reveal private facts, mutate coworker state, and model proactive pressure.
 4. Add `grading_rules` or `state_evidence_rules` so score comes from state.
 5. Add `outcome_rules` for project deadlines.
 6. Add a `baseline.commands` block and a `scripted_policy`.

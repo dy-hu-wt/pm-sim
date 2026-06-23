@@ -17,7 +17,7 @@ def load_scenario(path: Path | str) -> dict[str, Any]:
     if not scenario_path.exists():
         raise ScenarioError(f"Scenario file not found: {scenario_path}")
 
-    data = _compile_grading_rules(_load_scenario_data(scenario_path))
+    data = _compile_actor_behaviors(_compile_grading_rules(_load_scenario_data(scenario_path)))
     _validate_scenario(data, scenario_path)
     return data
 
@@ -160,6 +160,65 @@ def copy_json_object(data: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(data))
 
 
+def _compile_actor_behaviors(data: dict[str, Any]) -> dict[str, Any]:
+    compiled = copy_json_object(data)
+    behaviors = [
+        behavior
+        for behavior in compiled.get("actor_behaviors", [])
+        if not (isinstance(behavior, dict) and behavior.get("_compiled_from"))
+    ]
+    behavior_ids = {
+        behavior.get("id")
+        for behavior in behaviors
+        if isinstance(behavior, dict) and isinstance(behavior.get("id"), str)
+    }
+
+    for rule in compiled.get("coworker_rules", []):
+        if not isinstance(rule, dict):
+            continue
+        behavior_id = rule.get("id")
+        if behavior_id in behavior_ids:
+            continue
+        behavior_ids.add(behavior_id)
+        behaviors.append(
+            {
+                "id": behavior_id,
+                "kind": "reply",
+                "person_id": rule.get("person_id"),
+                "channel": rule.get("channel", "chat"),
+                "priority": rule.get("priority", 0),
+                "match": rule.get("match", {}),
+                "when": rule.get("when", []),
+                "reply": rule.get("reply", {}),
+                "effects": rule.get("effects", []),
+                "_compiled_from": "coworker_rules",
+            }
+        )
+
+    for policy in compiled.get("coworker_policies", []):
+        if not isinstance(policy, dict):
+            continue
+        behavior_id = policy.get("id")
+        if behavior_id in behavior_ids:
+            continue
+        behavior_ids.add(behavior_id)
+        behaviors.append(
+            {
+                "id": behavior_id,
+                "kind": "policy",
+                "person_id": policy.get("person_id"),
+                "priority": policy.get("priority", 100),
+                "trigger": policy.get("trigger", {}),
+                "when": policy.get("when", []),
+                "effects": policy.get("effects", []),
+                "_compiled_from": "coworker_policies",
+            }
+        )
+
+    compiled["actor_behaviors"] = behaviors
+    return compiled
+
+
 def _semantic_match_for_grading_action(action: dict[str, Any]) -> dict[str, Any]:
     semantic_match = action.get("semantic_match")
     if isinstance(semantic_match, dict):
@@ -207,6 +266,7 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
     _ids(data, "calendar_events")
     _ids(data, "events")
     _ids(data, "coworker_state")
+    _ids(data, "actor_behaviors")
 
     valid_actors = people | {"agent"}
 
@@ -330,6 +390,17 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         blockers,
         tasks,
         valid_actors,
+    )
+    _validate_actor_behaviors(
+        data.get("actor_behaviors", []),
+        people,
+        docs,
+        facts,
+        projects,
+        blockers,
+        tasks,
+        valid_actors,
+        response_delays,
     )
 
     event_types = {
@@ -553,6 +624,57 @@ def _validate_coworker_policies(
         )
 
 
+def _validate_actor_behaviors(
+    behaviors: list[dict[str, Any]],
+    people: set[str],
+    docs: set[str],
+    facts: set[str],
+    projects: set[str],
+    blockers: set[str],
+    tasks: set[str],
+    valid_actors: set[str],
+    response_delays: dict[str, Any],
+) -> None:
+    if not isinstance(behaviors, list):
+        raise ScenarioError("actor_behaviors must be a list.")
+    seen = set()
+    for behavior in behaviors:
+        behavior_id = behavior.get("id")
+        if not isinstance(behavior_id, str) or not behavior_id:
+            raise ScenarioError("Actor behavior must have a string id.")
+        if behavior_id in seen:
+            raise ScenarioError(f"Actor behaviors have duplicate id: {behavior_id}")
+        seen.add(behavior_id)
+
+        kind = behavior.get("kind")
+        if kind == "reply":
+            _validate_coworker_rule(
+                behavior,
+                people,
+                docs,
+                facts,
+                projects,
+                blockers,
+                tasks,
+                valid_actors,
+                response_delays,
+            )
+            continue
+        if kind == "policy":
+            _validate_coworker_policies(
+                [behavior],
+                people,
+                docs,
+                facts,
+                projects,
+                blockers,
+                tasks,
+                valid_actors,
+            )
+            continue
+        raise ScenarioError(f"Actor behavior {behavior_id} has unsupported kind: {kind}")
+
+
 def _validate_meeting_rules(
     rules: list[dict[str, Any]],
     people: set[str],
@@ -717,6 +839,7 @@ def _validate_scored_evidence_is_state_derived(data: dict[str, Any]) -> None:
         )
 
     for section in (
+        "actor_behaviors",
         "event_rules",
         "coworker_rules",
         "coworker_policies",

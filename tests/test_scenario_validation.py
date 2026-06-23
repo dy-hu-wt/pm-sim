@@ -110,6 +110,19 @@ class ScenarioValidationTests(unittest.TestCase):
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
+    def test_invalid_actor_behavior_kind_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        scenario["actor_behaviors"].append(
+            {
+                "id": "invalid_actor_behavior",
+                "kind": "wander",
+                "person_id": "daisy",
+            }
+        )
+
+        with self.assertRaisesRegex(ScenarioError, "unsupported kind"):
+            load_scenario(self._write_scenario(scenario))
+
     def test_invalid_action_semantic_match_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.base)
         scenario["action_rules"][0]["semantic_match"] = {"required": [{"id": "missing_description"}]}

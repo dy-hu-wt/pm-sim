@@ -188,7 +188,7 @@ def _next_due_coworker_policy(
 
 
 def _coworker_policy_candidates(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    policies = loads(get_state_value(conn, "coworker_policies_json") or "[]", [])
+    policies = _policy_behaviors(conn)
     candidates = []
     for policy in policies if isinstance(policies, list) else []:
         trigger = policy.get("trigger", {})
@@ -204,6 +204,18 @@ def _coworker_policy_candidates(conn: sqlite3.Connection) -> list[dict[str, Any]
             policy["id"],
         ),
     )
+
+
+def _policy_behaviors(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    actor_behaviors = loads(get_state_value(conn, "actor_behaviors_json") or "[]", [])
+    if isinstance(actor_behaviors, list) and actor_behaviors:
+        return [
+            behavior
+            for behavior in actor_behaviors
+            if isinstance(behavior, dict) and behavior.get("kind") == "policy"
+        ]
+    policies = loads(get_state_value(conn, "coworker_policies_json") or "[]", [])
+    return policies if isinstance(policies, list) else []
 
 
 def _apply_coworker_policy(conn: sqlite3.Connection, policy: dict[str, Any]) -> dict[str, Any]:

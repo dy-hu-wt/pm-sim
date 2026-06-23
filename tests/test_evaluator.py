@@ -547,6 +547,9 @@ class EvaluatorTests(unittest.TestCase):
         self.assertIn("Missing: peach_unblocked, draft_mode_approved", output)
         self.assertIn("Missing: security_doc_found, security_question_answered", output)
         self.assertIn("Missing: koopa_scoped, koopa_update_sent", output)
+        self.assertIn("Failed gates:", output)
+        self.assertIn("daisy.customer_message_ready", output)
+        self.assertIn("fact fact_repo_sync_stale discovered", output)
 
     def test_documented_noop_baseline_path_is_runnable(self) -> None:
         self._run_cli("reset")
