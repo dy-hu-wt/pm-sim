@@ -63,6 +63,7 @@ def load_scenario(path: Path | str) -> dict[str, Any]:
     data = normalize_author_references(_load_scenario_data(scenario_path))
     data = compile_grading_rules(data)
     data = compile_behaviors(data)
+    data["_scenario_path"] = str(scenario_path.resolve())
     validate_scenario(data, scenario_path)
     return data
 

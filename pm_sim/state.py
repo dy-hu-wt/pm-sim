@@ -285,6 +285,8 @@ def log_action(
 
 def _load_scenario(conn: sqlite3.Connection, scenario: dict[str, Any]) -> None:
     set_state_value(conn, "scenario_id", scenario["id"])
+    if scenario.get("_scenario_path"):
+        set_state_value(conn, "scenario_path", str(scenario["_scenario_path"]))
     set_state_value(conn, "current_time", scenario["start_time"])
     set_state_value(conn, "actor_behaviors_json", dumps(scenario.get("actor_behaviors", [])))
     set_state_value(conn, "event_rules_json", dumps(scenario.get("event_rules", [])))

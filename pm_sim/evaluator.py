@@ -6,8 +6,9 @@ from typing import Any
 from .engine.conditions import all_conditions_match, condition_time, failed_condition_descriptions
 from .db import connect, rows_to_dicts
 from .jsonutil import loads
-from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
+from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH, REPO_ROOT
 from .scenario import load_scenario
+from .state import get_state_value
 
 
 LATE_CREDIT = 0.5
@@ -15,9 +16,9 @@ LATE_CREDIT = 0.5
 
 def evaluate(
     db_path: Path | str = DEFAULT_DB_PATH,
-    scenario_path: Path | str = DEFAULT_SCENARIO_PATH,
+    scenario_path: Path | str | None = DEFAULT_SCENARIO_PATH,
 ) -> dict[str, Any]:
-    scenario = load_scenario(scenario_path)
+    scenario = load_scenario(_resolve_scenario_path(db_path, scenario_path))
     targets = scenario.get("score_components", {})
 
     conn = connect(db_path)
@@ -48,6 +49,32 @@ def evaluate(
         }
     finally:
         conn.close()
+
+
+def _resolve_scenario_path(
+    db_path: Path | str,
+    scenario_path: Path | str | None,
+) -> Path | str:
+    if scenario_path is not None:
+        return scenario_path
+
+    conn = connect(db_path)
+    try:
+        active_path = get_state_value(conn, "scenario_path")
+        if active_path:
+            return Path(active_path)
+
+        active_id = get_state_value(conn, "scenario_id")
+    finally:
+        conn.close()
+
+    if active_id:
+        for candidate in sorted((REPO_ROOT / "scenarios").glob("*/scenario.yaml")):
+            scenario = load_scenario(candidate)
+            if scenario.get("id") == active_id:
+                return candidate
+
+    return DEFAULT_SCENARIO_PATH
 
 
 def _load_milestone_records(conn) -> list[dict[str, Any]]:

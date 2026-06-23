@@ -120,6 +120,8 @@ Evaluate the current state:
 pm-sim evaluate --explain
 ```
 
+`evaluate` uses the active scenario recorded in the current DB. Pass `--scenario` only when you intentionally want to override that.
+
 ## Expected Results
 
 Baseline, with no meaningful PM work, should score `15 / 120`.

@@ -161,8 +161,8 @@ def _build_parser() -> argparse.ArgumentParser:
     evaluate_parser.add_argument(
         "--scenario",
         type=Path,
-        default=DEFAULT_SCENARIO_PATH,
-        help=f"Scenario YAML path. Default: {DEFAULT_SCENARIO_PATH}",
+        default=None,
+        help="Scenario YAML path. Default: active scenario recorded in the DB.",
     )
     evaluate_parser.set_defaults(func=_evaluate_command)
 

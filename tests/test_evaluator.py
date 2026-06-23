@@ -568,6 +568,16 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(result["outcome_comparison"]["baseline_expected_score"], 30)
         self.assertEqual(result["final_outcome"]["outcome"], "inbox_move_not_ready")
 
+    def test_evaluate_cli_explain_uses_active_db_scenario(self) -> None:
+        reset(self.db_path, Path("scenarios/support_inbox_move"))
+        output = self._run_cli("evaluate", "--explain")
+
+        self.assertIn("saved_replies", output)
+        self.assertIn("vip_routing", output)
+        self.assertIn("written_plan", output)
+        self.assertNotIn("blocker_discovery", output)
+        self.assertNotIn("portfolio_tradeoff", output)
+
     def test_scored_milestone_trace_points_to_action_log(self) -> None:
         self._drive_happy_path()
         result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
