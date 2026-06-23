@@ -119,9 +119,20 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertIn("Policy: scripted", output)
         self.assertIn("Score:", output)
         self.assertIn("Deadline: advanced to Fri 2026-06-26 15:00", output)
+        self.assertIn("Outcome: Draft mode beta shipped", output)
+        self.assertIn("Nimbus received a Friday PR Review Agent beta", output)
         self.assertIn("project_deadline", output)
         self.assertIn("send_security_answer", output)
         self.assertIn("send_final_readiness_note", output)
+
+    def test_cli_accepts_db_after_subcommand(self) -> None:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            exit_code = cli_main(["reset", "--db", str(self.db_path)])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn(str(self.db_path), output.getvalue())
+        self.assertTrue(self.db_path.exists())
 
     def test_run_agent_summary_prints_missing_evidence(self) -> None:
         reset(self.db_path, DEFAULT_SCENARIO_PATH)

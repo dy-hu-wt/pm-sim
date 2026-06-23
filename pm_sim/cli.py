@@ -31,7 +31,7 @@ from .ui import DEFAULT_UI_HOST, DEFAULT_UI_PORT, serve_ui
 
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(_normalize_global_args(argv))
 
     try:
         result = args.func(args)
@@ -47,6 +47,29 @@ def main(argv: list[str] | None = None) -> int:
 
     _print_result(args.command, result, as_json=args.as_json)
     return 0
+
+
+def _normalize_global_args(argv: list[str] | None) -> list[str] | None:
+    if argv is None:
+        argv = sys.argv[1:]
+
+    normalized: list[str] = []
+    db_args: list[str] = []
+    index = 0
+    while index < len(argv):
+        arg = argv[index]
+        if arg == "--db" and index + 1 < len(argv):
+            db_args.extend([arg, argv[index + 1]])
+            index += 2
+            continue
+        if arg.startswith("--db="):
+            db_args.append(arg)
+            index += 1
+            continue
+        normalized.append(arg)
+        index += 1
+
+    return [*db_args, *normalized]
 
 
 def _build_parser() -> argparse.ArgumentParser:

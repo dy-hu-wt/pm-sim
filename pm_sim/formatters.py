@@ -725,6 +725,11 @@ def _format_run_agent(value: dict[str, Any]) -> str:
         details = _finalization_details(finalization)
         suffix = f"; {details}" if details else ""
         lines.append(f"  Deadline: {status} to {_pretty_time(finalization.get('to'))}{suffix}")
+    final_outcome = evaluation.get("final_outcome")
+    if isinstance(final_outcome, dict) and final_outcome.get("outcome"):
+        lines.append(f"  Outcome: {_humanize_identifier(str(final_outcome.get('outcome')))}")
+        if final_outcome.get("summary"):
+            lines.append(f"           {final_outcome.get('summary')}")
     missing = _agent_missing_components(evaluation)
     if missing:
         lines.extend(["", "Missing Evaluation"])
@@ -792,6 +797,10 @@ def _agent_stop_reason(reason: str) -> str:
         "no_tool_calls": "model returned no tool calls",
     }
     return labels.get(reason, reason)
+
+
+def _humanize_identifier(value: str) -> str:
+    return value.replace("_", " ").capitalize()
 
 
 def _format_effect(effect: dict[str, Any]) -> str:

@@ -249,6 +249,17 @@ pm-sim timeline --kind event
 pm-sim timeline --kind evidence
 ```
 
+Global options can be placed before or after a subcommand. These are equivalent:
+
+```bash
+pm-sim --db tmp/demo.sqlite observe
+pm-sim observe --db tmp/demo.sqlite
+```
+
+## Optional Operator UI
+
+The CLI is the primary runnable workflow. The browser UI is optional: it is useful for demos and inspection, but reviewers can exercise the full simulator with the commands above.
+
 Open the operator UI:
 
 ```bash
