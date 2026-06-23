@@ -505,7 +505,7 @@ class CoreSimulationTests(unittest.TestCase):
             ).fetchone()
             outcome_doc = conn.execute(
                 """
-                SELECT kind, body, visibility_scope
+                SELECT kind, body, visibility_scope, visible_at, updated_at
                 FROM docs
                 WHERE id = 'doc_friday_outcome'
                 """
@@ -519,7 +519,7 @@ class CoreSimulationTests(unittest.TestCase):
             ).fetchone()
             koopa_outcome_doc = conn.execute(
                 """
-                SELECT kind, body, visibility_scope
+                SELECT kind, body, visibility_scope, visible_at, updated_at
                 FROM docs
                 WHERE id = 'doc_koopa_audit_export_outcome'
                 """
@@ -534,6 +534,8 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(loads(project["metadata_json"])["final_outcome"], "no_approved_friday_plan")
         self.assertEqual(outcome_doc["kind"], "outcome_report")
         self.assertEqual(outcome_doc["visibility_scope"], "generated")
+        self.assertEqual(outcome_doc["visible_at"], "2026-06-26T15:00:00")
+        self.assertEqual(outcome_doc["updated_at"], "2026-06-26T15:00:00")
         self.assertIn("without an approved reliable launch plan", outcome_doc["body"])
         self.assertEqual(koopa_project["status"], "at_risk")
         self.assertEqual(koopa_project["risk_level"], "medium")
@@ -543,6 +545,8 @@ class CoreSimulationTests(unittest.TestCase):
         )
         self.assertEqual(koopa_outcome_doc["kind"], "outcome_report")
         self.assertEqual(koopa_outcome_doc["visibility_scope"], "generated")
+        self.assertEqual(koopa_outcome_doc["visible_at"], "2026-06-25T16:00:00")
+        self.assertEqual(koopa_outcome_doc["updated_at"], "2026-06-25T16:00:00")
         self.assertIn("without a clear scoped answer", koopa_outcome_doc["body"])
 
         evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)

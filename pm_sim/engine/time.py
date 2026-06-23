@@ -244,8 +244,8 @@ def _deliver_event(
 ) -> dict[str, Any]:
     payload = loads(event["payload_json"], {})
     source = f"event:{event['id']}"
-    effects = _effects_for_delivery(conn, event["event_type"], payload)
     event_time = event["scheduled_at"]
+    effects = _effects_for_delivery(conn, event["event_type"], payload, event_time)
     applied_effects = apply_effects(conn, effects, now=event_time, source=source)
     result = {
         "handled": True,
@@ -273,6 +273,7 @@ def _effects_for_delivery(
     conn: sqlite3.Connection,
     event_type: str,
     payload: dict[str, Any],
+    event_time: str,
 ) -> list[dict[str, Any]]:
     if event_type == "coworker_reply":
         return [
@@ -291,7 +292,7 @@ def _effects_for_delivery(
         return effects_for_meeting(payload, _meeting_state(conn))
 
     if event_type == "project_deadline":
-        return _effects_for_project_deadline(conn, payload)
+        return _effects_for_project_deadline(conn, payload, event_time)
 
     return effects_for_event(conn, event_type, payload)
 
@@ -299,6 +300,7 @@ def _effects_for_delivery(
 def _effects_for_project_deadline(
     conn: sqlite3.Connection,
     payload: dict[str, Any],
+    event_time: str,
 ) -> list[dict[str, Any]]:
     project_id = payload.get("project_id")
     if not isinstance(project_id, str) or not project_id:
@@ -327,7 +329,7 @@ def _effects_for_project_deadline(
             "id": outcome_doc_id,
             "title": payload.get("outcome_doc_title", "Project Outcome"),
             "kind": "outcome_report",
-            "visible_at": get_current_time(conn),
+            "visible_at": event_time,
             "body": outcome["summary"],
             "metadata": {"final_outcome": outcome["final_outcome"]},
         },
