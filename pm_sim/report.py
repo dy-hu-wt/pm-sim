@@ -295,8 +295,15 @@ p { margin: 0 0 8px; }
 .calendar-time { color: var(--muted); font-size: 11px; font-weight: 800; }
 .calendar-title { font-weight: 800; margin-top: 2px; }
 .calendar-detail { color: var(--muted); margin-top: 3px; font-size: 12px; }
-.playback-panel { padding: 16px; display: grid; gap: 14px; }
-.playback-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.playback-panel { display: grid; gap: 8px; }
+.playback-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 14px 0;
+}
 .playback-button {
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -532,19 +539,24 @@ def _evaluation(evaluation: dict[str, Any]) -> str:
 
 
 def _calendar_playback(entries: list[dict[str, Any]], scenario: dict[str, Any]) -> str:
+    playback_entries = _playback_entries(entries)
+    if not playback_entries:
+        return '<p class="empty">No visible activity</p>'
     return (
+        '<div class="playback-controls">'
+        '<button class="playback-button primary" type="button" data-playback="play">Play</button>'
+        '<button class="playback-button" type="button" data-playback="pause">Pause</button>'
+        '<button class="playback-button" type="button" data-playback="reset">Reset</button>'
+        f'<span class="playback-meter" id="playback-meter">0 / {len(playback_entries)}</span>'
+        "</div>"
         '<div class="replay-grid">'
         + _week_calendar(entries, scenario)
-        + _playback(entries)
+        + _playback(playback_entries)
         + "</div>"
     )
 
 
-def _playback(entries: list[dict[str, Any]]) -> str:
-    playback_entries = _playback_entries(entries)
-    if not playback_entries:
-        return '<p class="empty">No visible activity</p>'
-
+def _playback(playback_entries: list[dict[str, str]]) -> str:
     items = []
     for index, entry in enumerate(playback_entries):
         items.append(
@@ -556,12 +568,6 @@ def _playback(entries: list[dict[str, Any]]) -> str:
         )
     return (
         '<div class="playback-panel">'
-        '<div class="playback-controls">'
-        '<button class="playback-button primary" type="button" data-playback="play">Play</button>'
-        '<button class="playback-button" type="button" data-playback="pause">Pause</button>'
-        '<button class="playback-button" type="button" data-playback="reset">Reset</button>'
-        f'<span class="playback-meter" id="playback-meter">0 / {len(playback_entries)}</span>'
-        "</div>"
         '<div class="playback-track" id="playback-track">'
         + "".join(items)
         + "</div>"

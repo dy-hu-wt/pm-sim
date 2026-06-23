@@ -246,6 +246,7 @@ p { margin:0 0 8px; }
 .value { font-size:20px; font-weight:850; margin-top:4px; }
 section { margin:14px 0; overflow:hidden; }
 .section-head { padding:13px 15px; border-bottom:1px solid var(--line); background:#fbfcfe; }
+.playback-controls { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:8px; padding:14px 14px 0; }
 .replay { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(320px,.9fr); gap:12px; padding:14px; align-items:start; }
 .calendar-board { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; }
 .day { min-height:180px; border:1px solid var(--line); border-radius:10px; background:#f8fafc; overflow:hidden; }
@@ -277,10 +278,6 @@ section { margin:14px 0; overflow:hidden; }
   <nav class="top">
     <div class="brand"><strong>PM Sim</strong><span>live operator UI</span></div>
     <div class="controls">
-      <button class="primary" id="play">Play</button>
-      <button id="step">Step</button>
-      <button id="pause">Pause</button>
-      <button id="reset">Reset</button>
       <span class="meter" id="meter">loading</span>
     </div>
   </nav>
@@ -295,6 +292,12 @@ section { margin:14px 0; overflow:hidden; }
   </header>
   <section id="playback-section">
     <div class="section-head"><h2>Calendar Playback</h2></div>
+    <div class="playback-controls">
+      <button class="primary" id="play">Play</button>
+      <button id="step">Step</button>
+      <button id="pause">Pause</button>
+      <button id="reset">Reset</button>
+    </div>
     <div class="replay">
       <div class="calendar-board" id="calendar-board"></div>
       <div class="playback" id="playback"></div>
