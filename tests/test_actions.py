@@ -665,6 +665,20 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertEqual(meeting_events[0]["scheduled_at"], "2026-06-22T10:30:00")
         self.assertIn(result["meeting_id"], meeting_events[0]["payload_json"])
 
+    def test_schedule_meeting_rejects_short_meetings(self) -> None:
+        result = schedule_meeting(
+            self.db_path,
+            "Too-short risk review",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:05:00",
+            ["luigi"],
+        )
+        events = event_log(self.db_path, limit=20)
+
+        self.assertFalse(result["ok"])
+        self.assertIn("at least 10 minutes", result["error"])
+        self.assertFalse(any(event["event_type"] == "meeting_occurs" for event in events))
+
     def test_action_time_cost_delivers_events_crossed_during_work(self) -> None:
         advance_time(self.db_path, "to:2026-06-24T13:55:00")
 

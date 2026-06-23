@@ -436,6 +436,13 @@ def schedule_meeting(
         return {"ok": False, "error": "Meeting title is required."}
     if not attendees:
         return {"ok": False, "error": "At least one attendee is required."}
+    try:
+        start_time = _parse_time(start_at)
+        end_time = _parse_time(end_at)
+    except ValueError:
+        return {"ok": False, "error": "Meeting start_at and end_at must be ISO timestamps."}
+    if end_time - start_time < timedelta(minutes=10):
+        return {"ok": False, "error": "Meetings must be at least 10 minutes long."}
 
     conn = connect(db_path)
     try:

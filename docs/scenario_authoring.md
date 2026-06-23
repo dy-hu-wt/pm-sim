@@ -67,6 +67,18 @@ Effects are reusable state mutations:
 {"type": "create_message", "channel": "email", "sender_id": "daisy", "recipient_id": "agent", "body": "..."}
 ```
 
+## Multiple Valid Paths
+
+A scenario should not require one golden sequence. Author alternate tool paths by making different surfaces converge on the same state:
+
+- Chat rules can reveal information quickly through `coworker_reply` events.
+- Email rules can reveal the same information with email subjects/replies and longer action cost.
+- Meeting rules can combine attendees and topic terms, create a transcript, and apply multiple effects at the scheduled end time.
+
+For example, the billing migration scenario allows Luigi to reveal backfill risk by chat, by email, or in a meeting. All three paths set `luigi.backfill_risk_shared = true` and reveal `fact_backfill_checksum_mismatch`, so the evaluator sees the same grounded state rather than a channel-specific checklist.
+
+Meetings must be at least 10 minutes long. This keeps meetings distinct from instant chat while still allowing them to resolve several stakeholder inputs at once when the right people attend.
+
 ## Grading Template
 
 Use `grading_rules` for scored communication. A grading rule says: only after prerequisites are true, a matching action mutates coworker state; the evaluator then derives evidence from that state.

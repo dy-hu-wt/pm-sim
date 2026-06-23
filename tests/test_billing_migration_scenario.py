@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pm_sim.actions import send_email, update_task
+from pm_sim.actions import schedule_meeting, send_email, update_task
 from pm_sim.agents.scripted import run_scripted_agent
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
@@ -131,6 +131,71 @@ class BillingMigrationScenarioTests(unittest.TestCase):
         self.assertIn("Toad approves staged shadow mode", result["error"])
         self.assertNotEqual(evaluation["score"], evaluation["max_score"])
 
+    def test_email_can_drive_billing_decision_path(self) -> None:
+        reset(self.db_path, BILLING_SCENARIO_PATH)
+
+        send_email(
+            self.db_path,
+            "luigi",
+            "Atlas billing migration risk",
+            "Can you share the backfill checksum and full cutover risk for Friday?",
+        )
+        advance_time(self.db_path, "until_next_event")
+        self.assertTrue(self._coworker_state("luigi", "backfill_risk_shared"))
+
+        send_email(
+            self.db_path,
+            "daisy",
+            "Atlas Friday customer constraint",
+            (
+                "Atlas Friday billing migration has backfill checksum risk for invoices. "
+                "Would they accept staged shadow mode as the safe path instead of full cutover?"
+            ),
+        )
+        advance_time(self.db_path, "until_next_event")
+        self.assertTrue(self._coworker_state("daisy", "customer_preference_shared"))
+
+        send_email(
+            self.db_path,
+            "toad",
+            "Atlas migration staged shadow approval",
+            (
+                "Please approve staged shadow mode for the Atlas Friday billing migration. "
+                "Luigi found checksum/backfill invoice risk, Daisy says Atlas accepts staged "
+                "shadow mode for correctness, and full cutover should be deferred."
+            ),
+        )
+        advance_time(self.db_path, "until_next_event")
+        metadata = self._project_metadata("project_billing_migration")
+
+        self.assertTrue(self._coworker_state("toad", "stage_approved"))
+        self.assertEqual(metadata["decision"], "staged_shadow_mode")
+
+    def test_meeting_can_drive_billing_decision_path(self) -> None:
+        reset(self.db_path, BILLING_SCENARIO_PATH)
+
+        result = schedule_meeting(
+            self.db_path,
+            "Atlas billing migration staged shadow decision",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["luigi", "daisy", "toad"],
+        )
+        advance_time(self.db_path, "to:2026-06-22T10:30:00")
+        metadata = self._project_metadata("project_billing_migration")
+        transcript = self._latest_transcript()
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(self._fact_visible("fact_backfill_checksum_mismatch"))
+        self.assertTrue(self._fact_visible("fact_atlas_values_invoice_correctness"))
+        self.assertTrue(self._fact_visible("fact_staged_migration_approved"))
+        self.assertTrue(self._coworker_state("luigi", "backfill_risk_shared"))
+        self.assertTrue(self._coworker_state("daisy", "customer_preference_shared"))
+        self.assertTrue(self._coworker_state("toad", "stage_approved"))
+        self.assertEqual(metadata["decision"], "staged_shadow_mode")
+        self.assertIn("Backfill checksums", transcript)
+        self.assertIn("Toad approved staged shadow mode", transcript)
+
     def _coworker_state(self, person_id: str, key: str):
         with connect(self.db_path) as conn:
             row = conn.execute(
@@ -143,3 +208,40 @@ class BillingMigrationScenarioTests(unittest.TestCase):
                 (person_id, key),
             ).fetchone()
         return None if row is None else json.loads(row["value_json"])
+
+    def _fact_visible(self, fact_id: str) -> bool:
+        with connect(self.db_path) as conn:
+            row = conn.execute(
+                """
+                SELECT visible_at
+                FROM facts
+                WHERE id = ?
+                """,
+                (fact_id,),
+            ).fetchone()
+        return row is not None and row["visible_at"] is not None
+
+    def _project_metadata(self, project_id: str) -> dict:
+        with connect(self.db_path) as conn:
+            row = conn.execute(
+                """
+                SELECT metadata_json
+                FROM projects
+                WHERE id = ?
+                """,
+                (project_id,),
+            ).fetchone()
+        return json.loads(row["metadata_json"])
+
+    def _latest_transcript(self) -> str:
+        with connect(self.db_path) as conn:
+            row = conn.execute(
+                """
+                SELECT body
+                FROM docs
+                WHERE kind = 'meeting_transcript'
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """
+            ).fetchone()
+        return "" if row is None else row["body"]
