@@ -25,6 +25,7 @@ from pm_sim.agents.scripted import run_scripted_agent
 from pm_sim.cli import main as cli_main
 from pm_sim.engine.conditions import condition_matches
 from pm_sim.coworkers import effects_for_event, replies_for_chat, replies_for_email
+from pm_sim import coworkers as coworkers_module
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
 from pm_sim.engine.effects import apply_effects
@@ -145,6 +146,101 @@ class ActorBehaviorTests(unittest.TestCase):
             ("luigi_risk_answer", "luigi_security_answer"),
         )
         self.assertEqual({effect["type"] for effect in replies[0].effects}, {"discover_fact", "reveal_doc"})
+
+    def test_llm_coworker_mode_selects_only_allowed_candidate_effects(self) -> None:
+        behaviors = [
+            {
+                "id": "luigi_risk_answer",
+                "kind": "reply",
+                "person_id": "luigi",
+                "channel": "chat",
+                "priority": 100,
+                "match": {
+                    "mode": "deterministic",
+                    "intents": [
+                        {"id": "risk", "description": "Agent asks about risk.", "signals": ["risk"]},
+                    ],
+                    "require_all": ["risk"],
+                },
+                "reply": {"delay_minutes": 20, "body": "Repo sync risk exists."},
+                "effects": [{"type": "discover_fact", "fact_id": "fact_repo_sync_stale"}],
+            },
+            {
+                "id": "luigi_security_answer",
+                "kind": "reply",
+                "person_id": "luigi",
+                "channel": "chat",
+                "priority": 90,
+                "match": {
+                    "mode": "deterministic",
+                    "intents": [
+                        {"id": "security", "description": "Agent asks about security.", "signals": ["security"]},
+                    ],
+                    "require_all": ["security"],
+                },
+                "reply": {"delay_minutes": 30, "body": "Security baseline exists."},
+                "effects": [{"type": "reveal_doc", "doc_id": "doc_private_repo_security_baseline"}],
+            },
+        ]
+
+        with unittest.mock.patch.dict("os.environ", {"PM_SIM_COWORKER_MODE": "llm"}, clear=False):
+            with unittest.mock.patch.object(
+                coworkers_module,
+                "_llm_select_candidates",
+                return_value={
+                    "selected_candidate_ids": ["luigi_security_answer"],
+                    "body": "Use the security baseline first.",
+                },
+            ):
+                replies = replies_for_chat(
+                    "luigi",
+                    "Need risk and security.",
+                    {"actor_behaviors": behaviors, "response_delays": {"luigi": 120}},
+                )
+
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(replies[0].body, "Use the security baseline first.")
+        self.assertEqual({effect["type"] for effect in replies[0].effects}, {"reveal_doc"})
+        self.assertEqual(replies[0].matched_rule_ids, ("luigi_security_answer",))
+
+    def test_llm_coworker_mode_falls_back_on_invalid_selection(self) -> None:
+        behaviors = [
+            {
+                "id": "luigi_risk_answer",
+                "kind": "reply",
+                "person_id": "luigi",
+                "channel": "chat",
+                "priority": 100,
+                "match": {
+                    "mode": "deterministic",
+                    "intents": [
+                        {"id": "risk", "description": "Agent asks about risk.", "signals": ["risk"]},
+                    ],
+                    "require_all": ["risk"],
+                },
+                "reply": {"delay_minutes": 20, "body": "Repo sync risk exists."},
+                "effects": [{"type": "discover_fact", "fact_id": "fact_repo_sync_stale"}],
+            }
+        ]
+
+        with unittest.mock.patch.dict("os.environ", {"PM_SIM_COWORKER_MODE": "llm"}, clear=False):
+            with unittest.mock.patch.object(
+                coworkers_module,
+                "_llm_select_candidates",
+                return_value={"selected_candidate_ids": ["not_allowed"], "body": "Invented wording."},
+            ):
+                replies = replies_for_chat(
+                    "luigi",
+                    "Need risk.",
+                    {"actor_behaviors": behaviors, "response_delays": {"luigi": 120}},
+                )
+
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(replies[0].body, "Repo sync risk exists.")
+        self.assertEqual(
+            {effect["fact_id"] for effect in replies[0].effects},
+            {"fact_repo_sync_stale"},
+        )
 
     def test_coworker_does_not_combine_generic_fallback_with_specific_reply(self) -> None:
         behaviors = [

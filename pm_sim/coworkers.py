@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
+import os
 import sqlite3
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .concept_match import concept_match
@@ -9,9 +12,11 @@ from .engine.conditions import all_conditions_match
 from .engine.runtime_config import event_rules
 from .engine.rules import match_rule, match_text_and_facts, normalize_text, priority_sorted
 from .jsonutil import dumps, loads
+from .paths import REPO_ROOT
 
 
 Effect = dict[str, Any]
+DEFAULT_COWORKER_MODEL = "gpt-4.1-mini"
 
 
 @dataclass(frozen=True)
@@ -92,7 +97,7 @@ def replies_for_message(
         snapshot,
         conn,
     )
-    return _compose_actor_reply(person_id, channel, candidates)
+    return _compose_actor_reply(person_id, channel, text, snapshot, candidates)
 
 
 def _actor_decision_candidates(
@@ -223,6 +228,8 @@ def _commitment_candidates(
 def _compose_actor_reply(
     person_id: str,
     channel: str,
+    text: str,
+    snapshot: ActorSnapshot,
     candidates: list[ActorCandidate],
 ) -> list[CoworkerReply]:
     if not candidates:
@@ -232,8 +239,38 @@ def _compose_actor_reply(
     if not positive:
         return [candidates[0].reply]
 
-    selected = _select_candidates(positive)
-    return [_compose_selected_reply(person_id, channel, selected)]
+    selected, body_override = _select_and_render_candidates(positive, text, snapshot)
+    return [_compose_selected_reply(person_id, channel, selected, body_override)]
+
+
+def _select_and_render_candidates(
+    candidates: list[ActorCandidate],
+    text: str,
+    snapshot: ActorSnapshot,
+) -> tuple[list[ActorCandidate], str | None]:
+    deterministic = _select_candidates(candidates)
+    if _coworker_mode() != "llm":
+        return deterministic, None
+
+    try:
+        result = _llm_select_candidates(text, snapshot, candidates)
+    except Exception:
+        return deterministic, None
+
+    allowed = {_candidate_id(candidate): candidate for candidate in candidates}
+    selected = [
+        allowed[candidate_id]
+        for candidate_id in result.get("selected_candidate_ids", [])
+        if candidate_id in allowed
+    ]
+    if not selected:
+        return deterministic, None
+
+    body = result.get("body")
+    body_override = body.strip() if isinstance(body, str) and body.strip() else None
+    if body_override and len(body_override) > 2000:
+        body_override = None
+    return selected[:3], body_override
 
 
 def _select_candidates(candidates: list[ActorCandidate]) -> list[ActorCandidate]:
@@ -254,13 +291,14 @@ def _compose_selected_reply(
     person_id: str,
     channel: str,
     selected: list[ActorCandidate],
+    body_override: str | None = None,
 ) -> CoworkerReply:
     first = selected[0].reply
     replies = [candidate.reply for candidate in selected]
     return CoworkerReply(
         person_id=person_id,
         delay_minutes=max(reply.delay_minutes for reply in replies),
-        body="\n\n".join(reply.body for reply in replies if reply.body),
+        body=body_override or "\n\n".join(reply.body for reply in replies if reply.body),
         channel=channel,
         subject=first.subject,
         effects=tuple(_dedupe_effects(effect for reply in replies for effect in reply.effects)),
@@ -271,6 +309,134 @@ def _compose_selected_reply(
             for rule_id in reply.matched_rule_ids
         ),
     )
+
+
+def _coworker_mode() -> str:
+    mode = os.environ.get("PM_SIM_COWORKER_MODE", "deterministic").strip().lower()
+    return "llm" if mode == "llm" else "deterministic"
+
+
+def _coworker_model() -> str:
+    return (
+        os.environ.get("PM_SIM_COWORKER_MODEL")
+        or os.environ.get("OPENAI_MODEL")
+        or DEFAULT_COWORKER_MODEL
+    )
+
+
+def _llm_select_candidates(
+    text: str,
+    snapshot: ActorSnapshot,
+    candidates: list[ActorCandidate],
+) -> dict[str, Any]:
+    _load_dotenv()
+    if not os.environ.get("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY is required for PM_SIM_COWORKER_MODE=llm.")
+
+    try:
+        from openai import OpenAI
+    except ImportError as error:
+        raise RuntimeError("Install the optional OpenAI SDK to use LLM coworker selection.") from error
+
+    payload = {
+        "coworker": {
+            "id": snapshot.person_id,
+            "behavior": snapshot.behavior,
+            "workload": snapshot.workload,
+            "goals": [
+                {"id": goal.get("id"), "description": goal.get("description")}
+                for goal in snapshot.goals
+            ],
+            "commitments": [
+                {
+                    "id": commitment.get("id"),
+                    "description": commitment.get("description"),
+                    "due_at": commitment.get("due_at"),
+                    "status": commitment.get("status"),
+                }
+                for commitment in snapshot.commitments
+            ],
+        },
+        "incoming_message": text,
+        "allowed_candidates": [_candidate_payload(candidate) for candidate in candidates[:8]],
+    }
+
+    client = OpenAI()
+    response = client.responses.create(
+        model=_coworker_model(),
+        instructions=(
+            "You select and phrase a simulated coworker response. "
+            "You must only choose candidate ids from allowed_candidates. "
+            "Do not invent facts, approvals, promises, or effects. "
+            "Return strict JSON with selected_candidate_ids as a list of strings and body as a concise message. "
+            "The simulator will ignore any state changes not attached to selected candidate ids."
+        ),
+        input=json.dumps(payload, sort_keys=True),
+    )
+    output_text = getattr(response, "output_text", "") or ""
+    parsed = json.loads(output_text)
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Coworker selector returned non-object JSON.")
+    selected = parsed.get("selected_candidate_ids")
+    if not isinstance(selected, list) or any(not isinstance(item, str) for item in selected):
+        raise RuntimeError("Coworker selector returned invalid selected_candidate_ids.")
+    if "body" in parsed and not isinstance(parsed["body"], str):
+        raise RuntimeError("Coworker selector returned invalid body.")
+    return parsed
+
+
+def _candidate_payload(candidate: ActorCandidate) -> dict[str, Any]:
+    reply = candidate.reply
+    return {
+        "id": _candidate_id(candidate),
+        "kind": candidate.kind,
+        "score": candidate.score,
+        "priority": reply.priority,
+        "summary": _candidate_summary(candidate),
+        "fallback_body": reply.body,
+        "effect_summaries": [_effect_summary(effect) for effect in reply.effects],
+    }
+
+
+def _candidate_id(candidate: ActorCandidate) -> str:
+    return candidate.reply.matched_rule_ids[0] if candidate.reply.matched_rule_ids else "candidate"
+
+
+def _candidate_summary(candidate: ActorCandidate) -> str:
+    effects = [_effect_summary(effect) for effect in candidate.reply.effects]
+    if effects:
+        return "; ".join(effects)
+    body = " ".join(candidate.reply.body.split())
+    return body[:180]
+
+
+def _effect_summary(effect: Effect) -> str:
+    effect_type = effect.get("type")
+    if effect_type == "discover_fact":
+        return f"discover fact {effect.get('fact_id')}"
+    if effect_type == "reveal_doc":
+        return f"reveal doc {effect.get('doc_id')}"
+    if effect_type == "update_coworker_state":
+        return f"update {effect.get('person_id')}.{effect.get('key')}"
+    if effect_type == "update_blocker":
+        return f"update blocker {effect.get('blocker_id')} to {effect.get('status')}"
+    if effect_type == "update_task":
+        return f"update task {effect.get('task_id')} to {effect.get('status')}"
+    if effect_type == "update_project":
+        return f"update project {effect.get('project_id')}"
+    return str(effect_type or "effect")
+
+
+def _load_dotenv(path: Path | None = None) -> None:
+    env_path = path or (REPO_ROOT / ".env")
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
 def _agenda_candidate(

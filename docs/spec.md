@@ -121,6 +121,8 @@ The runtime uses two generic interpreters:
 
 That keeps scenario-specific logic in YAML instead of Python branches. The same effect system handles direct actions, coworker replies, proactive policies, scheduled events, and meetings.
 
+Coworker replies are generated as structured candidates first. Each candidate has authored conditions, fallback text, and effects. By default the runtime selects candidates deterministically. With `PM_SIM_COWORKER_MODE=llm`, a model may choose and rephrase only from the allowed candidate IDs. The engine validates the selected IDs and applies only the selected candidates' authored effects; model text cannot create facts, resolve blockers, complete tasks, or award score.
+
 ## Evaluation
 
 The evaluator scores durable state, not surface activity.
@@ -136,7 +138,7 @@ action
 -> component score
 ```
 
-LLM use is intentionally narrow. Concept matching checks whether a grounded communication action expresses the authored required ideas and avoids forbidden ones. It does not decide project truth, task completion, blocker status, or final score by itself.
+LLM use is intentionally bounded. Concept matching checks whether a grounded communication action expresses the authored required ideas and avoids forbidden ones. Optional coworker LLM mode chooses and phrases among already-valid coworker response candidates. Neither path decides project truth, task completion, blocker status, or final score by itself.
 
 Scoring comes from state such as:
 

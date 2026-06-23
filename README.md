@@ -49,6 +49,8 @@ Concept matching has two runtime modes:
 
 `OPENAI_API_KEY` is required for `PM_SIM_CONCEPT_MODE=llm` and for `pm-sim run-agent --policy llm`. No-key runs can still be fully scored in `PM_SIM_CONCEPT_MODE=local`.
 
+Coworker replies are deterministic by default. Set `PM_SIM_COWORKER_MODE=llm` to let a model choose and phrase among already-valid coworker response candidates. The selected candidates' authored effects are still the only state mutations; invalid model output falls back to deterministic selection.
+
 ```bash
 cp .env.example .env
 ```
@@ -60,6 +62,8 @@ Relevant model settings:
 - `OPENAI_MODEL`: agent model default
 - `PM_SIM_CONCEPT_MODE`: `llm` or `local`
 - `PM_SIM_CONCEPT_MODEL`: concept-match model override
+- `PM_SIM_COWORKER_MODE`: `deterministic` or `llm`
+- `PM_SIM_COWORKER_MODEL`: coworker selector model override
 - `--model`: per-run override for `run-agent` or `ui`
 
 ## Quickstart
@@ -163,7 +167,7 @@ pm-sim advance-time to:2026-06-25T12:00:00
 Run agents:
 
 ```bash
-pm-sim run-agent --policy scripted --reset
+PM_SIM_CONCEPT_MODE=local pm-sim run-agent --policy scripted --reset
 pm-sim run-agent --policy llm --reset --max-turns 80
 pm-sim ui --policy llm --max-turns 80
 ```
