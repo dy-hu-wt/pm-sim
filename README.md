@@ -132,7 +132,7 @@ The launch scripted reference path should reach `120 / 120`. The support-inbox s
 
 The LLM path is not guaranteed to get full score. That is expected. The environment is meant to expose tradeoffs, missed sequencing, and late communication, not guarantee a perfect run.
 
-Use `PM_SIM_CONCEPT_MODE=local` for reproducible no-key scripted review. The local matcher is deterministic and useful for smoke tests, but it is exemplar/token based; robust semantic grading should use the LLM matcher plus deterministic causal gates.
+Use `PM_SIM_CONCEPT_MODE=local` for reproducible no-key scripted review. The local matcher is deterministic and useful for smoke tests, but it is exemplar/token based; robust semantic scoring should use the LLM matcher plus deterministic causal gates.
 
 ## Main Commands
 

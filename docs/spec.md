@@ -52,7 +52,7 @@ The simulator exposes workplace tools rather than direct storage operations:
 
 These are different interfaces over the same state.
 
-The agent-facing `observe` surface is intentionally public. It shows visible projects, people/roles, discovered facts, known blockers, recent messages, visible docs, tasks, calendar obligations, and live pressures. It does not expose private persona fields, coworker voice hints, hidden event queue entries, rule triggers, or grading internals. Operator/UI code may request private observation for debugging, but that is not part of the agent's tool surface.
+The agent-facing `observe` surface is intentionally public. It shows visible projects, people/roles, discovered facts, known blockers, recent messages, visible docs, tasks, calendar obligations, and live pressures. It does not expose private persona fields, coworker voice hints, hidden event queue entries, rule triggers, or scoring internals. Operator/UI code may request private observation for debugging, but that is not part of the agent's tool surface.
 
 ## State Ownership
 
@@ -141,6 +141,8 @@ action
 -> milestone derivation
 -> component score
 ```
+
+In scenario YAML, `action_checks` validate grounded agent actions and mutate durable state, `milestone_rules` derive scored milestones from state, and `score_components` assign points and penalties.
 
 LLM use is intentionally bounded. Concept matching checks whether a grounded communication action expresses the authored required ideas and avoids forbidden ones. Optional coworker LLM mode rephrases already-selected coworker responses but does not choose effects. Neither path decides project truth, task completion, blocker status, or final score by itself.
 
