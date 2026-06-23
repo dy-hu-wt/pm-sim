@@ -295,6 +295,7 @@ def _ui_command(args: argparse.Namespace) -> dict[str, Any]:
         policy=args.policy,
         model=args.model,
         max_turns=args.max_turns,
+        progress=None if args.as_json else _agent_progress,
     )
 
 

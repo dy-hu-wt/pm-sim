@@ -5,7 +5,7 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 from .actions import list_tasks
@@ -22,6 +22,7 @@ from .timeline import timeline
 
 DEFAULT_UI_HOST = "127.0.0.1"
 DEFAULT_UI_PORT = 8765
+ProgressFn = Callable[[str], None]
 
 
 def serve_ui(
@@ -36,6 +37,7 @@ def serve_ui(
     policy: str = "scripted",
     model: str | None = None,
     max_turns: int = 40,
+    progress: ProgressFn | None = None,
 ) -> dict[str, Any]:
     if reset_first:
         reset(db_path, scenario_path)
@@ -51,6 +53,7 @@ def serve_ui(
         policy=policy,
         model=model,
         max_turns=max_turns,
+        progress=progress,
     )
     url = f"http://{host}:{server.server_address[1]}/"
 
@@ -81,6 +84,7 @@ class _UiServer(ThreadingHTTPServer):
         policy: str,
         model: str | None,
         max_turns: int,
+        progress: ProgressFn | None,
     ):
         super().__init__(server_address, RequestHandlerClass)
         self.db_path = db_path
@@ -89,6 +93,7 @@ class _UiServer(ThreadingHTTPServer):
         self.policy = policy
         self.model = model
         self.max_turns = max_turns
+        self.progress = progress
         self.step_lock = threading.Lock()
         self.last_log_lines: list[str] = []
 
@@ -133,13 +138,15 @@ class _Handler(BaseHTTPRequestHandler):
                     policy=self.server.policy,
                     model=self.server.model,
                     max_turns=self.server.max_turns,
+                    progress=self.server.progress,
                 )
             finally:
                 self.server.step_lock.release()
             payload = _state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit)
             payload["step_result"] = step_result
             payload["done"] = bool(step_result.get("done"))
-            _emit_new_console_lines(self.server, payload.get("log_lines") or [])
+            if self.server.policy != "llm":
+                _emit_new_console_lines(self.server, payload.get("log_lines") or [])
             self._send_json(payload)
             return
         self.send_error(404)
@@ -208,6 +215,7 @@ def _run_next_ui_step(
     model: str | None = None,
     max_turns: int = 40,
     client: Any | None = None,
+    progress: ProgressFn | None = None,
 ) -> dict[str, Any]:
     if policy == "llm":
         return step_llm_session(
@@ -216,6 +224,7 @@ def _run_next_ui_step(
             model=model,
             max_turns=max_turns,
             client=client,
+            progress=progress,
         )
 
     steps = scripted_policy_steps(scenario_path)
@@ -283,7 +292,10 @@ def _emit_new_console_lines(server: _UiServer, log_lines: list[str]) -> None:
     elif previous and previous[-1] in log_lines:
         start = log_lines.index(previous[-1]) + 1
     for line in log_lines[start:]:
-        print(f"[ui] {line}", flush=True)
+        if server.progress is not None:
+            server.progress(line)
+        else:
+            print(f"[ui] {line}", flush=True)
     server.last_log_lines = list(log_lines)
 
 
