@@ -247,22 +247,6 @@ pm-sim --db tmp/demo.sqlite observe
 pm-sim observe --db tmp/demo.sqlite
 ```
 
-## How Scoring Works
-
-The evaluator scores state, not message count.
-
-High-level rubric:
-
-- blocker discovery: did the PM surface the real repo-sync risk?
-- stakeholder communication: did Daisy receive durable customer-ready wording?
-- task improvement: did approval and scope unblock real work?
-- risk handling: did the PM document the decision and close the Thursday readiness loop?
-- security interruption: did Daisy get a grounded private-repo answer?
-- portfolio tradeoff: did Koopa stay scoped without derailing Nimbus?
-- harmful actions: did the PM avoid fake completion, unsafe promises, and noisy outreach?
-
-The full breakdown for the launch scenario is in `scenarios/launch_readiness/scenario.md`. The scoring semantics and anti-cheat invariants are in `docs/evaluator_semantics.md`.
-
 ## Design Boundaries
 
 - The simulator owns all mutable run state in SQLite.
