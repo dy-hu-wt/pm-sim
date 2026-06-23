@@ -566,6 +566,7 @@ def _html() -> str:
 <style>
 :root { --bg:#eef2f6; --panel:#fff; --ink:#17202a; --muted:#637083; --line:#d9dee7; --line-strong:#c4cdd9; --blue:#255c99; --purple:#6f4bb2; --good:#0f7b4f; --warn:#9a5b00; --bad:#aa2f2f; --shadow:0 18px 44px rgba(24,35,52,.10); }
 * { box-sizing:border-box; }
+html, body { overflow-anchor:none; }
 body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
 main { max-width:1280px; margin:0 auto; padding:24px; }
 .top { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; gap:16px; align-items:center; margin-bottom:16px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.96); box-shadow:var(--shadow); backdrop-filter:blur(10px); }
@@ -594,7 +595,7 @@ section { margin:14px 0; overflow:hidden; }
 .section-head { padding:13px 15px; border-bottom:1px solid var(--line); background:#fbfcfe; }
 .playback-controls { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:8px; padding:14px 14px 0; }
 .replay { display:grid; grid-template-columns:1fr; gap:12px; padding:14px; align-items:start; }
-.calendar-board { display:grid; gap:10px; overflow-x:auto; padding-bottom:4px; }
+.calendar-board { display:grid; gap:10px; overflow:auto; max-height:52vh; padding-bottom:4px; overscroll-behavior:contain; overflow-anchor:none; }
 .day { min-height:180px; border:1px solid var(--line); border-radius:10px; background:#f8fafc; overflow:hidden; }
 .day-head { padding:9px 10px; border-bottom:1px solid var(--line); background:#fff; }
 .day-head strong { display:block; }
@@ -613,7 +614,7 @@ section { margin:14px 0; overflow:hidden; }
 .calendar-detail { display:none; }
 .calendar-event button.card-open { all:unset; display:grid; gap:6px; cursor:pointer; width:100%; }
 .calendar-event button.card-open:focus-visible { outline:2px solid rgba(37,92,153,.35); outline-offset:2px; border-radius:8px; }
-.log-console { max-height:360px; overflow:auto; padding:14px; border:1px solid var(--line); border-radius:10px; background:#101722; color:#d9e7ff; font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.log-console { max-height:360px; overflow:auto; padding:14px; border:1px solid var(--line); border-radius:10px; background:#101722; color:#d9e7ff; font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; overscroll-behavior:contain; overflow-anchor:none; }
 .log-line { white-space:pre-wrap; border-bottom:1px solid rgba(255,255,255,.06); padding:6px 0; }
 .log-line:last-child { border-bottom:none; }
 .agent-prefix, .agent-muted, .agent-message.muted { color:#7f8ea3; }
@@ -1011,6 +1012,8 @@ function renderReplay(items, scenario) {
 }
 
 function render(state) {
+  const pageX = window.scrollX;
+  const pageY = window.scrollY;
   const scenario = state.scenario || {};
   const obs = state.observation || {};
   const evaluation = state.evaluation || {};
@@ -1051,6 +1054,7 @@ function render(state) {
   $("tasks").innerHTML = tasks.length
     ? `<div class="task-list">${tasks.map(taskCard).join("")}</div>`
     : `<div class="empty">No tasks.</div>`;
+  window.scrollTo(pageX, pageY);
 }
 
 async function refresh() {
