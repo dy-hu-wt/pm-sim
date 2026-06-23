@@ -10,10 +10,11 @@ from urllib.parse import urlparse
 
 from .actions import list_tasks
 from .agents.finalize import finalize_to_deadline
-from .agents.llm import llm_session_state, start_llm_session, step_llm_session
+from .agents.llm import _load_llm_session, llm_session_state, start_llm_session, step_llm_session
 from .agents.scripted import run_scripted_step, scripted_policy_steps
 from .db import connect
 from .evaluator import evaluate
+from .formatters import format_output
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .scenario import load_scenario
 from .state import get_state_value, observe, reset, set_state_value
@@ -96,6 +97,7 @@ class _UiServer(ThreadingHTTPServer):
         self.progress = progress
         self.step_lock = threading.Lock()
         self.last_log_lines: list[str] = []
+        self.run_summary_printed = False
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -123,6 +125,7 @@ class _Handler(BaseHTTPRequestHandler):
             if self.server.policy == "llm":
                 start_llm_session(self.server.db_path, self.server.scenario_path, model=self.server.model)
             self.server.last_log_lines = []
+            self.server.run_summary_printed = False
             self._send_json(_state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit))
             return
         if path == "/api/advance-next":
@@ -147,6 +150,9 @@ class _Handler(BaseHTTPRequestHandler):
             payload["done"] = bool(step_result.get("done"))
             if self.server.policy != "llm":
                 _emit_new_console_lines(self.server, payload.get("log_lines") or [])
+            if payload["done"] and not self.server.run_summary_printed:
+                print(format_output("run-agent", _ui_run_summary(self.server)), flush=True)
+                self.server.run_summary_printed = True
             self._send_json(payload)
             return
         self.send_error(404)
@@ -299,6 +305,37 @@ def _emit_new_console_lines(server: _UiServer, log_lines: list[str]) -> None:
     server.last_log_lines = list(log_lines)
 
 
+def _ui_run_summary(server: _UiServer) -> dict[str, Any]:
+    evaluation = evaluate(server.db_path, server.scenario_path)
+    if server.policy == "llm":
+        state = _load_llm_session(server.db_path) or {}
+        return {
+            "ok": evaluation.get("score") == evaluation.get("max_score"),
+            "policy": "llm",
+            "model": state.get("model"),
+            "turns": state.get("turns", 0),
+            "finished": bool(state.get("finished")),
+            "done": bool(state.get("done")),
+            "stop_reason": state.get("stop_reason"),
+            "steps": list(state.get("steps", [])),
+            "evaluation": evaluation,
+        }
+
+    demo = _scripted_demo_state(server.db_path, server.scenario_path)
+    steps = [
+        {"name": step.get("name"), "ok": True}
+        for step in scripted_policy_steps(server.scenario_path)[: demo.get("index", 0)]
+    ]
+    if demo.get("finalized"):
+        steps.append({"name": "finalize_to_deadline", "ok": True})
+    return {
+        "ok": evaluation.get("score") == evaluation.get("max_score"),
+        "policy": "scripted",
+        "steps": steps,
+        "evaluation": evaluation,
+    }
+
+
 def _scripted_demo_state(db_path: Path, scenario_path: Path) -> dict[str, Any]:
     steps = scripted_policy_steps(scenario_path)
     conn = connect(db_path)
@@ -347,10 +384,15 @@ def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
         return None
 
     if kind == "message":
+        if str(entry.get("sender_id") or "").lower() == "agent":
+            return None
         channel = str(entry.get("channel") or "").lower()
         sender = _label(entry.get("sender_id"))
         recipient = _label(entry.get("recipient_id") or "all")
-        title = str(entry.get("subject") or f"{channel.capitalize()} update")
+        if channel == "email" and entry.get("subject"):
+            title = str(entry.get("subject"))
+        else:
+            title = f"{sender} replied"
         detail = str(entry.get("body") or "")
         card_kind = "message"
         badge = channel.upper()
@@ -415,13 +457,14 @@ def _log_lines(entries: list[dict[str, Any]], llm_state: dict[str, Any]) -> list
 
 def _action_title(action_type: str, payload: dict[str, Any]) -> str:
     if action_type == "send_chat":
-        return str(payload.get("subject") or "Message sent")
+        return f"Chat to {_label(payload.get('person_id'))}"
     if action_type == "send_email":
-        return str(payload.get("subject") or "Email sent")
+        subject = str(payload.get("subject") or "").strip()
+        return subject or f"Email to {_label(payload.get('person_id'))}"
     if action_type == "read_doc":
-        return _label(payload.get("doc_id"))
+        return f"Read {_label(payload.get('doc_id'))}"
     if action_type == "update_doc":
-        return _label(payload.get("doc_id"))
+        return f"Updated {_label(payload.get('doc_id'))}"
     if action_type == "update_task":
         return _label(payload.get("task_id"))
     if action_type == "schedule_meeting":
@@ -551,14 +594,13 @@ section { margin:14px 0; overflow:hidden; }
 .calendar-event.message { border-left-color:#1a8f6a; }
 .calendar-event.current { outline:2px solid rgba(37,92,153,.24); background:#f2f7ff; }
 .calendar-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
-.calendar-meta { display:flex; align-items:flex-start; gap:8px; min-width:0; flex:1 1 auto; }
+.calendar-meta { display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 auto; }
 .tool-badge { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; letter-spacing:.04em; background:#eaf1fb; color:var(--blue); }
 .calendar-event.message .tool-badge { background:#e7f6f0; color:#136c50; }
 .calendar-event.event .tool-badge { background:#f2ebff; color:var(--purple); }
-.calendar-route { font-size:12px; font-weight:700; color:var(--muted); overflow-wrap:anywhere; }
 .calendar-time { font-size:12px; font-weight:800; color:var(--muted); flex:0 0 auto; }
 .calendar-title { font-size:14px; font-weight:800; color:var(--ink); }
-.calendar-detail { font-size:12px; color:var(--muted); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.calendar-detail { display:none; }
 .calendar-event button.card-open { all:unset; display:grid; gap:6px; cursor:pointer; width:100%; }
 .calendar-event button.card-open:focus-visible { outline:2px solid rgba(37,92,153,.35); outline-offset:2px; border-radius:8px; }
 .log-console { max-height:360px; overflow:auto; padding:14px; border:1px solid var(--line); border-radius:10px; background:#101722; color:#d9e7ff; font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
@@ -808,12 +850,10 @@ function renderReplay(items, scenario) {
               <div class="calendar-top">
                 <div class="calendar-meta">
                   <span class="tool-badge">${esc(row.item.badge || row.item.kind)}</span>
-                  ${row.item.route ? `<span class="calendar-route">${esc(row.item.route)}</span>` : ""}
                 </div>
                 <div class="calendar-time">${esc(timeOnly(row.item.time))}</div>
               </div>
               <div class="calendar-title">${esc(row.item.title)}</div>
-              ${row.item.detail ? `<div class="calendar-detail">${esc(row.item.detail)}</div>` : ""}
             </button>
           </div>`)
           .join("");
