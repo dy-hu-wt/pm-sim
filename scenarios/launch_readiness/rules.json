@@ -634,6 +634,15 @@
       "person_id": "luigi",
       "channel": "chat",
       "priority": 110,
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "luigi",
+            "key": "risk_surfaced",
+            "equals": true
+          }
+        }
+      ],
       "match": {
         "required_facts": [
           "fact_repo_sync_stale"
@@ -667,6 +676,15 @@
       "person_id": "luigi",
       "channel": "chat",
       "priority": 100,
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "luigi",
+            "key": "risk_surfaced",
+            "equals": false
+          }
+        }
+      ],
       "match": {
         "absent_facts": [
           "fact_repo_sync_stale"
@@ -856,10 +874,50 @@
       ]
     },
     {
+      "id": "daisy_already_has_customer_update",
+      "person_id": "daisy",
+      "channel": "chat",
+      "priority": 120,
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "customer_update_received",
+            "equals": true
+          }
+        }
+      ],
+      "match": {
+        "terms_any": [
+          "nimbus",
+          "customer",
+          "friday",
+          "beta",
+          "draft",
+          "launch",
+          "confidence"
+        ]
+      },
+      "reply": {
+        "delay_minutes": 45,
+        "body": "I have the Nimbus update. Unless the launch mode, security wording, or Koopa scope changes, I do not need another chat; send any final customer-ready wording by email."
+      },
+      "effects": []
+    },
+    {
       "id": "daisy_aligns_on_customer_safe_draft_mode",
       "person_id": "daisy",
       "channel": "chat",
       "priority": 100,
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "reliability_preference_shared",
+            "equals": false
+          }
+        }
+      ],
       "match": {
         "term_groups_all": [
           [
@@ -963,10 +1021,48 @@
       "effects": []
     },
     {
+      "id": "peach_already_unblocked",
+      "person_id": "peach",
+      "channel": "chat",
+      "priority": 120,
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "peach",
+            "key": "scope_unblocked",
+            "equals": true
+          }
+        }
+      ],
+      "match": {
+        "terms_any": [
+          "onboarding",
+          "draft",
+          "human approval",
+          "scope",
+          "auto-commenting"
+        ]
+      },
+      "reply": {
+        "delay_minutes": 90,
+        "body": "I am already unblocked on onboarding and am using the draft-mode scope: human approval before posting, with auto-commenting left out of Friday."
+      },
+      "effects": []
+    },
+    {
       "id": "peach_unblocks_draft_mode_docs",
       "person_id": "peach",
       "channel": "chat",
       "priority": 100,
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "peach",
+            "key": "scope_unblocked",
+            "equals": false
+          }
+        }
+      ],
       "match": {
         "required_facts_any": [
           "fact_nimbus_values_reliability",
@@ -1060,10 +1156,56 @@
       ]
     },
     {
+      "id": "toad_already_approved_draft_mode",
+      "person_id": "toad",
+      "channel": "chat",
+      "priority": 120,
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "toad",
+            "key": "approval_recorded",
+            "equals": true
+          }
+        }
+      ],
+      "match": {
+        "term_groups_all": [
+          [
+            "approve",
+            "approval",
+            "decision",
+            "already recorded"
+          ],
+          [
+            "draft",
+            "launch",
+            "friday",
+            "nimbus",
+            "pr review"
+          ]
+        ]
+      },
+      "reply": {
+        "delay_minutes": 90,
+        "body": "The approval is already recorded: Friday is draft mode with human approval, and auto-commenting stays follow-up. Use the decision record as the source of truth."
+      },
+      "effects": []
+    },
+    {
       "id": "toad_approves_friday_draft_mode",
       "person_id": "toad",
       "channel": "chat",
       "priority": 100,
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "toad",
+            "key": "approval_recorded",
+            "equals": false
+          }
+        }
+      ],
       "match": {
         "required_facts": [
           "fact_repo_sync_stale",

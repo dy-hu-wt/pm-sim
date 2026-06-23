@@ -900,7 +900,10 @@ class CoworkerRuleTests(unittest.TestCase):
         replies = replies_for_chat(
             "luigi",
             "Any repo sync blockers for launch?",
-            self._state(["fact_repo_sync_stale"]),
+            {
+                **self._state(["fact_repo_sync_stale"]),
+                "coworker_state": {("luigi", "risk_surfaced"): True},
+            },
         )
 
         self.assertEqual(len(replies), 1)
@@ -1057,6 +1060,57 @@ class CoworkerRuleTests(unittest.TestCase):
                 conn.close()
 
         self.assertEqual(effects, [])
+
+    def test_coworker_when_conditions_use_actor_memory_for_repeat_reply(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            reset(db_path, DEFAULT_SCENARIO_PATH)
+            send_chat(db_path, "luigi", "Any repo sync blockers for launch?")
+            advance_time(db_path, "until_next_event")
+            send_chat(db_path, "luigi", "Any repo sync blockers for launch?")
+            advance_time(db_path, "until_next_event")
+
+            messages = [
+                message for message in observe(db_path)["recent_messages"]
+                if message["sender_id"] == "luigi"
+            ]
+
+        self.assertTrue(any("The risky part is repo sync" in message["body"] for message in messages))
+        self.assertTrue(any("Same repo sync risk as before" in message["body"] for message in messages))
+
+    def test_toad_memory_prevents_duplicate_approval_effects(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            reset(db_path, DEFAULT_SCENARIO_PATH)
+            send_chat(db_path, "luigi", "Any repo sync blockers for launch?")
+            advance_time(db_path, "until_next_event")
+            send_chat(
+                db_path,
+                "daisy",
+                "Repo sync has stale-code risk. Can we message reliable draft mode for Nimbus?",
+            )
+            advance_time(db_path, "45m")
+            first = send_chat(
+                db_path,
+                "toad",
+                "Repo sync can review stale commits. Approve draft mode for Friday Nimbus beta?",
+            )
+            advance_time(db_path, "until_next_event")
+            second = send_chat(
+                db_path,
+                "toad",
+                "Can you approve the Friday launch decision again?",
+            )
+            advance_time(db_path, "until_next_event")
+            messages = [
+                message for message in observe(db_path)["recent_messages"]
+                if message["sender_id"] == "toad"
+            ]
+
+        self.assertTrue(first["scheduled_reply_ids"])
+        self.assertTrue(second["scheduled_reply_ids"])
+        self.assertTrue(any("Approved to de-scope auto-commenting" in message["body"] for message in messages))
+        self.assertTrue(any("approval is already recorded" in message["body"] for message in messages))
 
 
 class EffectApplicationTests(unittest.TestCase):

@@ -289,6 +289,12 @@ def _validate_coworker_rule(
         for fact_id in match.get(key, []):
             if fact_id not in facts:
                 raise ScenarioError(f"Coworker rule {rule_id} references unknown {key} fact: {fact_id}")
+    _validate_conditions(
+        rule.get("when", []),
+        label=f"Coworker rule {rule_id}",
+        facts=facts,
+        valid_actors=valid_actors,
+    )
 
     reply = rule.get("reply", {})
     if not isinstance(reply.get("body"), str) or not reply["body"].strip():

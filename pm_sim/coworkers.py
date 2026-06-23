@@ -20,12 +20,15 @@ class CoworkerReply:
 
 
 def replies_for_chat(
-    person_id: str, body: str, state: dict[str, Any] | None = None
+    person_id: str,
+    body: str,
+    state: dict[str, Any] | None = None,
+    conn: sqlite3.Connection | None = None,
 ) -> list[CoworkerReply]:
     person_id = person_id.lower()
     normalized = _normalize(body)
     state = state or {}
-    structured_replies = _structured_replies_for_chat(person_id, normalized, state)
+    structured_replies = _structured_replies_for_chat(person_id, normalized, state, conn)
     return structured_replies[:1]
 
 
@@ -33,6 +36,7 @@ def _structured_replies_for_chat(
     person_id: str,
     normalized: str,
     state: dict[str, Any],
+    conn: sqlite3.Connection | None = None,
 ) -> list[CoworkerReply]:
     replies = []
     rules = sorted(
@@ -46,6 +50,10 @@ def _structured_replies_for_chat(
         if rule.get("person_id", "").lower() != person_id:
             continue
         if not _rule_matches(rule.get("match", rule), normalized, state):
+            continue
+        if conn is not None and not all_conditions_match(conn, rule.get("when", [])):
+            continue
+        if conn is None and not _state_conditions_match(rule.get("when", []), state):
             continue
 
         reply = rule.get("reply", {})
@@ -97,6 +105,34 @@ def _rule_matches(match: dict[str, Any], normalized: str, state: dict[str, Any])
         return False
 
     return True
+
+
+def _state_conditions_match(conditions: list[dict[str, Any]], state: dict[str, Any]) -> bool:
+    return all(_state_condition_matches(condition, state) for condition in conditions)
+
+
+def _state_condition_matches(condition: dict[str, Any], state: dict[str, Any]) -> bool:
+    if "not" in condition:
+        return not _state_condition_matches(condition["not"], state)
+    if "all" in condition:
+        return all(_state_condition_matches(item, state) for item in condition["all"])
+    if "any" in condition:
+        return any(_state_condition_matches(item, state) for item in condition["any"])
+    if "coworker_state" in condition:
+        spec = condition["coworker_state"]
+        person_id = spec["person_id"]
+        key = spec["key"]
+        values = state.get("coworker_state", {})
+        value = values.get((person_id, key), values.get(f"{person_id}.{key}", False))
+        if "equals" in spec:
+            return value == spec["equals"]
+        if "not_equals" in spec:
+            return value != spec["not_equals"]
+        if spec.get("truthy"):
+            return bool(value)
+        if spec.get("falsy"):
+            return not bool(value)
+    return False
 
 
 def effects_for_event(

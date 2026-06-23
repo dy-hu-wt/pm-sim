@@ -189,7 +189,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
             (message_id, AGENT_ID, person_id, body, current_time),
         )
 
-        replies = replies_for_chat(person_id, body, _behavior_state(conn))
+        replies = replies_for_chat(person_id, body, _behavior_state(conn), conn=conn)
         scheduled_reply_ids = [
             _schedule_coworker_reply(conn, reply, current_time) for reply in replies
         ]
