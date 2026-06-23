@@ -340,6 +340,12 @@
       "value": false
     },
     {
+      "id": "coworker_state_daisy_customer_message_ready",
+      "person_id": "daisy",
+      "key": "customer_message_ready",
+      "value": false
+    },
+    {
       "id": "coworker_state_daisy_security_answer_received",
       "person_id": "daisy",
       "key": "security_answer_received",

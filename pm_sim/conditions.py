@@ -47,19 +47,11 @@ def condition_matches(
         return _message_exists(conn, condition["message_exists"])
     if "first_time_at_or_after" in condition:
         spec = condition["first_time_at_or_after"]
-        first_time = first_fact_or_evidence_time(
-            conn,
-            fact_id=spec.get("fact_id"),
-            evidence_key=spec.get("evidence_key"),
-        )
+        first_time = _first_condition_time(conn, spec)
         return first_time is not None and first_time >= spec["at"]
     if "first_time_before" in condition:
         spec = condition["first_time_before"]
-        first_time = first_fact_or_evidence_time(
-            conn,
-            fact_id=spec.get("fact_id"),
-            evidence_key=spec.get("evidence_key"),
-        )
+        first_time = _first_condition_time(conn, spec)
         return first_time is not None and first_time < spec["before"]
     if "outreach_before" in condition:
         return _outreach_before(conn, condition["outreach_before"])
@@ -86,6 +78,9 @@ def condition_time(conn: sqlite3.Connection, source: dict[str, Any]) -> str | No
         return fact_discovered_at(conn, source["fact_discovered"])
     if "evidence" in source:
         return first_evidence_time(conn, source["evidence"])
+    if "coworker_state" in source:
+        spec = source["coworker_state"]
+        return coworker_state_updated_at(conn, spec["person_id"], spec["key"])
     if "first_fact_or_evidence" in source:
         spec = source["first_fact_or_evidence"]
         return first_fact_or_evidence_time(
@@ -140,6 +135,23 @@ def first_fact_or_evidence_time(
     return min(times) if times else None
 
 
+def _first_condition_time(conn: sqlite3.Connection, spec: dict[str, Any]) -> str | None:
+    times = [
+        value
+        for value in (
+            fact_discovered_at(conn, spec.get("fact_id")) if spec.get("fact_id") else None,
+            first_evidence_time(conn, spec.get("evidence_key"))
+            if spec.get("evidence_key")
+            else None,
+            condition_time(conn, {"coworker_state": spec["coworker_state"]})
+            if "coworker_state" in spec
+            else None,
+        )
+        if value is not None
+    ]
+    return min(times) if times else None
+
+
 def project_decision(conn: sqlite3.Connection, project_id: str | None) -> str | None:
     if project_id is None:
         row = conn.execute(
@@ -181,6 +193,18 @@ def coworker_state(conn: sqlite3.Connection, person_id: str, key: str) -> Any:
         (person_id, key),
     ).fetchone()
     return None if row is None else loads(row["value_json"], None)
+
+
+def coworker_state_updated_at(conn: sqlite3.Connection, person_id: str, key: str) -> str | None:
+    row = conn.execute(
+        """
+        SELECT updated_at
+        FROM coworker_state
+        WHERE person_id = ? AND key = ?
+        """,
+        (person_id, key),
+    ).fetchone()
+    return None if row is None else row["updated_at"]
 
 
 def _blocker_status_matches(conn: sqlite3.Connection, spec: dict[str, Any]) -> bool:

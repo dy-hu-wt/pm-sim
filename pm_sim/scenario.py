@@ -17,7 +17,7 @@ def load_scenario(path: Path | str) -> dict[str, Any]:
     if not scenario_path.exists():
         raise ScenarioError(f"Scenario file not found: {scenario_path}")
 
-    data = _load_scenario_data(scenario_path)
+    data = _compile_grading_rules(_load_scenario_data(scenario_path))
     _validate_scenario(data, scenario_path)
     return data
 
@@ -52,6 +52,127 @@ def _load_json_object(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ScenarioError(f"Scenario file must contain a JSON object: {path}")
     return data
+
+
+def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
+    grading_rules = data.get("grading_rules", [])
+    if not grading_rules:
+        return data
+    if not isinstance(grading_rules, list):
+        raise ScenarioError("grading_rules must be a list.")
+
+    compiled = copy_json_object(data)
+    generated_action_ids = {
+        f"grading_{_required_string(rule, 'id', 'grading rule')}_action"
+        for rule in grading_rules
+        if isinstance(rule, dict)
+    }
+    generated_evidence_keys = {
+        _required_string(
+            _required_object(rule, "evidence", f"grading rule {rule.get('id')}"),
+            "key",
+            f"grading rule {rule.get('id')} evidence",
+        )
+        for rule in grading_rules
+        if isinstance(rule, dict)
+    }
+    action_rules = [
+        rule
+        for rule in compiled.get("action_rules", [])
+        if rule.get("id") not in generated_action_ids
+    ]
+    state_evidence_rules = [
+        rule
+        for rule in compiled.get("state_evidence_rules", [])
+        if rule.get("evidence_key") not in generated_evidence_keys
+    ]
+    for rule in grading_rules:
+        if not isinstance(rule, dict):
+            raise ScenarioError("grading_rules entries must be objects.")
+        if rule.get("template") != "grounded_communication":
+            raise ScenarioError(f"Unsupported grading rule template: {rule.get('template')}")
+
+        rule_id = _required_string(rule, "id", "grading rule")
+        action = _required_object(rule, "action", f"grading rule {rule_id}")
+        state = _required_object(rule, "state", f"grading rule {rule_id}")
+        evidence = _required_object(rule, "evidence", f"grading rule {rule_id}")
+
+        action_type = _required_string(action, "type", f"grading rule {rule_id} action")
+        recipient_id = _required_string(
+            action,
+            "recipient_id",
+            f"grading rule {rule_id} action",
+        )
+        person_id = _required_string(state, "person_id", f"grading rule {rule_id} state")
+        key = _required_string(state, "key", f"grading rule {rule_id} state")
+        if "value" not in state:
+            raise ScenarioError(f"grading rule {rule_id} state must include value.")
+        evidence_key = _required_string(evidence, "key", f"grading rule {rule_id} evidence")
+        note = _required_string(evidence, "note", f"grading rule {rule_id} evidence")
+
+        action_rules.append(
+            {
+                "id": f"grading_{rule_id}_action",
+                "action_type": action_type,
+                "priority": int(rule.get("priority", 60)),
+                "recipient_id": recipient_id,
+                "claims_all": action.get("claims_all", []),
+                "claims_any": action.get("claims_any", []),
+                "when": rule.get("requires", []),
+                "effects": [
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": person_id,
+                        "key": key,
+                        "value": state["value"],
+                    },
+                    *rule.get("effects", []),
+                ],
+            }
+        )
+        state_evidence_rules.append(
+            {
+                "evidence_key": evidence_key,
+                "note": note,
+                "when": [
+                    {
+                        "coworker_state": {
+                            "person_id": person_id,
+                            "key": key,
+                            "equals": state["value"],
+                        }
+                    }
+                ],
+                "created_at": {
+                    "coworker_state": {
+                        "person_id": person_id,
+                        "key": key,
+                    }
+                },
+            }
+        )
+
+    compiled["action_rules"] = action_rules
+    compiled["state_evidence_rules"] = state_evidence_rules
+    return compiled
+
+
+def copy_json_object(data: dict[str, Any]) -> dict[str, Any]:
+    return json.loads(json.dumps(data))
+
+
+def _required_object(row: dict[str, Any], key: str, label: str) -> dict[str, Any]:
+    value = row.get(key)
+    if not isinstance(value, dict):
+        raise ScenarioError(f"{label} must include object {key}.")
+    return value
+
+
+def _required_string(row: dict[str, Any], key: str, label: str) -> str:
+    value = row.get(key)
+    if not isinstance(value, str) or not value:
+        raise ScenarioError(f"{label} must include string {key}.")
+    return value
 
 
 def _validate_scenario(data: dict[str, Any], path: Path) -> None:

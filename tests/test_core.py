@@ -1895,19 +1895,37 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         )
         conn = connect(self.db_path)
         try:
-            evidence = conn.execute(
+            row = conn.execute(
                 """
-                SELECT evidence_key
-                FROM evaluation_evidence
-                WHERE evidence_key = 'customer_message_ready'
+                SELECT value_json
+                FROM coworker_state
+                WHERE person_id = 'daisy'
+                  AND key = 'customer_message_ready'
                 """
             ).fetchone()
         finally:
             conn.close()
+        evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        stakeholder_component = next(
+            component
+            for component in evaluation["components"]
+            if component["key"] == "stakeholder_communication"
+        )
 
         self.assertTrue(result["ok"])
-        self.assertTrue(any(effect.get("key") == "customer_message_ready" for effect in result["applied_effects"]))
-        self.assertIsNotNone(evidence)
+        self.assertTrue(
+            any(
+                effect.get("type") == "update_coworker_state"
+                and effect.get("person_id") == "daisy"
+                and "customer_message_ready" in effect.get("keys", [])
+                for effect in result["applied_effects"]
+            )
+        )
+        self.assertTrue(loads(row["value_json"]))
+        self.assertIn(
+            "customer_message_ready",
+            {evidence["key"] for evidence in stakeholder_component["evidence"]},
+        )
 
     def test_security_answer_email_before_daisy_question_does_not_score(self) -> None:
         result = send_email(
@@ -1960,19 +1978,39 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         )
         conn = connect(self.db_path)
         try:
-            evidence = conn.execute(
+            row = conn.execute(
                 """
-                SELECT evidence_key, note
-                FROM evaluation_evidence
-                WHERE evidence_key = 'security_question_answered'
+                SELECT value_json
+                FROM coworker_state
+                WHERE person_id = 'daisy'
+                  AND key = 'security_answer_received'
                 """
             ).fetchone()
         finally:
             conn.close()
+        evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+        security_component = next(
+            component
+            for component in evaluation["components"]
+            if component["key"] == "security_interruption"
+        )
+        evidence = next(
+            item
+            for item in security_component["evidence"]
+            if item["key"] == "security_question_answered"
+        )
 
         self.assertTrue(result["ok"])
-        self.assertTrue(any(effect.get("key") == "security_question_answered" for effect in result["applied_effects"]))
-        self.assertEqual(evidence["evidence_key"], "security_question_answered")
+        self.assertTrue(
+            any(
+                effect.get("type") == "update_coworker_state"
+                and effect.get("person_id") == "daisy"
+                and "security_answer_received" in effect.get("keys", [])
+                for effect in result["applied_effects"]
+            )
+        )
+        self.assertTrue(loads(row["value_json"]))
+        self.assertEqual(evidence["key"], "security_question_answered")
         self.assertIn("private repo source handling", evidence["note"])
 
     def test_schedule_meeting_creates_future_meeting_event(self) -> None:
@@ -2320,7 +2358,13 @@ class EvaluatorTests(unittest.TestCase):
         conn = connect(self.db_path)
         try:
             conn.execute(
-                "DELETE FROM evaluation_evidence WHERE evidence_key = 'final_readiness_confirmed'"
+                """
+                UPDATE coworker_state
+                SET value_json = ?, updated_at = '2026-06-22T09:00:00'
+                WHERE person_id = 'daisy'
+                  AND key = 'final_readiness_confirmed'
+                """,
+                (json.dumps(False),),
             )
             conn.commit()
         finally:
@@ -2340,7 +2384,13 @@ class EvaluatorTests(unittest.TestCase):
         conn = connect(self.db_path)
         try:
             conn.execute(
-                "DELETE FROM evaluation_evidence WHERE evidence_key = 'final_readiness_confirmed'"
+                """
+                UPDATE coworker_state
+                SET value_json = ?, updated_at = '2026-06-22T09:00:00'
+                WHERE person_id = 'daisy'
+                  AND key = 'final_readiness_confirmed'
+                """,
+                (json.dumps(False),),
             )
             conn.commit()
         finally:
@@ -2621,7 +2671,7 @@ class EvaluatorTests(unittest.TestCase):
         self.assertIn("+10 portfolio_tradeoff (passed, max 10)", output)
         self.assertIn("Evidence:", output)
         self.assertIn("Stale repo sync risk is discovered in world state.", output)
-        self.assertIn("Agent gave Daisy a Nimbus-ready Friday update", output)
+        self.assertIn("Daisy has received grounded customer-ready Nimbus beta wording.", output)
         self.assertIn("Draft-mode approval is recorded in world state.", output)
         self.assertIn("Luigi pointed the agent to the private repo security baseline.", output)
 

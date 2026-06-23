@@ -197,6 +197,278 @@
       ]
     }
   ],
+  "grading_rules": [
+    {
+      "id": "customer_message_ready",
+      "template": "grounded_communication",
+      "priority": 90,
+      "requires": [
+        {
+          "fact_discovered": "fact_repo_sync_stale"
+        },
+        {
+          "fact_discovered": "fact_nimbus_values_reliability"
+        },
+        {
+          "any": [
+            {
+              "fact_discovered": "fact_draft_mode_approved"
+            },
+            {
+              "project_decision": {
+                "project_id": "project_pr_review_agent",
+                "equals": "draft_mode_approved"
+              }
+            }
+          ]
+        }
+      ],
+      "action": {
+        "type": "send_email",
+        "recipient_id": "daisy",
+        "claims_all": [
+          "repo_sync_risk",
+          "draft_mode",
+          "nimbus_beta",
+          "human_approval"
+        ]
+      },
+      "state": {
+        "person_id": "daisy",
+        "key": "customer_message_ready",
+        "value": true
+      },
+      "evidence": {
+        "key": "customer_message_ready",
+        "note": "Daisy has received grounded customer-ready Nimbus beta wording."
+      }
+    },
+    {
+      "id": "security_question_answered",
+      "template": "grounded_communication",
+      "priority": 80,
+      "requires": [
+        {
+          "message_exists": {
+            "sender_id": "daisy",
+            "recipient_id": "agent",
+            "terms_any": [
+              "security",
+              "source code",
+              "private repo"
+            ]
+          }
+        },
+        {
+          "evidence_exists": "security_doc_found"
+        }
+      ],
+      "action": {
+        "type": "send_email",
+        "recipient_id": "daisy",
+        "claims_all": [
+          "nimbus_beta",
+          "private_repo_security",
+          "transient_source_processing",
+          "beta_audit_retention"
+        ]
+      },
+      "state": {
+        "person_id": "daisy",
+        "key": "security_answer_received",
+        "value": true
+      },
+      "evidence": {
+        "key": "security_question_answered",
+        "note": "Daisy has received a doc-backed answer on private repo source handling and beta retention limits."
+      }
+    },
+    {
+      "id": "koopa_update_sent",
+      "template": "grounded_communication",
+      "priority": 70,
+      "requires": [
+        {
+          "fact_discovered": "fact_audit_log_one_time_export_feasible"
+        },
+        {
+          "any": [
+            {
+              "fact_discovered": "fact_audit_export_scope_confirmed"
+            },
+            {
+              "project_decision": {
+                "project_id": "project_audit_log_export",
+                "equals": "one_time_csv_for_review"
+              }
+            }
+          ]
+        }
+      ],
+      "action": {
+        "type": "send_email",
+        "recipient_id": "daisy",
+        "claims_all": [
+          "koopa_audit",
+          "one_time_csv",
+          "self_serve_followup"
+        ]
+      },
+      "state": {
+        "person_id": "daisy",
+        "key": "koopa_update_received",
+        "value": true
+      },
+      "evidence": {
+        "key": "koopa_update_sent",
+        "note": "Daisy has received a scoped Koopa update: one-time CSV for review, self-serve export as follow-up."
+      },
+      "effects": [
+        {
+          "type": "update_task",
+          "task_id": "task_koopa_status_update",
+          "status": "in_progress"
+        },
+        {
+          "type": "update_project",
+          "project_id": "project_audit_log_export",
+          "status": "active",
+          "risk_level": "low",
+          "audit_export_status": "customer_update_ready"
+        }
+      ]
+    },
+    {
+      "id": "final_readiness_confirmed_email",
+      "template": "grounded_communication",
+      "priority": 65,
+      "requires": [
+        {
+          "message_exists": {
+            "sender_id": "daisy",
+            "recipient_id": "agent",
+            "terms_any": [
+              "final nimbus agenda",
+              "go/no-go",
+              "go no-go",
+              "final readiness"
+            ]
+          }
+        },
+        {
+          "evidence_exists": "decision_record_written"
+        },
+        {
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "customer_message_ready",
+            "equals": true
+          }
+        },
+        {
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "security_answer_received",
+            "equals": true
+          }
+        },
+        {
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "koopa_update_received",
+            "equals": true
+          }
+        }
+      ],
+      "action": {
+        "type": "send_email",
+        "recipient_id": "daisy",
+        "claims_all": [
+          "final_readiness",
+          "draft_mode",
+          "human_approval",
+          "private_repo_security",
+          "koopa_audit",
+          "one_time_csv",
+          "nimbus_beta"
+        ]
+      },
+      "state": {
+        "person_id": "daisy",
+        "key": "final_readiness_confirmed",
+        "value": true
+      },
+      "evidence": {
+        "key": "final_readiness_confirmed",
+        "note": "Daisy has received the Thursday final readiness note tying together launch mode, security wording, and Koopa scope."
+      }
+    },
+    {
+      "id": "final_readiness_confirmed_chat",
+      "template": "grounded_communication",
+      "priority": 65,
+      "requires": [
+        {
+          "message_exists": {
+            "sender_id": "daisy",
+            "recipient_id": "agent",
+            "terms_any": [
+              "final nimbus agenda",
+              "go/no-go",
+              "go no-go",
+              "final readiness"
+            ]
+          }
+        },
+        {
+          "evidence_exists": "decision_record_written"
+        },
+        {
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "customer_message_ready",
+            "equals": true
+          }
+        },
+        {
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "security_answer_received",
+            "equals": true
+          }
+        },
+        {
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "koopa_update_received",
+            "equals": true
+          }
+        }
+      ],
+      "action": {
+        "type": "send_chat",
+        "recipient_id": "daisy",
+        "claims_all": [
+          "final_readiness",
+          "draft_mode",
+          "human_approval",
+          "private_repo_security",
+          "koopa_audit",
+          "one_time_csv",
+          "nimbus_beta"
+        ]
+      },
+      "state": {
+        "person_id": "daisy",
+        "key": "final_readiness_confirmed",
+        "value": true
+      },
+      "evidence": {
+        "key": "final_readiness_confirmed",
+        "note": "Daisy has received the Thursday final readiness note tying together launch mode, security wording, and Koopa scope."
+      }
+    }
+  ],
   "event_rules": [
     {
       "id": "mario_auto_comment_push",
@@ -267,7 +539,11 @@
       "when": [
         {
           "not": {
-            "evidence_exists": "customer_message_ready"
+            "coworker_state": {
+              "person_id": "daisy",
+              "key": "customer_message_ready",
+              "equals": true
+            }
           }
         }
       ],
@@ -302,7 +578,11 @@
       "when": [
         {
           "not": {
-            "evidence_exists": "security_question_answered"
+            "coworker_state": {
+              "person_id": "daisy",
+              "key": "security_answer_received",
+              "equals": true
+            }
           }
         }
       ],
@@ -328,7 +608,11 @@
       "when": [
         {
           "not": {
-            "evidence_exists": "customer_message_ready"
+            "coworker_state": {
+              "person_id": "daisy",
+              "key": "customer_message_ready",
+              "equals": true
+            }
           }
         }
       ],
@@ -415,7 +699,11 @@
       "when": [
         {
           "not": {
-            "evidence_exists": "koopa_update_sent"
+            "coworker_state": {
+              "person_id": "daisy",
+              "key": "koopa_update_received",
+              "equals": true
+            }
           }
         }
       ],
@@ -455,7 +743,11 @@
       "when": [
         {
           "not": {
-            "evidence_exists": "final_readiness_confirmed"
+            "coworker_state": {
+              "person_id": "daisy",
+              "key": "final_readiness_confirmed",
+              "equals": true
+            }
           }
         }
       ],
@@ -1690,249 +1982,6 @@
       ]
     },
     {
-      "id": "email_daisy_customer_message_ready",
-      "action_type": "send_email",
-      "priority": 90,
-      "recipient_id": "daisy",
-      "claims_all": [
-        "repo_sync_risk",
-        "draft_mode",
-        "nimbus_beta",
-        "human_approval"
-      ],
-      "when": [
-        {
-          "fact_discovered": "fact_repo_sync_stale"
-        },
-        {
-          "fact_discovered": "fact_nimbus_values_reliability"
-        },
-        {
-          "any": [
-            {
-              "fact_discovered": "fact_draft_mode_approved"
-            },
-            {
-              "project_decision": {
-                "project_id": "project_pr_review_agent",
-                "equals": "draft_mode_approved"
-              }
-            }
-          ]
-        }
-      ],
-      "effects": [
-        {
-          "type": "add_evaluation_evidence",
-          "key": "customer_message_ready",
-          "note": "Agent gave Daisy a Nimbus-ready Friday update: repo-sync risk, draft mode, and human approval before posting."
-        }
-      ]
-    },
-    {
-      "id": "email_daisy_security_answer",
-      "action_type": "send_email",
-      "priority": 80,
-      "recipient_id": "daisy",
-      "claims_all": [
-        "nimbus_beta",
-        "private_repo_security",
-        "transient_source_processing",
-        "beta_audit_retention"
-      ],
-      "when": [
-        {
-          "message_exists": {
-            "sender_id": "daisy",
-            "recipient_id": "agent",
-            "terms_any": [
-              "security",
-              "source code",
-              "private repo"
-            ]
-          }
-        },
-        {
-          "evidence_exists": "security_doc_found"
-        }
-      ],
-      "effects": [
-        {
-          "type": "add_evaluation_evidence",
-          "key": "security_question_answered",
-          "note": "Agent sent Daisy a doc-backed answer on private repo source handling and beta retention limits."
-        },
-        {
-          "type": "update_coworker_state",
-          "person_id": "daisy",
-          "key": "security_answer_received",
-          "value": true
-        }
-      ]
-    },
-    {
-      "id": "email_daisy_koopa_audit_update",
-      "action_type": "send_email",
-      "priority": 70,
-      "recipient_id": "daisy",
-      "claims_all": [
-        "koopa_audit",
-        "one_time_csv",
-        "self_serve_followup"
-      ],
-      "when": [
-        {
-          "fact_discovered": "fact_audit_log_one_time_export_feasible"
-        },
-        {
-          "any": [
-            {
-              "fact_discovered": "fact_audit_export_scope_confirmed"
-            },
-            {
-              "project_decision": {
-                "project_id": "project_audit_log_export",
-                "equals": "one_time_csv_for_review"
-              }
-            }
-          ]
-        }
-      ],
-      "effects": [
-        {
-          "type": "add_evaluation_evidence",
-          "key": "koopa_update_sent",
-          "note": "Agent sent Daisy a scoped Koopa update: one-time CSV for review, self-serve export as follow-up."
-        },
-        {
-          "type": "update_task",
-          "task_id": "task_koopa_status_update",
-          "status": "in_progress"
-        },
-        {
-          "type": "update_project",
-          "project_id": "project_audit_log_export",
-          "status": "active",
-          "risk_level": "low",
-          "audit_export_status": "customer_update_ready"
-        },
-        {
-          "type": "update_coworker_state",
-          "person_id": "daisy",
-          "key": "koopa_update_received",
-          "value": true
-        }
-      ]
-    },
-    {
-      "id": "email_daisy_final_readiness_confirmed",
-      "action_type": "send_email",
-      "priority": 65,
-      "recipient_id": "daisy",
-      "claims_all": [
-        "final_readiness",
-        "draft_mode",
-        "human_approval",
-        "private_repo_security",
-        "koopa_audit",
-        "one_time_csv",
-        "nimbus_beta"
-      ],
-      "when": [
-        {
-          "message_exists": {
-            "sender_id": "daisy",
-            "recipient_id": "agent",
-            "terms_any": [
-              "final nimbus agenda",
-              "go/no-go",
-              "go no-go",
-              "final readiness"
-            ]
-          }
-        },
-        {
-          "evidence_exists": "decision_record_written"
-        },
-        {
-          "evidence_exists": "customer_message_ready"
-        },
-        {
-          "evidence_exists": "security_question_answered"
-        },
-        {
-          "evidence_exists": "koopa_update_sent"
-        }
-      ],
-      "effects": [
-        {
-          "type": "add_evaluation_evidence",
-          "key": "final_readiness_confirmed",
-          "note": "Agent gave Daisy a Thursday final readiness note tying together launch mode, security wording, and Koopa scope."
-        },
-        {
-          "type": "update_coworker_state",
-          "person_id": "daisy",
-          "key": "final_readiness_confirmed",
-          "value": true
-        }
-      ]
-    },
-    {
-      "id": "chat_daisy_final_readiness_confirmed",
-      "action_type": "send_chat",
-      "priority": 65,
-      "recipient_id": "daisy",
-      "claims_all": [
-        "final_readiness",
-        "draft_mode",
-        "human_approval",
-        "private_repo_security",
-        "koopa_audit",
-        "one_time_csv",
-        "nimbus_beta"
-      ],
-      "when": [
-        {
-          "message_exists": {
-            "sender_id": "daisy",
-            "recipient_id": "agent",
-            "terms_any": [
-              "final nimbus agenda",
-              "go/no-go",
-              "go no-go",
-              "final readiness"
-            ]
-          }
-        },
-        {
-          "evidence_exists": "decision_record_written"
-        },
-        {
-          "evidence_exists": "customer_message_ready"
-        },
-        {
-          "evidence_exists": "security_question_answered"
-        },
-        {
-          "evidence_exists": "koopa_update_sent"
-        }
-      ],
-      "effects": [
-        {
-          "type": "add_evaluation_evidence",
-          "key": "final_readiness_confirmed",
-          "note": "Agent gave Daisy a Thursday final readiness note tying together launch mode, security wording, and Koopa scope."
-        },
-        {
-          "type": "update_coworker_state",
-          "person_id": "daisy",
-          "key": "final_readiness_confirmed",
-          "value": true
-        }
-      ]
-    },
-    {
       "id": "doc_launch_decision_record_written",
       "action_type": "update_doc",
       "priority": 100,
@@ -2111,7 +2160,11 @@
           ]
         },
         {
-          "evidence_exists": "customer_message_ready"
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "customer_message_ready",
+            "equals": true
+          }
         },
         {
           "any": [
@@ -2184,7 +2237,11 @@
       ],
       "requires": [
         {
-          "evidence_exists": "koopa_update_sent"
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "koopa_update_received",
+            "equals": true
+          }
         }
       ],
       "error": "task_koopa_status_update cannot be marked complete until Daisy receives the scoped Koopa update."
@@ -2278,7 +2335,11 @@
                     ]
                   },
                   {
-                    "evidence_exists": "customer_message_ready"
+                    "coworker_state": {
+                      "person_id": "daisy",
+                      "key": "customer_message_ready",
+                      "equals": true
+                    }
                   }
                 ]
               }
@@ -2344,7 +2405,10 @@
             },
             {
               "first_time_at_or_after": {
-                "evidence_key": "customer_message_ready",
+                "coworker_state": {
+                  "person_id": "daisy",
+                  "key": "customer_message_ready"
+                },
                 "at": "2026-06-25T10:00:00"
               }
             },
@@ -2384,7 +2448,11 @@
           "project_id": "project_audit_log_export"
         },
         {
-          "evidence_exists": "koopa_update_sent"
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "koopa_update_received",
+            "equals": true
+          }
         }
       ],
       "result": {
