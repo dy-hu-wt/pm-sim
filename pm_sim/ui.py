@@ -89,6 +89,7 @@ class _UiServer(ThreadingHTTPServer):
         self.policy = policy
         self.model = model
         self.max_turns = max_turns
+        self.step_lock = threading.Lock()
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -107,19 +108,32 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         path = urlparse(self.path).path
         if path == "/api/reset":
+            if self.server.step_lock.locked():
+                payload = _state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit)
+                payload["busy"] = True
+                self._send_json(payload)
+                return
             reset(self.server.db_path, self.server.scenario_path)
             if self.server.policy == "llm":
                 start_llm_session(self.server.db_path, self.server.scenario_path, model=self.server.model)
             self._send_json(_state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit))
             return
         if path == "/api/advance-next":
-            step_result = _run_next_ui_step(
-                self.server.db_path,
-                self.server.scenario_path,
-                policy=self.server.policy,
-                model=self.server.model,
-                max_turns=self.server.max_turns,
-            )
+            if not self.server.step_lock.acquire(blocking=False):
+                payload = _state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit)
+                payload["busy"] = True
+                self._send_json(payload)
+                return
+            try:
+                step_result = _run_next_ui_step(
+                    self.server.db_path,
+                    self.server.scenario_path,
+                    policy=self.server.policy,
+                    model=self.server.model,
+                    max_turns=self.server.max_turns,
+                )
+            finally:
+                self.server.step_lock.release()
             payload = _state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit)
             payload["step_result"] = step_result
             payload["done"] = bool(step_result.get("done"))
@@ -149,6 +163,7 @@ class _Handler(BaseHTTPRequestHandler):
 
 def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> dict[str, Any]:
     scenario = load_scenario(scenario_path)
+    llm_state = llm_session_state(db_path)
     entries = timeline(db_path, limit=0)
     if timeline_limit > 0:
         entries = entries[-timeline_limit:]
@@ -174,9 +189,10 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
         "tasks": list_tasks(db_path),
         "timeline": entries,
         "display_timeline": display_timeline,
+        "log_lines": _log_lines(entries, llm_state),
         "authored_schedule": _authored_schedule(scenario),
         "scripted_demo": _scripted_demo_state(db_path, scenario_path),
-        "llm_session": llm_session_state(db_path),
+        "llm_session": llm_state,
     }
 
 
@@ -321,6 +337,31 @@ def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
     }
 
 
+def _log_lines(entries: list[dict[str, Any]], llm_state: dict[str, Any]) -> list[str]:
+    progress = llm_state.get("progress") or []
+    if progress:
+        return list(progress)
+
+    lines: list[str] = []
+    for entry in entries:
+        kind = entry.get("kind")
+        if kind == "action":
+            action_type = str(entry.get("action_type") or "")
+            if action_type in {"reset", "finalize_to_deadline"}:
+                continue
+            payload = entry.get("payload") or {}
+            detail = _action_detail(action_type, payload)
+            title = _action_title(action_type, payload).upper()
+            lines.append(f"[{_pretty_time(entry.get('time'))}] {title} - {detail}")
+        elif kind == "event_delivered":
+            if entry.get("event_type") == "coworker_reply":
+                continue
+            lines.append(
+                f"[{_pretty_time(entry.get('time'))}] EVENT - {_label(entry.get('event_type'))}"
+            )
+    return lines[-80:]
+
+
 def _action_title(action_type: str, payload: dict[str, Any]) -> str:
     if action_type == "send_chat":
         return f"Chat to {_label(payload.get('person_id'))}"
@@ -360,6 +401,19 @@ def _label(value: Any) -> str:
             text = text[len(prefix):]
             break
     return text.replace("_", " ").replace("-", " ").strip().capitalize()
+
+
+def _pretty_time(value: Any) -> str:
+    text = str(value or "")
+    if not text:
+        return ""
+    try:
+        import datetime as _dt
+
+        parsed = _dt.datetime.fromisoformat(text)
+    except Exception:
+        return text
+    return parsed.strftime("%a %Y-%m-%d %H:%M")
 
 
 def _html() -> str:
@@ -405,18 +459,18 @@ section { margin:14px 0; overflow:hidden; }
 .calendar-event { margin:8px; padding:8px; border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:8px; background:#fff; }
 .calendar-event.event { border-left-color:var(--purple); }
 .calendar-event.current { outline:2px solid rgba(37,92,153,.24); background:#f2f7ff; }
-.playback { display:grid; gap:8px; max-height:360px; overflow:auto; padding-right:4px; }
-.item { border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:8px; background:#fff; padding:10px; }
-.item.event { border-left-color:var(--purple); }
-.item.current { outline:2px solid rgba(37,92,153,.24); background:#f2f7ff; }
-.item .time { color:var(--muted); font-size:12px; font-weight:850; }
-.item .title { font-weight:850; margin-top:2px; }
-.item .detail { color:var(--muted); margin-top:2px; }
+.log-console { max-height:360px; overflow:auto; padding:14px; border:1px solid var(--line); border-radius:10px; background:#101722; color:#d9e7ff; font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.log-line { white-space:pre-wrap; border-bottom:1px solid rgba(255,255,255,.06); padding:6px 0; }
+.log-line:last-child { border-bottom:none; }
 .helper { color:var(--muted); font-size:12px; margin:8px 14px 0; }
 .columns { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px; }
 .list { padding:14px; display:grid; gap:8px; }
 .row { border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }
 .row.scheduled { border-left:4px solid var(--purple); }
+.table-wrap { padding:14px; overflow:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th, td { padding:10px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
 details.operator { margin:14px 0; border:1px solid var(--line); border-radius:12px; background:#fff; box-shadow:var(--shadow); overflow:hidden; }
 details.operator summary { cursor:pointer; padding:13px 15px; font-weight:850; background:#fbfcfe; border-bottom:1px solid var(--line); }
 details.operator[open] summary { border-bottom:1px solid var(--line); }
@@ -444,7 +498,7 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
   </header>
   <section id="playback-section">
     <div class="section-head"><h2>Live Playback</h2></div>
-    <p class="helper">Play runs the deterministic scripted PM demo one workplace action at a time. The cards stream from SQLite as actions and events mutate state.</p>
+    <p class="helper">Play runs the selected backend policy one step at a time. The calendar shows when things happen; the log shows the actual streamed tool/event flow.</p>
     <div class="playback-controls">
       <button class="primary" id="play">Play</button>
       <button id="step">Step</button>
@@ -453,21 +507,22 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
     </div>
     <div class="replay">
       <div class="calendar-board" id="calendar-board"></div>
-      <div class="playback" id="playback"></div>
+      <div class="log-console" id="playback"></div>
     </div>
   </section>
   <div class="columns">
     <section><div class="section-head"><h2>Visible Projects</h2></div><p class="helper">Current project state from SQLite. It changes only when delivered events or actions mutate state.</p><div class="list" id="projects"></div></section>
-    <section><div class="section-head"><h2>Authored Schedule</h2></div><p class="helper">Reference schedule seeded by the scenario. These events have not necessarily been delivered yet.</p><div class="list" id="schedule"></div></section>
+    <section><div class="section-head"><h2>Known Blockers</h2></div><p class="helper">Only blockers already visible in the run. This is the PM-facing view, not the hidden authored truth.</p><div class="list" id="blockers"></div></section>
   </div>
-  <div class="columns">
-    <section><div class="section-head"><h2>Tasks</h2></div><div class="list" id="tasks"></div></section>
-  </div>
+  <section><div class="section-head"><h2>Tasks</h2></div><div class="table-wrap" id="tasks"></div></section>
   <details class="operator">
     <summary>Operator inspector: current evaluation</summary>
     <p class="helper">This is for debugging and grading. It is computed from current visible state/evidence and is not shown as part of the agent-facing playback.</p>
     <div class="grid" id="summary"></div>
     <div class="list" id="evaluation"></div>
+    <div class="section-head"><h2>Authored Schedule</h2></div>
+    <p class="helper">Seeded scenario events for author/debug use. These are not all visible to the agent at the start.</p>
+    <div class="list" id="schedule"></div>
   </details>
 </main>
 <script>
@@ -541,12 +596,6 @@ function scenarioDays(scenario, items) {
 }
 
 function renderReplay(items, scenario) {
-  const latest = items.length - 1;
-  $("playback").innerHTML = items.length
-    ? items.map((item, index) => `<div class="item ${esc(item.kind)} ${index === latest ? "current" : ""}"><div class="time">${esc(pretty(item.time))}</div><div class="title">${esc(item.title)}</div><div class="detail">${esc(item.detail)}</div></div>`).join("")
-    : `<div class="empty">No visible activity yet.</div>`;
-  $("playback").lastElementChild?.scrollIntoView({ block: "nearest" });
-
   const days = scenarioDays(scenario || {}, items);
   $("calendar-board").style.gridTemplateColumns = days.length
     ? `repeat(${days.length}, minmax(150px, 1fr))`
@@ -583,11 +632,25 @@ function render(state) {
   ].join("");
 
   renderReplay(state.display_timeline || [], scenario);
+  const logs = state.log_lines || [];
+  $("playback").innerHTML = logs.length
+    ? logs.map(line => `<div class="log-line">${esc(line)}</div>`).join("")
+    : `<div class="empty">No log output yet.</div>`;
+  $("playback").lastElementChild?.scrollIntoView({ block: "nearest" });
 
   $("projects").innerHTML = (obs.projects || []).map(project => row(project.name, `${project.stakeholder_pressure || ""} Deadline: ${pretty(project.deadline)}`, project.status)).join("") || `<div class="empty">No projects.</div>`;
+  $("blockers").innerHTML = (obs.known_blockers || []).map(blocker => row(blocker.title, blocker.description || "", blocker.status)).join("") || `<div class="empty">No visible blockers.</div>`;
   $("schedule").innerHTML = (state.authored_schedule || []).map(item => `<div class="row scheduled"><strong>${esc(item.title)}</strong> <span class="badge">${esc(timeOnly(item.time))}</span><div>${esc(pretty(item.time))}</div><div>${esc(item.detail)}</div></div>`).join("") || `<div class="empty">No authored events.</div>`;
   $("evaluation").innerHTML = (evaluation.components || []).map(component => row(label(component.key), component.note || "", `${component.earned} / ${component.points}`)).join("") || `<div class="empty">No evaluation yet.</div>`;
-  $("tasks").innerHTML = (state.tasks || []).slice(0, 12).map(task => row(task.title, `Owner: ${task.owner_id || "unowned"} · Due: ${pretty(task.due_at)}`, task.status)).join("") || `<div class="empty">No tasks.</div>`;
+  const tasks = (state.tasks || []).slice(0, 12);
+  $("tasks").innerHTML = tasks.length ? `
+    <table>
+      <thead><tr><th>Task</th><th>Status</th><th>Owner</th><th>Priority</th><th>Due</th></tr></thead>
+      <tbody>
+        ${tasks.map(task => `<tr><td>${esc(task.title)}</td><td><span class="badge ${statusClass(task.status)}">${esc(label(task.status))}</span></td><td>${esc(task.owner_id || "unowned")}</td><td>${esc(label(task.priority || ""))}</td><td>${esc(pretty(task.due_at))}</td></tr>`).join("")}
+      </tbody>
+    </table>
+  ` : `<div class="empty">No tasks.</div>`;
 }
 
 async function refresh() {
@@ -599,6 +662,7 @@ async function step() {
   stepping = true;
   try {
     const state = await api("/api/advance-next", { method: "POST" });
+    if (state.busy) return;
     render(state);
     if (state.done) pause();
   } finally {

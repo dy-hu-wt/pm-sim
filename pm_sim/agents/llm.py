@@ -29,8 +29,9 @@ ToolResult = Union[dict[str, Any], list[dict[str, Any]]]
 ToolFn = Callable[[dict[str, Any]], ToolResult]
 ProgressFn = Callable[[str], None]
 
-DEFAULT_MODEL = "gpt-5.5"
+DEFAULT_MODEL = "gpt-5.4"
 LLM_SESSION_STATE_KEY = "llm_agent_session_json"
+LLM_PROGRESS_LOG_KEY = "llm_agent_progress_json"
 
 
 class LlmAgentError(RuntimeError):
@@ -66,6 +67,7 @@ def start_llm_session(
         ],
     }
     _save_llm_session(db_path, state)
+    _save_llm_progress(db_path, [])
     return llm_session_state(db_path)
 
 
@@ -91,6 +93,7 @@ def llm_session_state(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
         "done": bool(state.get("done")),
         "stop_reason": state.get("stop_reason"),
         "steps": len(state.get("steps", [])),
+        "progress": _load_llm_progress(db_path),
     }
 
 
@@ -104,6 +107,7 @@ def step_llm_session(
     progress: ProgressFn | None = None,
 ) -> dict[str, Any]:
     _load_dotenv()
+    progress = _ui_progress_recorder(db_path, progress)
     state = _load_llm_session(db_path)
     if state is None:
         start_llm_session(db_path, scenario_path, model=model)
@@ -644,6 +648,41 @@ def _save_llm_session(db_path: Path | str, state: dict[str, Any]) -> None:
         conn.commit()
     finally:
         conn.close()
+
+
+def _load_llm_progress(db_path: Path | str) -> list[str]:
+    conn = connect(db_path)
+    try:
+        return loads(get_state_value(conn, LLM_PROGRESS_LOG_KEY), [])
+    finally:
+        conn.close()
+
+
+def _save_llm_progress(db_path: Path | str, rows: list[str]) -> None:
+    conn = connect(db_path)
+    try:
+        set_state_value(conn, LLM_PROGRESS_LOG_KEY, dumps(rows))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _append_llm_progress(db_path: Path | str, message: str, limit: int = 80) -> None:
+    rows = _load_llm_progress(db_path)
+    rows.append(message)
+    _save_llm_progress(db_path, rows[-limit:])
+
+
+def _ui_progress_recorder(
+    db_path: Path | str,
+    progress: ProgressFn | None,
+) -> ProgressFn:
+    def record(message: str) -> None:
+        _append_llm_progress(db_path, message)
+        if progress is not None:
+            progress(message)
+
+    return record
 
 
 def _llm_step_payload(
