@@ -31,7 +31,7 @@ ToolResult = Union[dict[str, Any], list[dict[str, Any]]]
 ToolFn = Callable[[dict[str, Any]], ToolResult]
 ProgressFn = Callable[[str], None]
 
-DEFAULT_MODEL = "gpt-5.4"
+DEFAULT_MODEL = "gpt-5.5"
 LLM_SESSION_STATE_KEY = "llm_agent_session_json"
 LLM_PROGRESS_LOG_KEY = "llm_agent_progress_json"
 
