@@ -1,20 +1,22 @@
-# Scenario Authoring
+# Writing a Scenario
 
-`pm-sim` scenarios are data-authored directories. The engine owns storage, time, tools, event delivery, condition evaluation, effects, scoring, and timelines. Scenario YAML owns the company setup, coworker behavior, deadlines, scoring targets, and scripted demo path.
+A scenario is a small work week. It should feel like a real project manager joined a company on Monday and has to learn what matters, talk to the right people, make tradeoffs, and leave the project in a better state by Friday.
 
-## Required Files
+Start with the story before writing YAML. Pick one primary project, one interruption or competing project, three to five coworkers, one or two hidden risks, and a deadline. The best scenarios are not puzzles with one magic sequence. They give the agent several reasonable ways to learn the same facts, but still require grounded decisions before the project can improve.
 
-Each scenario directory has this shape:
+## Files
+
+Each scenario lives in its own directory:
 
 ```text
 scenarios/<scenario_id>/
-  scenario.yaml      # manifest and includes
-  world.yaml         # seeded company/project state
-  interactions.yaml  # coworker, event, meeting, and action behavior
-  evaluation.yaml    # grading, gates, outcomes, baseline, scripted path
+  scenario.yaml
+  world.yaml
+  interactions.yaml
+  evaluation.yaml
 ```
 
-`scenario.yaml` is intentionally small:
+`scenario.yaml` is only the manifest. Keep it short.
 
 ```yaml
 id: billing_migration
@@ -28,239 +30,341 @@ include:
   - evaluation.yaml
 ```
 
-Use `pm-sim reset --scenario scenarios/<scenario_id>` to validate and load it.
+`world.yaml` seeds the company state. `interactions.yaml` says how coworkers, events, meetings, and agent actions mutate that state. `evaluation.yaml` explains what good project management means for this scenario.
+
+Run this early and often:
+
+```bash
+pm-sim reset --scenario scenarios/<scenario_id>
+```
+
+Reset loads the scenario, validates references, creates the SQLite state, and fails fast if an ID is wrong.
 
 ## World State
 
-`world.yaml` defines the persistent starting state:
+`world.yaml` is the starting point. It should describe what exists at Monday 9:00, not everything the agent will eventually know.
 
-- `people`: coworkers, roles, goals, constraints, availability, private knowledge, and behavior notes.
-- `coworker_state`: mutable actor memory such as `risk_shared`, `approval_recorded`, or `customer_update_received`.
-- `actor_goals`, `actor_workload`, and `actor_commitments`: optional first-class runtime actor
-  state for deterministic NPC complexity. If omitted, goals and workload are seeded from
-  `people[].goals` and `people[].behavior.current_focus`.
-- `projects`: active workstreams with status, risk, stakeholder pressure, deadline, and metadata.
-- `facts`: discoverable information, often hidden until chat, email, docs, or events reveal it.
-- `tasks` and `dependencies`: visible PM work, owners, due dates, blockers, and priorities.
-- `blockers`: known or hidden risks with severity, owner, status, and `visible_at`.
-- `docs`: readable or hidden documents.
-- `messages`: initial chat/email context.
-- `events`: scheduled background events, coworker interruptions, and project deadlines.
+People are coworkers. Give each person a role, a response delay, some goals, and a short behavior note. This is enough to make them distinct without turning them into free-form agents.
 
-Visibility is standardized with nullable `visible_at`: if it is `null`, the item exists in the world but is not visible to the agent yet.
+```yaml
+people:
+  - id: daisy
+    name: Daisy
+    role: Customer success lead
+    response_delay_minutes: 40
+    goals:
+      - Give customers accurate written updates.
+      - Avoid surprising Nimbus on launch mode.
+    behavior:
+      current_focus: Waiting for customer-safe wording.
+      needs_from_pm:
+        - A written launch-mode answer before Thursday.
+```
 
-## Readable Task References
+Coworker state is mutable memory. Use it for things the evaluator or later behavior needs to know, such as whether Daisy received a customer update or Toad approved a decision.
 
-Task IDs are authored as short scenario names, and the loader canonicalizes them for SQLite and
-tool APIs. Write this in YAML:
+```yaml
+coworker_state:
+  - id: daisy_customer_update_received
+    person_id: daisy
+    key: customer_update_received
+    value: false
+```
+
+Projects are the active workstreams. A good scenario usually has one main project and one smaller interruption so the agent has to prioritize.
+
+```yaml
+projects:
+  - id: project_pr_review_agent
+    name: PR Review Agent Beta
+    status: active
+    risk_level: medium
+    stakeholder_pressure: Daisy promised Nimbus Labs a Friday beta.
+    deadline_at: "2026-06-26T15:00:00"
+```
+
+Facts are pieces of knowledge. Hidden or private facts should not be visible until a coworker, document, meeting, or event reveals them.
+
+```yaml
+facts:
+  - id: fact_repo_sync_stale
+    visibility_scope: hidden
+    owner_id: luigi
+    summary: Repo sync can review an older commit when webhooks arrive out of order.
+    visible_at: null
+```
+
+Tasks are what the project manager can see and move. Write task IDs as readable names. The loader turns `launch_decision` into `task_launch_decision` internally, so the database and CLI stay stable while the YAML stays readable.
 
 ```yaml
 tasks:
   - id: launch_decision
+    project_id: project_pr_review_agent
     title: Decide auto-commenting versus draft mode
+    owner_id: toad
+    status: not_started
+    priority: critical
+    due_at: "2026-06-25T11:00:00"
 
 dependencies:
-  - upstream_task_id: launch_decision
-    downstream_task_id: draft_mode_docs
-
-task_gate_rules:
-  - task_id: customer_talk_track
+  - id: dep_talk_track_needs_decision
+    project_id: project_pr_review_agent
+    upstream_task_id: launch_decision
+    downstream_task_id: customer_talk_track
+    description: Customer wording depends on the launch mode decision.
 ```
 
-At runtime those become `task_launch_decision`, `task_draft_mode_docs`, and
-`task_customer_talk_track`. This keeps CLI output and database IDs stable while keeping scenario
-source readable. The same alias works anywhere the YAML schema expects `task_id`,
-`upstream_task_id`, `downstream_task_id`, or a `task_status.id` condition.
+Use `visible_at: null` for docs, facts, and blockers that exist in the world but should not be known yet. When something becomes visible, an effect sets `visible_at` to the simulated time.
 
 ## Interactions
 
-`interactions.yaml` defines how coworkers and background dynamics change the world. Reply behavior
-and proactive coworker behavior live in one `actor_behaviors` list:
+`interactions.yaml` is where the week moves. The engine advances time, delivers events, records actions, and applies effects. The scenario decides which facts are revealed and which state changes happen.
 
-- `actor_behaviors`: the reusable actor model. `kind: "reply"` entries respond to chat/email;
-  `kind: "policy"` entries fire from time plus state. Both use the shared condition and effect
-  languages.
-- `event_rules`: effects applied when scheduled non-actor events are delivered.
-- `meeting_rules`: transcript lines and effects applied when a meeting resolves.
-- `action_rules`: effects applied when an agent action matches causal conditions and optional
-  semantic criteria.
-
-`actor_behaviors` is the single scenario surface for coworker replies and proactive actor behavior.
+Coworker behavior lives in `actor_behaviors`. A `reply` behavior handles chat or email from the agent. A `policy` behavior is proactive: the coworker reaches out because time passed or some state was missing.
 
 ```yaml
-id: daisy_customer_wording_nudge
-kind: policy
-person_id: daisy
-trigger:
-  at: "2026-06-25T09:30:00"
-when:
-  - not:
+actor_behaviors:
+  - id: luigi_repo_sync_reply
+    kind: reply
+    person_id: luigi
+    channels: [chat, email]
+    match:
+      mode: semantic
+      intents:
+        - id: asks_repo_sync_risk
+          description: The agent asks whether repo sync is safe for Friday launch.
+          signals:
+            - repo sync risk
+            - stale commit
+            - latest commit reliability
+      require_all: [asks_repo_sync_risk]
+    reply:
+      body: Repo sync can still review a stale commit if webhooks arrive out of order. I recommend draft mode for Friday.
+      delay_minutes: 70
+    effects:
+      - type: discover_fact
+        fact_id: fact_repo_sync_stale
+        source: luigi_reply
+      - type: update_coworker_state
+        person_id: luigi
+        key: repo_sync_risk_shared
+        value: true
+```
+
+The important part is the effect, not the exact sentence. If the same information can be learned by chat, email, or meeting, make all paths converge on the same fact and coworker state.
+
+Proactive behavior makes coworkers feel stateful. Daisy should not wait forever if she needs customer wording.
+
+```yaml
+actor_behaviors:
+  - id: daisy_customer_wording_nudge
+    kind: policy
+    person_id: daisy
+    trigger:
+      at: "2026-06-25T09:30:00"
+    when:
+      - not:
+          coworker_state:
+            person_id: daisy
+            key: customer_update_received
+            equals: true
+    effects:
+      - type: create_message
+        channel: email
+        sender_id: daisy
+        recipient_id: agent
+        subject: Customer wording risk
+        body: I still need written customer-ready wording before I update Nimbus.
+```
+
+Scheduled events represent outside pressure: customer questions, teammate pushes, or deadlines. They should be on the calendar or event queue so the agent has to keep working through the week.
+
+```yaml
+events:
+  - id: event_daisy_security_question
+    event_type: daisy_private_repo_security_question
+    scheduled_at: "2026-06-24T14:00:00"
+    priority: 100
+    payload:
+      project_id: project_pr_review_agent
+```
+
+`event_rules` say what happens when an event is delivered.
+
+```yaml
+event_rules:
+  - id: daisy_security_question_arrives
+    event_type: daisy_private_repo_security_question
+    effects:
+      - type: create_message
+        channel: email
+        sender_id: daisy
+        recipient_id: agent
+        subject: Nimbus private repo security question
+        body: Nimbus asked whether the agent stores source code from private repos.
+```
+
+Meetings should be useful but not magical. They must be at least 10 minutes long. A meeting can reveal several facts at once if the right people attend and the topic is relevant.
+
+## Scoring
+
+`evaluation.yaml` should describe outcomes, not reward busywork. The evaluator should not score a message just because it contains the right words. It should score state that changed after the agent had enough information to act responsibly.
+
+Use `grading_rules` for important communications. A grading rule has four parts: prerequisites, the action to recognize, the state mutation, and the evidence derived from that state.
+
+```yaml
+grading_rules:
+  - id: customer_message_ready
+    template: grounded_communication
+    requires:
+      - fact_discovered: fact_repo_sync_stale
+      - project_decision:
+          project_id: project_pr_review_agent
+          equals: draft_mode_approved
+    action:
+      type: send_email
+      recipient_id: daisy
+      match:
+        mode: semantic
+        intents:
+          - id: draft_mode
+            description: The message says Friday launch mode is draft mode.
+            signals:
+              - draft mode
+              - draft suggestions
+          - id: human_approval
+            description: The message says a human must approve before posting.
+            signals:
+              - human approval
+              - approve before posting
+          - id: repo_sync_risk
+            description: The message explains stale commit or repo sync risk.
+            signals:
+              - stale commit
+              - repo sync risk
+        require_all:
+          - draft_mode
+          - human_approval
+          - repo_sync_risk
+    state:
+      person_id: daisy
+      key: customer_update_received
+      value: true
+    evidence:
+      key: customer_message_ready
+      note: Daisy received grounded customer-ready launch wording.
+```
+
+This rule is causal. The agent must discover the risk and get the decision before the email can update Daisy's state. The evaluator later scores `customer_message_ready` from Daisy's state, not from the raw email body.
+
+State-derived evidence looks like this:
+
+```yaml
+state_evidence_rules:
+  - evidence_key: customer_message_ready
+    note: Daisy has received customer-ready launch wording.
+    when:
+      - coworker_state:
+          person_id: daisy
+          key: customer_update_received
+          equals: true
+    created_at:
       coworker_state:
         person_id: daisy
-        key: customer_message_ready
-        equals: true
-effects:
-  - type: create_message
-    channel: email
-    sender_id: daisy
-    recipient_id: agent
-    subject: Customer wording risk
-    body: I still need written customer-ready wording.
+        key: customer_update_received
 ```
 
-## Evaluation
-
-`evaluation.yaml` defines grading and reviewer/demo behavior:
-
-- `agent_brief`: scenario-specific operating guidance for LLM-driven runs, including objective,
-  timing guidance, finish criteria, and optional tool hints.
-- `grading_rules`: reusable templates that compile into action rules plus state-derived evidence.
-- `state_evidence_rules`: how evaluator evidence is derived from coworker/world state.
-- `task_gate_rules`: prevents task completion before required state exists.
-- `harmful_action_rules`: harmful or suspicious world states the evaluator should penalize.
-- `outcome_rules`: classifies project outcome at deadline.
-- `evaluation_targets`: point allocation and evidence requirements.
-- `baseline`: no-op reference path.
-- `scripted_policy`: deterministic demo path using normal tools.
-
-Keep engine behavior out of `agent_brief`. It should orient the agent to the scenario's visible
-PM objective and durable-work expectations; it should not reveal hidden facts or evaluator keys.
-
-Effects are reusable state mutations:
+Do not directly write scored evidence from an action or event. The validator rejects that for evidence keys used in `evaluation_targets`.
 
 ```yaml
-- type: discover_fact
-  fact_id: fact_backfill_checksum_mismatch
-- type: update_coworker_state
-  person_id: toad
-  key: stage_approved
-  value: true
-- type: update_actor_workload
-  person_id: daisy
-  load_level: high
-- type: add_actor_commitment
-  person_id: daisy
-  description: Send customer update.
-- type: update_project
-  project_id: project_billing_migration
-  decision: staged_shadow_mode
-- type: create_message
-  channel: email
-  sender_id: daisy
-  recipient_id: agent
-  body: ...
+# Do not do this for scored evidence.
+- type: add_evaluation_evidence
+  key: customer_message_ready
 ```
+
+## Outcomes
+
+Outcome rules classify the project at deadline. Write them in order from worst or most specific to best or fallback.
+
+```yaml
+outcome_rules:
+  - id: risky_auto_commenting
+    when:
+      - project_id: project_pr_review_agent
+      - project_decision:
+          project_id: project_pr_review_agent
+          equals: auto_commenting_approved
+      - blocker_status:
+          id: blocker_repo_sync_stale
+          is: unresolved
+    result:
+      status: shipped
+      risk_level: high
+      final_outcome: risky_auto_commenting
+      summary: Auto-commenting shipped while stale-code risk was still unresolved.
+
+  - id: draft_mode_beta_shipped
+    when:
+      - project_id: project_pr_review_agent
+    result:
+      status: shipped
+      risk_level: low
+      final_outcome: draft_mode_beta_shipped
+      summary: Nimbus received a draft-mode beta with human approval before posting.
+```
+
+A good outcome rule should be understandable to a reviewer without reading Python. If the rule says a project shipped, the required state should explain why.
+
+## Baseline And Scripted Path
+
+Every scenario needs a no-op baseline and a scripted success path. The baseline shows what happens if the agent does nothing. The scripted path proves that the scenario is solvable through the normal tools.
+
+```yaml
+baseline:
+  description: The agent does nothing until Friday.
+  commands:
+    - pm-sim reset --scenario scenarios/launch_readiness
+    - pm-sim advance-time to:2026-06-26T15:00:00
+    - pm-sim evaluate --explain
+
+scripted_policy:
+  - name: ask_luigi_about_repo_sync_risk
+    tool: send_chat
+    args:
+      person_id: luigi
+      body: Is repo sync safe enough for auto-commenting on Friday?
+```
+
+The scripted path should be boring. It is not there to be clever; it is there to make the scenario easy to test and demo.
 
 ## Multiple Valid Paths
 
-A scenario should not require one golden sequence. Author alternate tool paths by making different surfaces converge on the same state:
+Do not make one golden path. If Luigi can share a risk in chat, he should usually be able to share the same risk by email. If the agent schedules a meeting with Luigi and Toad, the meeting can reveal the same risk and approval path. The channel can change the cost and delay, but the important state should converge.
 
-- Chat rules can reveal information quickly through `coworker_reply` events.
-- Email rules can reveal the same information with email subjects/replies and longer action cost.
-- Meeting rules can combine attendees and topic terms, create a transcript, and apply multiple effects at the scheduled end time.
-
-For example, the billing migration scenario allows Luigi to reveal backfill risk by chat, by email, or in a meeting. All three paths set `luigi.backfill_risk_shared = true` and reveal `fact_backfill_checksum_mismatch`, so the evaluator sees the same grounded state rather than a channel-specific checklist.
-
-Meetings must be at least 10 minutes long. This keeps meetings distinct from instant chat while still allowing them to resolve several stakeholder inputs at once when the right people attend.
-
-## Grading Template
-
-Use `grading_rules` for scored communication. A grading rule says: only after prerequisites are true, a matching action mutates coworker state; the evaluator then derives evidence from that state.
+For example, these three paths can all lead to the same state:
 
 ```yaml
-id: atlas_customer_update
-template: grounded_communication
-requires:
-  - fact_discovered: fact_backfill_checksum_mismatch
-  - project_decision:
-      project_id: project_billing_migration
-      equals: staged_shadow_mode
-action:
-  type: send_email
-  recipient_id: daisy
-  match:
-    mode: semantic
-    intents:
-      - id: staged_shadow
-        description: The message says the migration will use staged shadow mode.
-        signals:
-          - staged shadow
-          - shadow mode
-      - id: invoice_correctness
-        description: The message explains the invoice correctness or checksum rationale.
-        signals:
-          - invoice correctness
-          - checksum
-    require_all:
-      - staged_shadow
-      - invoice_correctness
-state:
-  person_id: daisy
-  key: atlas_update_received
-  value: true
-evidence:
-  key: atlas_update_sent
-  note: Daisy received grounded Atlas customer wording by email.
+effects:
+  - type: discover_fact
+    fact_id: fact_repo_sync_stale
+  - type: update_coworker_state
+    person_id: luigi
+    key: repo_sync_risk_shared
+    value: true
 ```
 
-This keeps scoring causal:
+That lets agents solve the scenario differently while the evaluator stays stable.
 
-- The agent must discover the risk first.
-- The agent must get the decision first.
-- The matching email changes Daisy's state.
-- The evaluator scores Daisy's state, not raw message text.
+## Authoring Checklist
 
-## Evaluator Invariant
-
-Scored evidence must be state-derived. The scenario validator rejects direct `add_evaluation_evidence` effects for keys listed in `evaluation_targets`.
-
-Allowed:
-
-```yaml
-type: update_coworker_state
-person_id: daisy
-key: customer_update_received
-value: true
-```
-
-Then:
-
-```yaml
-evidence_key: customer_update_sent
-when:
-  - coworker_state:
-      person_id: daisy
-      key: customer_update_received
-      equals: true
-created_at:
-  coworker_state:
-    person_id: daisy
-    key: customer_update_received
-```
-
-Not allowed for scored keys:
-
-```yaml
-type: add_evaluation_evidence
-key: customer_update_sent
-```
-
-## Adding A Scenario Without Python
-
-1. Create `scenarios/<id>/scenario.yaml`, `world.yaml`, `interactions.yaml`, and `evaluation.yaml`.
-2. Seed at least one project, several coworkers, hidden facts, blockers, tasks, docs, messages, and deadline events.
-3. Add actor behaviors that reveal private facts, mutate coworker state, and model proactive pressure.
-4. Add `grading_rules` or `state_evidence_rules` so score comes from state.
-5. Add `outcome_rules` for project deadlines.
-6. Add a `baseline.commands` block and a `scripted_policy`.
-7. Run:
+Before calling a scenario done, run these commands:
 
 ```bash
-pm-sim reset --scenario scenarios/<id>
+pm-sim reset --scenario scenarios/<scenario_id>
 pm-sim advance-time to:2026-06-26T15:00:00
-pm-sim evaluate --scenario scenarios/<id> --explain
-pm-sim run-agent --policy scripted --reset --scenario scenarios/<id>
+pm-sim evaluate --scenario scenarios/<scenario_id> --explain
+pm-sim run-agent --policy scripted --reset --scenario scenarios/<scenario_id>
 python -m unittest discover -s tests
 ```
 
-If those commands pass without Python changes, the scenario is using the reusable engine surface.
+Then inspect the no-op score and the scripted score. The no-op path should be clearly worse. The scripted path should pass. If both paths score well, the evaluator is too loose. If the scripted path only works by following one exact sequence, add alternate chat, email, or meeting paths that produce the same state.
