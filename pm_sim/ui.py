@@ -413,8 +413,9 @@ def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
     else:
         action_type = str(entry.get("action_type") or "")
         payload = entry.get("payload") or {}
+        result = entry.get("result") or {}
         title = _action_title(action_type, payload)
-        detail = _action_detail(action_type, payload)
+        detail = _action_detail(action_type, payload, result)
         card_kind = "action"
         badge = _action_badge(action_type)
         route = _action_route(action_type, payload)
@@ -484,11 +485,13 @@ def _action_title(action_type: str, payload: dict[str, Any]) -> str:
     return _label(action_type)
 
 
-def _action_detail(action_type: str, payload: dict[str, Any]) -> str:
+def _action_detail(action_type: str, payload: dict[str, Any], result: dict[str, Any]) -> str:
     if action_type in {"send_chat", "send_email"}:
         return str(payload.get("body") or payload.get("message") or "Message sent")
-    if action_type in {"read_doc", "update_doc"}:
-        return "Document"
+    if action_type == "read_doc":
+        return str(result.get("doc_body") or result.get("doc_title") or "Document")
+    if action_type == "update_doc":
+        return str(payload.get("body") or "Document updated")
     if action_type == "update_task":
         parts = []
         if payload.get("status"):

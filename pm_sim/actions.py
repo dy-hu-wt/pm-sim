@@ -85,7 +85,12 @@ def read_doc(db_path: Path | str, doc_id: str) -> dict[str, Any]:
             action_type="read_doc",
             created_at=current_time,
             payload={"doc_id": doc_id},
-            result={"doc_id": doc_id, "time_cost": time_cost},
+            result={
+                "doc_id": doc_id,
+                "doc_title": doc["title"],
+                "doc_body": doc["body"],
+                "time_cost": time_cost,
+            },
         )
         conn.commit()
         return {"ok": True, "doc": doc, "time_cost": time_cost}

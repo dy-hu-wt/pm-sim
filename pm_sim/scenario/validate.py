@@ -1,452 +1,12 @@
 from __future__ import annotations
 
-import copy
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
+from .load import ScenarioError, parse_datetime
 
 
-class ScenarioError(ValueError):
-    pass
-
-
-def load_scenario(path: Path | str) -> dict[str, Any]:
-    scenario_path = Path(path)
-    if scenario_path.is_dir():
-        scenario_path = scenario_path / "scenario.yaml"
-    if not scenario_path.exists():
-        raise ScenarioError(f"Scenario file not found: {scenario_path}")
-    if scenario_path.suffix not in {".yaml", ".yml"}:
-        raise ScenarioError(f"Scenario files must be YAML: {scenario_path}")
-
-    data = _normalize_author_references(_load_scenario_data(scenario_path))
-    data = _compile_grading_rules(data)
-    data = _compile_behaviors(data)
-    _validate_scenario(data, scenario_path)
-    return data
-
-
-def _load_scenario_data(path: Path) -> dict[str, Any]:
-    data = _load_yaml_object(path)
-    includes = data.get("include", [])
-    if includes is None:
-        includes = []
-    if not isinstance(includes, list):
-        raise ScenarioError(f"{path} include must be a list.")
-
-    merged = {key: value for key, value in data.items() if key != "include"}
-    for include in includes:
-        if not isinstance(include, str) or not include:
-            raise ScenarioError(f"{path} include entries must be non-empty strings.")
-        include_path = path.parent / include
-        included = _load_yaml_object(include_path)
-        for key, value in included.items():
-            if key in merged:
-                raise ScenarioError(
-                    f"{include_path} defines duplicate scenario key already present in {path}: {key}"
-                )
-            merged[key] = value
-    _reject_legacy_behavior_keys(merged, path)
-    return merged
-
-
-def _reject_legacy_behavior_keys(data: dict[str, Any], path: Path) -> None:
-    legacy_keys = {
-        "behaviors": "event_behaviors, policy_behaviors, reply_behaviors, meeting_behaviors, or action_behaviors",
-        "actor_behaviors": "policy_behaviors or reply_behaviors",
-        "event_rules": "event_behaviors",
-        "meeting_rules": "meeting_behaviors",
-        "action_rules": "action_behaviors or grading_rules",
-    }
-    for key, replacement in legacy_keys.items():
-        if key in data:
-            raise ScenarioError(
-                f"{path} uses legacy behavior key {key}; use {replacement} instead."
-            )
-
-
-def _load_yaml_object(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        raise ScenarioError(f"Scenario include file not found: {path}")
-    if path.suffix not in {".yaml", ".yml"}:
-        raise ScenarioError(f"Scenario include files must be YAML: {path}")
-    data = yaml.safe_load(path.read_text())
-    if not isinstance(data, dict):
-        raise ScenarioError(f"Scenario file must contain a YAML object: {path}")
-    return data
-
-
-def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
-    grading_rules = data.get("grading_rules", [])
-    if not grading_rules:
-        return data
-    if not isinstance(grading_rules, list):
-        raise ScenarioError("grading_rules must be a list.")
-
-    compiled = copy_object(data)
-    generated_action_ids = {
-        f"grading_{_required_string(rule, 'id', 'grading rule')}_action"
-        for rule in grading_rules
-        if isinstance(rule, dict)
-    }
-    generated_promotion_ids = {
-        f"grading_{_required_string(rule, 'id', 'grading rule')}_promotion"
-        for rule in grading_rules
-        if isinstance(rule, dict)
-    }
-    generated_milestone_keys = {
-        _required_string(
-            _required_object(rule, "milestone", f"grading rule {rule.get('id')}"),
-            "key",
-            f"grading rule {rule.get('id')} milestone",
-        )
-        for rule in grading_rules
-        if isinstance(rule, dict)
-    }
-    action_rules = []
-    milestone_rules = [
-        rule
-        for rule in compiled.get("milestone_rules", [])
-        if rule.get("id") not in generated_milestone_keys
-    ]
-    evidence_promotion_rules = [
-        rule
-        for rule in compiled.get("evidence_promotion_rules", [])
-        if rule.get("id") not in generated_promotion_ids
-    ]
-    for rule in grading_rules:
-        if not isinstance(rule, dict):
-            raise ScenarioError("grading_rules entries must be objects.")
-        if rule.get("template") != "grounded_communication":
-            raise ScenarioError(f"Unsupported grading rule template: {rule.get('template')}")
-
-        rule_id = _required_string(rule, "id", "grading rule")
-        action = _required_object(rule, "action", f"grading rule {rule_id}")
-        state = _required_object(rule, "state", f"grading rule {rule_id}")
-        milestone = _required_object(rule, "milestone", f"grading rule {rule_id}")
-
-        action_type = _required_string(action, "type", f"grading rule {rule_id} action")
-        recipient_id = _required_string(
-            action,
-            "recipient_id",
-            f"grading rule {rule_id} action",
-        )
-        person_id = _required_string(state, "person_id", f"grading rule {rule_id} state")
-        key = _required_string(state, "key", f"grading rule {rule_id} state")
-        if "value" not in state:
-            raise ScenarioError(f"grading rule {rule_id} state must include value.")
-        milestone_key = _required_string(milestone, "key", f"grading rule {rule_id} milestone")
-        note = _required_string(milestone, "note", f"grading rule {rule_id} milestone")
-        evidence_key = f"grading_{rule_id}"
-
-        action_rules.append(
-            {
-                "id": f"{evidence_key}_action",
-                "action_type": action_type,
-                "priority": int(rule.get("priority", 60)),
-                "recipient_id": recipient_id,
-                "match": _match_for_grading_action(action),
-                "when": rule.get("requires", []),
-                "effects": [
-                    {
-                        "type": "record_action_evidence",
-                        "key": evidence_key,
-                        "action_type": action_type,
-                        "person_id": person_id,
-                        "state_key": key,
-                        "state_value": state["value"],
-                    },
-                ],
-            }
-        )
-        evidence_promotion_rules.append(
-            {
-                "id": f"{evidence_key}_promotion",
-                "priority": int(rule.get("priority", 60)),
-                "when": [
-                    *rule.get("requires", []),
-                    {
-                        "action_evidence": {
-                            "key": evidence_key,
-                            "status": "pending",
-                        }
-                    },
-                ],
-                "effects": [
-                    {
-                        "type": "update_coworker_state",
-                        "person_id": person_id,
-                        "key": key,
-                        "value": state["value"],
-                    },
-                    *rule.get("effects", []),
-                    {
-                        "type": "mark_action_evidence_promoted",
-                        "key": evidence_key,
-                    },
-                ],
-            }
-        )
-        milestone_rules.append(
-            {
-                "id": milestone_key,
-                "note": note,
-                "when": [
-                    {
-                        "coworker_state": {
-                            "person_id": person_id,
-                            "key": key,
-                            "equals": state["value"],
-                        }
-                    }
-                ],
-                "created_at": {
-                    "coworker_state": {
-                        "person_id": person_id,
-                        "key": key,
-                    }
-                },
-            }
-        )
-
-    compiled["action_rules"] = action_rules
-    compiled["evidence_promotion_rules"] = evidence_promotion_rules
-    compiled["milestone_rules"] = milestone_rules
-    return compiled
-
-
-def _compile_behaviors(data: dict[str, Any]) -> dict[str, Any]:
-    compiled = copy_object(data)
-    actor_behaviors: list[dict[str, Any]] = []
-    event_rules = _behavior_group(compiled, "event_behaviors")
-    meeting_rules = _behavior_group(compiled, "meeting_behaviors")
-    action_rules = [
-        *compiled.get("action_rules", []),
-        *_behavior_group(compiled, "action_behaviors"),
-    ]
-    seen = set()
-
-    for behavior in _behavior_group(compiled, "policy_behaviors"):
-        row = dict(behavior)
-        row["kind"] = "policy"
-        actor_behaviors.append(row)
-
-    reply_behaviors = compiled.get("reply_behaviors", {})
-    if reply_behaviors is None:
-        reply_behaviors = {}
-    if not isinstance(reply_behaviors, dict):
-        raise ScenarioError("reply_behaviors must be an object keyed by person id.")
-    for person_id, behaviors in reply_behaviors.items():
-        if not isinstance(person_id, str) or not person_id:
-            raise ScenarioError("reply_behaviors keys must be non-empty person ids.")
-        if not isinstance(behaviors, list):
-            raise ScenarioError(f"reply_behaviors.{person_id} must be a list.")
-        for behavior in behaviors:
-            if not isinstance(behavior, dict):
-                raise ScenarioError(f"reply_behaviors.{person_id} entries must be objects.")
-            row = dict(behavior)
-            row["kind"] = "reply"
-            row["person_id"] = person_id
-            actor_behaviors.append(row)
-
-    for group_name, group in (
-        ("event_behaviors", event_rules),
-        ("policy_behaviors", actor_behaviors),
-        ("meeting_behaviors", meeting_rules),
-        ("action_behaviors", action_rules),
-    ):
-        for behavior in group:
-            behavior_id = behavior.get("id")
-            if not isinstance(behavior_id, str) or not behavior_id:
-                raise ScenarioError(f"{group_name} entries must include string id.")
-            if behavior_id in seen:
-                raise ScenarioError(f"Behavior groups have duplicate id: {behavior_id}")
-            seen.add(behavior_id)
-
-    for key in (
-        "event_behaviors",
-        "policy_behaviors",
-        "reply_behaviors",
-        "meeting_behaviors",
-        "action_behaviors",
-    ):
-        compiled.pop(key, None)
-    compiled["actor_behaviors"] = actor_behaviors
-    compiled["event_rules"] = event_rules
-    compiled["meeting_rules"] = meeting_rules
-    compiled["action_rules"] = action_rules
-    return compiled
-
-
-def _behavior_group(data: dict[str, Any], key: str) -> list[dict[str, Any]]:
-    behaviors = data.get(key, [])
-    if behaviors is None:
-        return []
-    if not isinstance(behaviors, list):
-        raise ScenarioError(f"{key} must be a list.")
-    for behavior in behaviors:
-        if not isinstance(behavior, dict):
-            raise ScenarioError(f"{key} entries must be objects.")
-    return [dict(behavior) for behavior in behaviors]
-
-
-def _normalize_author_references(data: dict[str, Any]) -> dict[str, Any]:
-    normalized = copy_object(data)
-    aliases = _resource_aliases(normalized)
-    _canonicalize_resource_ids(normalized, aliases)
-    _rewrite_resource_references(normalized, aliases)
-    return normalized
-
-
-RESOURCE_PREFIXES = {
-    "projects": "project_",
-    "facts": "fact_",
-    "blockers": "blocker_",
-    "docs": "doc_",
-    "tasks": "task_",
-    "pressures": "pressure_",
-}
-
-RESOURCE_REF_KEYS = {
-    "project_id": "projects",
-    "fact_id": "facts",
-    "fact_discovered": "facts",
-    "fact_ids": "facts",
-    "private_fact_ids": "facts",
-    "required_facts": "facts",
-    "required_facts_any": "facts",
-    "absent_facts": "facts",
-    "blocker_id": "blockers",
-    "blocked_by": "blockers",
-    "doc_id": "docs",
-    "task_id": "tasks",
-    "upstream_task_id": "tasks",
-    "downstream_task_id": "tasks",
-    "pressure_id": "pressures",
-}
-
-CONDITION_REF_SECTIONS = {
-    "project_decision": "projects",
-    "blocker_status": "blockers",
-    "task_status": "tasks",
-    "pressure_at_least": "pressures",
-    "pressure_at_most": "pressures",
-}
-
-
-def _resource_aliases(data: dict[str, Any]) -> dict[str, dict[str, str]]:
-    return {
-        section: _section_aliases(data.get(section, []), prefix)
-        for section, prefix in RESOURCE_PREFIXES.items()
-    }
-
-
-def _section_aliases(items: list[dict[str, Any]], prefix: str) -> dict[str, str]:
-    aliases: dict[str, str] = {}
-    for item in items:
-        item_id = item.get("id")
-        if not isinstance(item_id, str) or not item_id:
-            continue
-        canonical = item_id if item_id.startswith(prefix) else f"{prefix}{item_id}"
-        names = {item_id, canonical}
-        if canonical.startswith(prefix):
-            names.add(canonical.removeprefix(prefix))
-        for key in ("key", "slug", "ref"):
-            value = item.get(key)
-            if isinstance(value, str) and value:
-                names.add(value)
-        for name in names:
-            existing = aliases.get(name)
-            if existing and existing != canonical:
-                raise ScenarioError(
-                    f"Ambiguous scenario reference {name!r}: {existing} and {canonical}"
-                )
-            aliases[name] = canonical
-    return aliases
-
-
-def _canonicalize_resource_ids(
-    data: dict[str, Any],
-    aliases: dict[str, dict[str, str]],
-) -> None:
-    for section, section_aliases in aliases.items():
-        for item in data.get(section, []):
-            item_id = item.get("id")
-            if isinstance(item_id, str) and item_id in section_aliases:
-                item["id"] = section_aliases[item_id]
-
-
-def _rewrite_resource_references(value: Any, aliases: dict[str, dict[str, str]]) -> None:
-    if isinstance(value, list):
-        for item in value:
-            _rewrite_resource_references(item, aliases)
-        return
-    if not isinstance(value, dict):
-        return
-    for key, item in value.items():
-        section = RESOURCE_REF_KEYS.get(key)
-        if section:
-            value[key] = _resolve_resource_value(item, aliases[section])
-            continue
-        condition_section = CONDITION_REF_SECTIONS.get(key)
-        if condition_section and isinstance(item, dict):
-            item_id = item.get("id")
-            if isinstance(item_id, str):
-                item["id"] = _resolve_resource_reference(item_id, aliases[condition_section])
-            project_id = item.get("project_id")
-            if isinstance(project_id, str):
-                item["project_id"] = _resolve_resource_reference(project_id, aliases["projects"])
-            _rewrite_resource_references(item, aliases)
-            continue
-        if key == "first_time_at_or_after" and isinstance(item, dict):
-            fact_id = item.get("fact_id")
-            if isinstance(fact_id, str):
-                item["fact_id"] = _resolve_resource_reference(fact_id, aliases["facts"])
-            _rewrite_resource_references(item, aliases)
-            continue
-        _rewrite_resource_references(item, aliases)
-
-
-def _resolve_resource_reference(resource_id: str, aliases: dict[str, str]) -> str:
-    return aliases.get(resource_id, resource_id)
-
-
-def _resolve_resource_value(value: Any, aliases: dict[str, str]) -> Any:
-    if isinstance(value, str):
-        return _resolve_resource_reference(value, aliases)
-    if isinstance(value, list):
-        return [_resolve_resource_value(item, aliases) for item in value]
-    return value
-
-
-def copy_object(data: dict[str, Any]) -> dict[str, Any]:
-    return copy.deepcopy(data)
-
-
-def _match_for_grading_action(action: dict[str, Any]) -> dict[str, Any]:
-    match = action.get("match")
-    if isinstance(match, dict):
-        return {"mode": "concept_match", **match}
-    raise ScenarioError("grading rule action must include match.")
-
-
-def _required_object(row: dict[str, Any], key: str, label: str) -> dict[str, Any]:
-    value = row.get(key)
-    if not isinstance(value, dict):
-        raise ScenarioError(f"{label} must include object {key}.")
-    return value
-
-
-def _required_string(row: dict[str, Any], key: str, label: str) -> str:
-    value = row.get(key)
-    if not isinstance(value, str) or not value:
-        raise ScenarioError(f"{label} must include string {key}.")
-    return value
-
-
-def _validate_scenario(data: dict[str, Any], path: Path) -> None:
+def validate_scenario(data: dict[str, Any], path: Path) -> None:
     required = ["id", "start_time", "people", "projects"]
     missing = [key for key in required if key not in data]
     if missing:
@@ -458,7 +18,7 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
     if not isinstance(data["projects"], list):
         raise ScenarioError("Scenario key 'projects' must be a list.")
 
-    start_time = _parse_datetime(data["start_time"], "start_time")
+    start_time = parse_datetime(data["start_time"], "start_time")
     people = _ids(data, "people")
     projects = _ids(data, "projects")
     facts = _ids(data, "facts")
@@ -499,7 +59,9 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
 
     for goal in data.get("actor_goals", []):
         if goal.get("person_id") not in people:
-            raise ScenarioError(f"Actor goal {goal.get('id')} references unknown person_id: {goal.get('person_id')}")
+            raise ScenarioError(
+                f"Actor goal {goal.get('id')} references unknown person_id: {goal.get('person_id')}"
+            )
         project_id = goal.get("project_id")
         if project_id and project_id not in projects:
             raise ScenarioError(f"Actor goal {goal.get('id')} references unknown project_id: {project_id}")
@@ -566,8 +128,8 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
                 )
 
     for calendar_event in data.get("calendar_events", []):
-        _parse_datetime(calendar_event.get("start_at"), f"calendar event {calendar_event.get('id')} start_at")
-        _parse_datetime(calendar_event.get("end_at"), f"calendar event {calendar_event.get('id')} end_at")
+        parse_datetime(calendar_event.get("start_at"), f"calendar event {calendar_event.get('id')} start_at")
+        parse_datetime(calendar_event.get("end_at"), f"calendar event {calendar_event.get('id')} end_at")
         for attendee in calendar_event.get("attendees", []):
             if attendee not in valid_actors:
                 raise ScenarioError(
@@ -575,7 +137,7 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
                 )
 
     for event in data.get("events", []):
-        scheduled_at = _parse_datetime(
+        scheduled_at = parse_datetime(
             event.get("scheduled_at"),
             f"event {event.get('id')} scheduled_at",
         )
@@ -616,7 +178,6 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         valid_actors,
         response_delays,
     )
-
     event_types = {
         event.get("event_type")
         for event in data.get("events", [])
@@ -720,7 +281,7 @@ def _validate_pressure(pressure: dict[str, Any]) -> None:
         )
     due_at = pressure.get("due_at")
     if due_at is not None:
-        _parse_datetime(due_at, f"pressure {pressure_id} due_at")
+        parse_datetime(due_at, f"pressure {pressure_id} due_at")
 
 
 def _validate_actor_reply_behavior(
@@ -766,7 +327,6 @@ def _validate_actor_reply_behavior(
         pressures=pressures,
         valid_actors=valid_actors,
     )
-
     reply = rule.get("reply", {})
     if not isinstance(reply.get("body"), str) or not reply["body"].strip():
         raise ScenarioError(f"Actor behavior {rule_id} reply.body must be a non-empty string.")
@@ -776,7 +336,6 @@ def _validate_actor_reply_behavior(
             f"Actor behavior {rule_id} must define positive integer reply.delay_minutes "
             f"or use a person with response_delay_minutes."
         )
-
     _validate_effects(
         rule.get("effects", []),
         label=f"Actor behavior {rule_id}",
@@ -809,7 +368,6 @@ def _validate_event_rules(
         if rule_id in seen:
             raise ScenarioError(f"Event rules have duplicate id: {rule_id}")
         seen.add(rule_id)
-
         event_type = rule.get("event_type")
         if event_type not in event_types:
             raise ScenarioError(f"Event rule {rule_id} references unknown event_type: {event_type}")
@@ -850,20 +408,14 @@ def _validate_actor_policy_behavior(
     behavior_id = behavior["id"]
     person_id = behavior.get("person_id")
     if person_id not in people:
-        raise ScenarioError(
-            f"Actor behavior {behavior_id} references unknown person_id: {person_id}"
-        )
-
+        raise ScenarioError(f"Actor behavior {behavior_id} references unknown person_id: {person_id}")
     trigger = behavior.get("trigger")
     if not isinstance(trigger, dict):
         raise ScenarioError(f"Actor behavior {behavior_id} trigger must be an object.")
     trigger_at = trigger.get("at") or trigger.get("at_or_after")
     if not isinstance(trigger_at, str) or not trigger_at:
-        raise ScenarioError(
-            f"Actor behavior {behavior_id} trigger must include at or at_or_after."
-        )
-    _parse_datetime(trigger_at, f"Actor behavior {behavior_id} trigger")
-
+        raise ScenarioError(f"Actor behavior {behavior_id} trigger must include at or at_or_after.")
+    parse_datetime(trigger_at, f"Actor behavior {behavior_id} trigger")
     _validate_conditions(
         behavior.get("when", []),
         label=f"Actor behavior {behavior_id}",
@@ -871,7 +423,6 @@ def _validate_actor_policy_behavior(
         pressures=pressures,
         valid_actors=valid_actors,
     )
-
     effects = behavior.get("effects", [])
     if not isinstance(effects, list) or not effects:
         raise ScenarioError(f"Actor behavior {behavior_id} effects must be a non-empty list.")
@@ -910,7 +461,6 @@ def _validate_actor_behaviors(
         if behavior_id in seen:
             raise ScenarioError(f"Actor behaviors have duplicate id: {behavior_id}")
         seen.add(behavior_id)
-
         kind = behavior.get("kind")
         if kind == "reply":
             _validate_actor_reply_behavior(
@@ -961,7 +511,6 @@ def _validate_meeting_rules(
         if rule_id in seen:
             raise ScenarioError(f"Meeting rules have duplicate id: {rule_id}")
         seen.add(rule_id)
-
         for key in ("required_attendees", "attendees_any"):
             _validate_string_list(rule.get(key, []), f"Meeting rule {rule_id} {key}")
             for attendee in rule.get(key, []):
@@ -969,14 +518,12 @@ def _validate_meeting_rules(
                     raise ScenarioError(
                         f"Meeting rule {rule_id} references unknown {key} attendee: {attendee}"
                     )
-
         _validate_string_list(rule.get("transcript_lines", []), f"Meeting rule {rule_id} transcript_lines")
         topic_match = rule.get("topic_match")
         if topic_match is not None:
             if not isinstance(topic_match, dict):
                 raise ScenarioError(f"Meeting rule {rule_id} topic_match must be an object.")
             _validate_match_spec(topic_match, f"Meeting rule {rule_id} topic_match", facts=facts)
-
         for key in ("required_facts", "required_facts_any", "absent_facts"):
             _validate_string_list(rule.get(key, []), f"Meeting rule {rule_id} {key}")
             for fact_id in rule.get(key, []):
@@ -984,10 +531,8 @@ def _validate_meeting_rules(
                     raise ScenarioError(
                         f"Meeting rule {rule_id} references unknown {key} fact: {fact_id}"
                     )
-
         for key in ("required_milestones", "absent_milestones"):
             _validate_string_list(rule.get(key, []), f"Meeting rule {rule_id} {key}")
-
         effects = rule.get("effects", [])
         if effects is not None:
             if not isinstance(effects, list):
@@ -1024,11 +569,9 @@ def _validate_action_rules(
         if rule_id in seen:
             raise ScenarioError(f"Action rules have duplicate id: {rule_id}")
         seen.add(rule_id)
-
         action_type = rule.get("action_type")
         if action_type not in {"send_chat", "send_email", "update_doc"}:
             raise ScenarioError(f"Action rule {rule_id} has unsupported action_type: {action_type}")
-
         person_id = rule.get("person_id")
         if person_id is not None and person_id not in people:
             raise ScenarioError(f"Action rule {rule_id} references unknown person_id: {person_id}")
@@ -1038,12 +581,10 @@ def _validate_action_rules(
         doc_id = rule.get("doc_id")
         if doc_id is not None and doc_id not in docs:
             raise ScenarioError(f"Action rule {rule_id} references unknown doc_id: {doc_id}")
-
         match = rule.get("match")
         if not isinstance(match, dict):
             raise ScenarioError(f"Action rule {rule_id} match must be an object.")
         _validate_match_spec(match, f"Action rule {rule_id}", facts=facts)
-
         _validate_conditions(
             rule.get("when", []),
             label=f"Action rule {rule_id}",
@@ -1051,7 +592,6 @@ def _validate_action_rules(
             pressures=pressures,
             valid_actors=valid_actors,
         )
-
         effects = rule.get("effects", [])
         if not isinstance(effects, list):
             raise ScenarioError(f"Action rule {rule_id} effects must be a list.")
@@ -1086,7 +626,6 @@ def _validate_evidence_promotion_rules(
         if rule_id in seen:
             raise ScenarioError(f"Evidence promotion rules have duplicate id: {rule_id}")
         seen.add(rule_id)
-
         _validate_conditions(
             rule.get("when", []),
             label=f"Evidence promotion rule {rule_id}",
@@ -1094,7 +633,6 @@ def _validate_evidence_promotion_rules(
             pressures=pressures,
             valid_actors=valid_actors,
         )
-
         effects = rule.get("effects", [])
         if not isinstance(effects, list):
             raise ScenarioError(f"Evidence promotion rule {rule_id} effects must be a list.")
@@ -1115,21 +653,17 @@ def _validate_match_spec(spec: dict[str, Any], label: str, *, facts: set[str]) -
     mode = spec.get("mode", "deterministic")
     if mode not in {"deterministic", "concept_match"}:
         raise ScenarioError(f"{label} match.mode must be deterministic or concept_match.")
-
     matcher = spec.get("matcher")
     if matcher is not None and matcher != "llm":
         raise ScenarioError(f"{label} match.matcher must be llm when provided.")
-
     for key in ("required_facts", "required_facts_any", "absent_facts"):
         _validate_string_list(spec.get(key, []), f"{label} {key}")
         for fact_id in spec.get(key, []):
             if fact_id not in facts:
                 raise ScenarioError(f"{label} references unknown {key} fact: {fact_id}")
-
     if mode == "concept_match":
         _validate_concept_match_spec(spec, label)
         return
-
     intents = spec.get("intents", [])
     if intents is None:
         intents = []
@@ -1149,13 +683,11 @@ def _validate_match_spec(spec: dict[str, Any], label: str, *, facts: set[str]) -
         if not isinstance(intent.get("description"), str) or not intent.get("description"):
             raise ScenarioError(f"{intent_label} must include description.")
         _validate_string_list(intent.get("signals", []), f"{intent_label} signals")
-
     for key in ("require_all", "require_any", "forbid", "forbidden"):
         _validate_string_list(spec.get(key, []), f"{label} match.{key}")
         for intent_id in spec.get(key, []):
             if intent_id not in intent_ids:
                 raise ScenarioError(f"{label} match.{key} references unknown intent: {intent_id}")
-
     for key in ("required_concepts", "forbidden_concepts"):
         if key in spec:
             raise ScenarioError(f"{label} match.{key} is only valid with mode: concept_match.")
@@ -1172,7 +704,6 @@ def _validate_concept_match_spec(spec: dict[str, Any], label: str) -> None:
             f"{label} match.mode concept_match cannot use deterministic intent keys: "
             + ", ".join(legacy_keys)
         )
-
     required_ids = _validate_concept_list(
         spec.get("required_concepts", []),
         f"{label} match.required_concepts",
@@ -1242,7 +773,6 @@ def _validate_condition_rule_sets(
                 pressures=pressures,
                 valid_actors=valid_actors,
             )
-
     for component_id, component in data.get("score_components", {}).items():
         if not isinstance(component, dict):
             continue
@@ -1266,7 +796,6 @@ def _validate_scored_milestones_are_state_derived(data: dict[str, Any]) -> None:
     }
     if not scored_keys:
         return
-
     allowed_state_keys = {
         rule.get("id")
         for rule in data.get("milestone_rules", [])
@@ -1275,10 +804,8 @@ def _validate_scored_milestones_are_state_derived(data: dict[str, Any]) -> None:
     missing = sorted(scored_keys - allowed_state_keys)
     if missing:
         raise ScenarioError(
-            "Scored milestones must be derived from milestone_rules: "
-            + ", ".join(missing)
+            "Scored milestones must be derived from milestone_rules: " + ", ".join(missing)
         )
-
     for section in (
         "actor_behaviors",
         "event_rules",
@@ -1291,10 +818,7 @@ def _validate_scored_milestones_are_state_derived(data: dict[str, Any]) -> None:
         for rule in data.get(section, []):
             rule_id = rule.get("id", "<unknown>")
             for effect in rule.get("effects", []):
-                if (
-                    effect.get("type") == "record_milestone"
-                    and effect.get("key") in scored_keys
-                ):
+                if effect.get("type") == "record_milestone" and effect.get("key") in scored_keys:
                     raise ScenarioError(
                         f"{section} {rule_id} directly writes scored milestone "
                         f"{effect.get('key')}; use state mutation plus milestone_rules."
@@ -1320,17 +844,13 @@ def _validate_scripted_policy(
         if not isinstance(args, dict):
             raise ScenarioError(f"scripted_policy step {name} args must be an object.")
         if tool in {"read_doc", "update_doc"} and args.get("doc_id") not in docs:
-            raise ScenarioError(
-                f"scripted_policy step {name} references unknown doc_id: {args.get('doc_id')}"
-            )
+            raise ScenarioError(f"scripted_policy step {name} references unknown doc_id: {args.get('doc_id')}")
         if tool in {"send_chat", "send_email"} and args.get("person_id") not in people:
             raise ScenarioError(
                 f"scripted_policy step {name} references unknown person_id: {args.get('person_id')}"
             )
         if tool == "update_task" and args.get("task_id") not in tasks:
-            raise ScenarioError(
-                f"scripted_policy step {name} references unknown task_id: {args.get('task_id')}"
-            )
+            raise ScenarioError(f"scripted_policy step {name} references unknown task_id: {args.get('task_id')}")
         if tool == "schedule_meeting":
             for attendee in args.get("attendees", []):
                 if attendee not in people:
@@ -1453,9 +973,7 @@ def _validate_effects(
     for effect in effects:
         effect_type = effect.get("type")
         if effect_type == "reveal_doc" and effect.get("doc_id") not in docs:
-            raise ScenarioError(
-                f"{label} references unknown reveal_doc doc_id: {effect.get('doc_id')}"
-            )
+            raise ScenarioError(f"{label} references unknown reveal_doc doc_id: {effect.get('doc_id')}")
         if effect_type == "discover_fact" and effect.get("fact_id") not in facts:
             raise ScenarioError(
                 f"{label} references unknown discover_fact fact_id: {effect.get('fact_id')}"
@@ -1508,9 +1026,7 @@ def _validate_effects(
                 f"{label} references unknown update_blocker blocker_id: {effect.get('blocker_id')}"
             )
         if effect_type == "update_task" and effect.get("task_id") not in tasks:
-            raise ScenarioError(
-                f"{label} references unknown update_task task_id: {effect.get('task_id')}"
-            )
+            raise ScenarioError(f"{label} references unknown update_task task_id: {effect.get('task_id')}")
         if effect_type in {"increase_pressure", "lower_pressure"}:
             pressure_id = effect.get("pressure_id")
             if pressure_id not in pressures:
@@ -1527,9 +1043,7 @@ def _validate_effects(
                 if has_to == has_by:
                     raise ScenarioError(f"{label} lower_pressure must include exactly one of to or by.")
                 if has_to and (
-                    not isinstance(effect.get("to"), int)
-                    or effect["to"] < 1
-                    or effect["to"] > 10
+                    not isinstance(effect.get("to"), int) or effect["to"] < 1 or effect["to"] > 10
                 ):
                     raise ScenarioError(f"{label} lower_pressure.to must be an integer from 1 to 10.")
                 if has_by and (not isinstance(effect.get("by"), int) or effect["by"] < 0):
@@ -1554,12 +1068,3 @@ def _validate_string_list(values: Any, label: str) -> None:
         raise ScenarioError(f"{label} must be a list.")
     if any(not isinstance(value, str) or not value.strip() for value in values):
         raise ScenarioError(f"{label} must contain non-empty strings.")
-
-
-def _parse_datetime(value: Any, label: str) -> datetime:
-    if not isinstance(value, str) or not value:
-        raise ScenarioError(f"Scenario {label} must be an ISO datetime string.")
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError as error:
-        raise ScenarioError(f"Scenario {label} is not a valid ISO datetime: {value}") from error
