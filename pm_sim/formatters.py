@@ -43,6 +43,20 @@ def format_agent_tool_progress(name: str, args: dict[str, Any], result: Any) -> 
     return action
 
 
+def format_semantic_progress(match: dict[str, Any]) -> str:
+    rule_id = str(match.get("rule_id") or "semantic_check")
+    mode = str(match.get("mode") or "unknown")
+    model = str(match.get("model") or "")
+    matcher = f"{mode}:{model}" if model else mode
+    required = match.get("required") if isinstance(match.get("required"), list) else []
+    matched_required = sum(1 for item in required if item.get("matched"))
+    required_summary = f"{matched_required}/{len(required)} required" if required else "required n/a"
+    if match.get("error"):
+        return f"SEMANTIC {rule_id} {matcher} failed closed: {_short(match.get('error'), 100)}"
+    status = "matched" if match.get("matches") else "failed"
+    return f"SEMANTIC {rule_id} {matcher} {status} {required_summary}"
+
+
 def format_agent_progress_console(message: str, *, color: bool) -> str:
     if not color:
         return f"[agent] {message}"
@@ -161,6 +175,7 @@ def _highlight_agent_progress(message: str, *, mode: str) -> str:
     )
     message = _highlight_agent_people(message, mode=mode)
     for label, css_class, ansi_code in (
+        ("SEMANTIC", "tool-semantic", "95"),
         ("READ", "tool-read", "34"),
         ("UPDATE_DOC", "tool-read", "34"),
         ("CHAT", "tool-chat", "35"),
@@ -221,6 +236,7 @@ _AGENT_ANSI_BY_CLASS = {
     "tool-meeting": "33",
     "tool-task": "33",
     "tool-wait": "32",
+    "tool-semantic": "95",
 }
 
 

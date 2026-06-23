@@ -28,7 +28,7 @@ from pm_sim.coworkers import effects_for_event, replies_for_chat
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
 from pm_sim.effects import apply_effects
-from pm_sim.formatters import format_output
+from pm_sim.formatters import format_agent_progress_html, format_output, format_semantic_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
 from pm_sim.report import generate_report
@@ -1954,6 +1954,11 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
                 for effect in result["applied_effects"]
             )
         )
+        self.assertTrue(result["semantic_matches"])
+        self.assertIn(
+            "grading_customer_message_ready_action",
+            {match["rule_id"] for match in result["semantic_matches"]},
+        )
         self.assertTrue(loads(row["value_json"]))
         self.assertIn(
             "customer_message_ready",
@@ -2965,6 +2970,38 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertIn("Finish: not called", output)
         self.assertIn("Missing Evaluation", output)
         self.assertIn("security_interruption: security_doc_found, security_question_answered", output)
+
+    def test_semantic_progress_line_is_compact_and_highlighted(self) -> None:
+        line = format_semantic_progress(
+            {
+                "rule_id": "final_readiness_confirmed_email",
+                "mode": "llm",
+                "model": "gpt-4.1-mini",
+                "matches": True,
+                "required": [{"matched": True}, {"matched": True}],
+            }
+        )
+        html = format_agent_progress_html(f"[Thu 2026-06-25 12:10] {line}")
+
+        self.assertEqual(
+            line,
+            "SEMANTIC final_readiness_confirmed_email llm:gpt-4.1-mini matched 2/2 required",
+        )
+        self.assertIn("agent-tool-semantic", html)
+
+    def test_semantic_progress_line_shows_fail_closed_error(self) -> None:
+        line = format_semantic_progress(
+            {
+                "rule_id": "customer_message_ready",
+                "mode": "llm",
+                "matches": False,
+                "error": "JSONDecodeError: Expecting value",
+                "required": [],
+            }
+        )
+
+        self.assertIn("failed closed", line)
+        self.assertIn("JSONDecodeError", line)
 
     def test_long_run_agent_summary_compacts_steps(self) -> None:
         reset(self.db_path, DEFAULT_SCENARIO_PATH)

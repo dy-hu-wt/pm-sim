@@ -14,7 +14,12 @@ from .agents.llm import _load_llm_session, llm_session_state, start_llm_session,
 from .agents.scripted import run_scripted_step, scripted_policy_steps
 from .db import connect
 from .evaluator import evaluate
-from .formatters import format_agent_progress_html, format_agent_tool_progress, format_output
+from .formatters import (
+    format_agent_progress_html,
+    format_agent_tool_progress,
+    format_output,
+    format_semantic_progress,
+)
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .scenario import load_scenario
 from .state import get_state_value, observe, reset, set_state_value
@@ -442,6 +447,11 @@ def _log_lines(entries: list[dict[str, Any]], llm_state: dict[str, Any]) -> list
             f"[{_pretty_time(entry.get('time'))}] "
             f"{format_agent_tool_progress(action_type, payload, result)}"
         )
+        for match in result.get("semantic_matches", []):
+            if isinstance(match, dict):
+                lines.append(
+                    f"[{_pretty_time(entry.get('time'))}] {format_semantic_progress(match)}"
+                )
     return lines[-80:]
 
 

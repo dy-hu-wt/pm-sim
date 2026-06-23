@@ -152,6 +152,7 @@ def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
                 "doc_id": doc_id,
                 "revision_id": revision_id,
                 "applied_effects": applied_effects,
+                "semantic_matches": action_context.get("semantic_matches", []),
                 "time_cost": time_cost,
             },
         )
@@ -161,6 +162,7 @@ def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
             "doc_id": doc_id,
             "revision_id": revision_id,
             "applied_effects": applied_effects,
+            "semantic_matches": action_context.get("semantic_matches", []),
             "time_cost": time_cost,
         }
     finally:
@@ -229,6 +231,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
                 "message_id": message_id,
                 "scheduled_reply_ids": scheduled_reply_ids,
                 "applied_effects": applied_effects,
+                "semantic_matches": action_context.get("semantic_matches", []),
                 "time_cost": time_cost,
             },
         )
@@ -239,6 +242,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
             "message_id": message_id,
             "scheduled_reply_ids": scheduled_reply_ids,
             "applied_effects": applied_effects,
+            "semantic_matches": action_context.get("semantic_matches", []),
             "time_cost": time_cost,
         }
     finally:
@@ -309,6 +313,7 @@ def send_email(
             result={
                 "message_id": message_id,
                 "applied_effects": applied_effects,
+                "semantic_matches": action_context.get("semantic_matches", []),
                 "time_cost": time_cost,
             },
         )
@@ -318,6 +323,7 @@ def send_email(
             "ok": True,
             "message_id": message_id,
             "applied_effects": applied_effects,
+            "semantic_matches": action_context.get("semantic_matches", []),
             "time_cost": time_cost,
         }
     finally:
@@ -543,6 +549,11 @@ def _effects_for_action(
                 {
                     "rule_id": rule.get("id"),
                     "mode": semantic_result.get("mode"),
+                    "model": semantic_result.get("model"),
+                    "matches": semantic_result.get("matches"),
+                    "required": semantic_result.get("required", []),
+                    "forbidden": semantic_result.get("forbidden", []),
+                    "error": semantic_result.get("error"),
                     "cache_key": semantic_result.get("cache_key"),
                 }
             )

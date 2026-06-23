@@ -18,7 +18,7 @@ from ..actions import (
 from ..calendar import validate_finish
 from ..db import connect
 from ..evaluator import evaluate
-from ..formatters import format_agent_tool_progress
+from ..formatters import format_agent_tool_progress, format_semantic_progress
 from ..jsonutil import dumps, loads
 from ..paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH, REPO_ROOT
 from ..state import get_state_value, observe, reset, set_state_value
@@ -175,6 +175,8 @@ def step_llm_session(
             state.setdefault("steps", []).append(step)
             steps_this_turn.append(step)
             _progress(progress, f"{_sim_time_label(db_path)} {_tool_progress_line(name, args, result)}")
+            for line in _semantic_progress_lines(db_path, result):
+                _progress(progress, line)
             input_items.append(
                 {
                     "type": "function_call_output",
@@ -273,6 +275,8 @@ def run_llm_agent(
 
             steps.append(_step(name, result))
             _progress(progress, f"{_sim_time_label(db_path)} {_tool_progress_line(name, args, result)}")
+            for line in _semantic_progress_lines(db_path, result):
+                _progress(progress, line)
             input_items.append(
                 {
                     "type": "function_call_output",
@@ -548,6 +552,16 @@ def _tool_call_summary(tool_calls: list[Any]) -> str:
 
 def _tool_progress_line(name: str, args: dict[str, Any], result: ToolResult) -> str:
     return format_agent_tool_progress(name, args, result)
+
+
+def _semantic_progress_lines(db_path: Path | str, result: ToolResult) -> list[str]:
+    if not isinstance(result, dict):
+        return []
+    return [
+        f"{_sim_time_label(db_path)} {format_semantic_progress(match)}"
+        for match in result.get("semantic_matches", [])
+        if isinstance(match, dict)
+    ]
 
 
 def _load_llm_session(db_path: Path | str) -> dict[str, Any] | None:
