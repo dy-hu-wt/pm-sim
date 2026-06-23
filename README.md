@@ -226,7 +226,7 @@ Open the operator UI:
 pm-sim ui
 ```
 
-This resets the scenario, starts a local UI, and opens it in your browser. The Play button advances simulated time through the backend, so events are delivered into SQLite as the UI runs. Use `pm-sim ui --resume` only when you intentionally want to inspect the current DB instead of starting fresh. To write a static HTML snapshot instead, use `pm-sim ui --static --output tmp/demo_ui.html`.
+This resets the scenario, starts a local UI, and opens it in your browser. The Play button advances simulated time through the backend, so events are delivered into SQLite as the UI runs. Use `pm-sim ui --resume` only when you intentionally want to inspect the current DB instead of starting fresh. To write a static HTML snapshot of the current DB, use `pm-sim ui --static --output tmp/demo_ui.html`; that file is a report-style snapshot, not a live run.
 
 Advance simulated time without using wall-clock time:
 

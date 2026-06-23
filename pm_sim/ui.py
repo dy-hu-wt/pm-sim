@@ -296,6 +296,9 @@ section { margin:14px 0; overflow:hidden; }
 .list { padding:14px; display:grid; gap:8px; }
 .row { border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }
 .row.scheduled { border-left:4px solid var(--purple); }
+details.operator { margin:14px 0; border:1px solid var(--line); border-radius:12px; background:#fff; box-shadow:var(--shadow); overflow:hidden; }
+details.operator summary { cursor:pointer; padding:13px 15px; font-weight:850; background:#fbfcfe; border-bottom:1px solid var(--line); }
+details.operator[open] summary { border-bottom:1px solid var(--line); }
 .badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:800; background:#eef2f7; }
 .good { color:var(--good); } .warn { color:var(--warn); } .bad { color:var(--bad); }
 .empty { color:var(--muted); font-style:italic; padding:14px; }
@@ -317,7 +320,6 @@ section { margin:14px 0; overflow:hidden; }
       <p id="subtitle"></p>
       <p>Simulated time: <strong id="sim-time"></strong></p>
     </div>
-    <div class="score"><span id="score">-</span><span>score</span></div>
   </header>
   <section id="playback-section">
     <div class="section-head"><h2>Live Playback</h2></div>
@@ -333,15 +335,19 @@ section { margin:14px 0; overflow:hidden; }
       <div class="playback" id="playback"></div>
     </div>
   </section>
-  <div class="grid" id="summary"></div>
   <div class="columns">
-    <section><div class="section-head"><h2>Projects</h2></div><div class="list" id="projects"></div></section>
+    <section><div class="section-head"><h2>Visible Projects</h2></div><p class="helper">Current project state from SQLite. It changes only when delivered events or actions mutate state.</p><div class="list" id="projects"></div></section>
     <section><div class="section-head"><h2>Authored Schedule</h2></div><p class="helper">Reference schedule seeded by the scenario. These events have not necessarily been delivered yet.</p><div class="list" id="schedule"></div></section>
   </div>
   <div class="columns">
-    <section><div class="section-head"><h2>Current Evaluation</h2></div><p class="helper">This is the current score from visible state and recorded evidence, not a preview of future ground truth.</p><div class="list" id="evaluation"></div></section>
     <section><div class="section-head"><h2>Tasks</h2></div><div class="list" id="tasks"></div></section>
   </div>
+  <details class="operator">
+    <summary>Operator inspector: current evaluation</summary>
+    <p class="helper">This is for debugging and grading. It is computed from current visible state/evidence and is not shown as part of the agent-facing playback.</p>
+    <div class="grid" id="summary"></div>
+    <div class="list" id="evaluation"></div>
+  </details>
 </main>
 <script>
 let timer = null;
@@ -443,7 +449,6 @@ function render(state) {
   $("title").textContent = scenario.name || obs.scenario_id || "PM Sim";
   $("subtitle").textContent = scenario.company || "";
   $("sim-time").textContent = pretty(obs.current_time);
-  $("score").textContent = `${evaluation.score ?? "-"} / ${evaluation.max_score ?? "-"}`;
   $("meter").textContent = `${state.display_timeline.length} visible item(s)`;
 
   $("summary").innerHTML = [

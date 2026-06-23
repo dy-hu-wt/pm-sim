@@ -120,6 +120,7 @@ def _render_html(data: dict[str, Any]) -> str:
             '<p class="eyebrow">PM Sim Operator UI</p>',
             f"<h1>{_h(scenario.get('name') or observation.get('scenario_id', 'scenario'))}</h1>",
             f"<p>{_h(scenario.get('company', ''))}</p>",
+            '<p class="muted">Static snapshot of the current SQLite state. Use <span class="mono">pm-sim ui</span> for a fresh live run.</p>',
             f"<p>Simulated time: <strong>{_h(observation.get('current_time'))}</strong></p>",
             "</div>",
             f'<div class="hero-score">{_h(score)}<span>score</span></div>',
