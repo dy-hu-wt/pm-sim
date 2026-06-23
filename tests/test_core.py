@@ -868,6 +868,14 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertIn("evidenceItem", html)
         self.assertIn("Source:", html)
 
+    def test_live_ui_keeps_tasks_in_operator_inspector(self) -> None:
+        html = _html()
+
+        self.assertIn("Task State", html)
+        self.assertIn("Project status:", html)
+        self.assertIn("Risk:", html)
+        self.assertNotIn("<section><div class=\"section-head\"><h2>Tasks</h2>", html)
+
     def test_live_ui_can_step_llm_policy(self) -> None:
         client = _FakeResponsesClient(
             [

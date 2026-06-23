@@ -629,9 +629,10 @@ section { margin:14px 0; overflow:hidden; }
 .row { border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }
 .row.scheduled { border-left:4px solid var(--purple); }
 .project-card { border:1px solid var(--line); border-radius:10px; padding:12px; background:#fff; display:grid; gap:8px; }
-.project-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.project-head { display:grid; gap:4px; }
 .project-title { font-size:15px; font-weight:800; }
-.project-flags { display:flex; flex-wrap:wrap; gap:6px; }
+.project-state { display:flex; flex-wrap:wrap; gap:8px; color:var(--muted); font-size:12px; font-weight:800; }
+.project-state strong { color:var(--ink); }
 .meta-chip { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; background:#f1f4f8; color:var(--muted); }
 .project-copy { font-size:13px; color:var(--muted); }
 .project-footer { display:flex; flex-wrap:wrap; gap:6px; }
@@ -647,13 +648,11 @@ section { margin:14px 0; overflow:hidden; }
 table { width:100%; border-collapse:collapse; font-size:13px; }
 th, td { padding:10px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
 th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
-.task-grid { padding:14px; display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
-.task-card { border:1px solid var(--line); border-radius:10px; padding:12px; background:#fff; display:grid; gap:8px; }
-.task-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
-.task-title { font-weight:800; }
-.task-subtle { color:var(--muted); font-size:12px; margin-top:2px; }
-.task-meta { display:flex; flex-wrap:wrap; gap:6px; }
-.task-deadline { font-size:12px; color:var(--muted); }
+.task-list { padding:14px; display:grid; gap:6px; }
+.task-row { border:1px solid var(--line); border-radius:8px; padding:9px 10px; background:#fff; display:grid; gap:5px; }
+.task-row-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+.task-title { font-size:13px; font-weight:800; }
+.task-meta { color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
 .score-grid { padding:14px; display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
 .score-card { border:1px solid var(--line); border-radius:10px; padding:12px; background:#fff; display:grid; gap:8px; }
 .score-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
@@ -731,12 +730,16 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
     <section><div class="section-head"><h2>Visible Projects</h2></div><p class="helper">Current project state from SQLite. It changes only when delivered events or actions mutate state.</p><div class="list" id="projects"></div></section>
     <section><div class="section-head"><h2>Known Blockers</h2></div><p class="helper">Only blockers already visible in the run. This is the PM-facing view, not the hidden authored truth.</p><div class="list" id="blockers"></div></section>
   </div>
-  <section><div class="section-head"><h2>Tasks</h2></div><div class="table-wrap" id="tasks"></div></section>
   <details class="operator">
     <summary>Operator inspector: current evaluation</summary>
     <p class="helper">This is for debugging and grading. It is computed from current visible state/evidence and is not shown as part of the agent-facing playback.</p>
     <div class="grid" id="summary"></div>
     <div class="score-grid" id="evaluation"></div>
+    <div class="inspector-section">
+    <div class="inspector-title">Task State</div>
+    <p class="helper">Compact work-tracker state for debugging task gates and fake-progress guardrails.</p>
+    <div id="tasks"></div>
+    </div>
     <div class="inspector-section">
     <div class="inspector-title">Authored Schedule</div>
     <p class="helper">Seeded scenario events for author/debug use. These are not all visible to the agent at the start.</p>
@@ -838,9 +841,9 @@ function projectCard(project) {
     <div class="project-card">
       <div class="project-head">
         <div class="project-title">${esc(project.name || "Project")}</div>
-        <div class="project-flags">
-          ${status ? `<span class="badge ${statusClass(status)}">${esc(label(status))}</span>` : ""}
-          ${risk ? `<span class="badge ${statusClass(risk)}">${esc(label(risk))} risk</span>` : ""}
+        <div class="project-state">
+          ${status ? `<span>Project status: <strong class="${statusClass(status)}">${esc(label(status))}</strong></span>` : ""}
+          ${risk ? `<span>Risk: <strong class="${statusClass(risk)}">${esc(label(risk))}</strong></span>` : ""}
         </div>
       </div>
       ${project.stakeholder_pressure ? `<div class="project-copy">${esc(project.stakeholder_pressure)}</div>` : ""}
@@ -853,18 +856,19 @@ function projectCard(project) {
 }
 
 function taskCard(task) {
+  const meta = [
+    `Owner ${label(task.owner_id || "unowned")}`,
+    `Priority ${label(task.priority || "")}`,
+    task.due_at ? `Due ${pretty(task.due_at)}` : "",
+    task.blocked_by ? `Blocked by ${label(task.blocked_by)}` : "",
+  ].filter(Boolean).join(" · ");
   return `
-    <div class="task-card">
-      <div class="task-head">
+    <div class="task-row">
+      <div class="task-row-top">
         <div class="task-title">${esc(task.title || "Task")}</div>
         <span class="badge ${statusClass(task.status)}">${esc(label(task.status || ""))}</span>
       </div>
-      ${task.blocked_by ? `<div class="task-subtle">Blocked by ${esc(label(task.blocked_by))}</div>` : ""}
-      <div class="task-meta">
-        <span class="meta-chip">Owner ${esc(label(task.owner_id || "unowned"))}</span>
-        <span class="meta-chip">Priority ${esc(label(task.priority || ""))}</span>
-      </div>
-      ${task.due_at ? `<div class="task-deadline">Due ${esc(pretty(task.due_at))}</div>` : ""}
+      <div class="task-meta">${esc(meta)}</div>
     </div>
   `;
 }
@@ -1045,7 +1049,7 @@ function render(state) {
   $("evaluation").innerHTML = (evaluation.components || []).map(evaluationCard).join("") || `<div class="empty">No evaluation yet.</div>`;
   const tasks = (state.tasks || []).slice(0, 12);
   $("tasks").innerHTML = tasks.length
-    ? `<div class="task-grid">${tasks.map(taskCard).join("")}</div>`
+    ? `<div class="task-list">${tasks.map(taskCard).join("")}</div>`
     : `<div class="empty">No tasks.</div>`;
 }
 
