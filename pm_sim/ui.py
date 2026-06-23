@@ -622,11 +622,30 @@ section { margin:14px 0; overflow:hidden; }
 table { width:100%; border-collapse:collapse; font-size:13px; }
 th, td { padding:10px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
 th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+.task-grid { padding:14px; display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+.task-card { border:1px solid var(--line); border-radius:10px; padding:12px; background:#fff; display:grid; gap:8px; }
+.task-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
 .task-title { font-weight:800; }
 .task-subtle { color:var(--muted); font-size:12px; margin-top:2px; }
+.task-meta { display:flex; flex-wrap:wrap; gap:6px; }
+.task-deadline { font-size:12px; color:var(--muted); }
+.score-grid { padding:14px; display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+.score-card { border:1px solid var(--line); border-radius:10px; padding:12px; background:#fff; display:grid; gap:8px; }
+.score-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.score-name { font-size:14px; font-weight:800; }
+.score-points { font-size:12px; color:var(--muted); font-weight:800; }
+.score-note { font-size:13px; color:var(--muted); }
+.score-missing { font-size:12px; color:var(--bad); }
+.schedule-grid { padding:14px; display:grid; gap:8px; }
+.schedule-card { border:1px solid var(--line); border-left:4px solid var(--purple); border-radius:10px; padding:10px 12px; background:#fff; display:grid; gap:4px; }
+.schedule-top { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+.schedule-title { font-weight:800; font-size:14px; }
+.schedule-detail { font-size:12px; color:var(--muted); }
 details.operator { margin:14px 0; border:1px solid var(--line); border-radius:12px; background:#fff; box-shadow:var(--shadow); overflow:hidden; }
 details.operator summary { cursor:pointer; padding:13px 15px; font-weight:850; background:#fbfcfe; border-bottom:1px solid var(--line); }
 details.operator[open] summary { border-bottom:1px solid var(--line); }
+.inspector-section { border-top:1px solid var(--line); }
+.inspector-title { padding:13px 15px 0; font-size:15px; font-weight:800; }
 .badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:800; background:#eef2f7; }
 .good { color:var(--good); } .warn { color:var(--warn); } .bad { color:var(--bad); }
 .empty { color:var(--muted); font-style:italic; padding:14px; }
@@ -685,10 +704,12 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
     <summary>Operator inspector: current evaluation</summary>
     <p class="helper">This is for debugging and grading. It is computed from current visible state/evidence and is not shown as part of the agent-facing playback.</p>
     <div class="grid" id="summary"></div>
-    <div class="list" id="evaluation"></div>
-    <div class="section-head"><h2>Authored Schedule</h2></div>
+    <div class="score-grid" id="evaluation"></div>
+    <div class="inspector-section">
+    <div class="inspector-title">Authored Schedule</div>
     <p class="helper">Seeded scenario events for author/debug use. These are not all visible to the agent at the start.</p>
-    <div class="list" id="schedule"></div>
+    <div class="schedule-grid" id="schedule"></div>
+    </div>
   </details>
 </main>
 <div class="modal" id="card-modal" hidden>
@@ -799,6 +820,50 @@ function projectCard(project) {
   `;
 }
 
+function taskCard(task) {
+  return `
+    <div class="task-card">
+      <div class="task-head">
+        <div class="task-title">${esc(task.title || "Task")}</div>
+        <span class="badge ${statusClass(task.status)}">${esc(label(task.status || ""))}</span>
+      </div>
+      ${task.blocked_by ? `<div class="task-subtle">Blocked by ${esc(label(task.blocked_by))}</div>` : ""}
+      <div class="task-meta">
+        <span class="meta-chip">Owner ${esc(label(task.owner_id || "unowned"))}</span>
+        <span class="meta-chip">Priority ${esc(label(task.priority || ""))}</span>
+      </div>
+      ${task.due_at ? `<div class="task-deadline">Due ${esc(pretty(task.due_at))}</div>` : ""}
+    </div>
+  `;
+}
+
+function evaluationCard(component) {
+  const missing = component.missing_evidence || [];
+  return `
+    <div class="score-card">
+      <div class="score-top">
+        <div class="score-name">${esc(label(component.key))}</div>
+        <div class="score-points">${esc(component.earned)} / ${esc(component.points)}</div>
+      </div>
+      <div><span class="badge ${statusClass(component.status)}">${esc(label(component.status || ""))}</span></div>
+      <div class="score-note">${esc(component.note || "")}</div>
+      ${missing.length ? `<div class="score-missing">Missing: ${esc(missing.join(", "))}</div>` : ""}
+    </div>
+  `;
+}
+
+function scheduleCard(item) {
+  return `
+    <div class="schedule-card">
+      <div class="schedule-top">
+        <div class="schedule-title">${esc(item.title || "")}</div>
+        <span class="meta-chip">${esc(pretty(item.time))}</span>
+      </div>
+      <div class="schedule-detail">${esc(item.detail || "")}</div>
+    </div>
+  `;
+}
+
 function modalOpen(item) {
   $("modal-title").textContent = item.title || "";
   $("modal-route").textContent = item.route || "";
@@ -894,29 +959,12 @@ function render(state) {
 
   $("projects").innerHTML = (obs.projects || []).map(projectCard).join("") || `<div class="empty">No projects.</div>`;
   $("blockers").innerHTML = (obs.known_blockers || []).map(blocker => row(blocker.title, blocker.description || "", blocker.status)).join("") || `<div class="empty">No visible blockers.</div>`;
-  $("schedule").innerHTML = (state.authored_schedule || []).map(item => `<div class="row scheduled"><strong>${esc(item.title)}</strong> <span class="badge">${esc(timeOnly(item.time))}</span><div>${esc(pretty(item.time))}</div><div>${esc(item.detail)}</div></div>`).join("") || `<div class="empty">No authored events.</div>`;
-  $("evaluation").innerHTML = (evaluation.components || []).map(component => row(label(component.key), component.note || "", `${component.earned} / ${component.points}`)).join("") || `<div class="empty">No evaluation yet.</div>`;
+  $("schedule").innerHTML = (state.authored_schedule || []).map(scheduleCard).join("") || `<div class="empty">No authored events.</div>`;
+  $("evaluation").innerHTML = (evaluation.components || []).map(evaluationCard).join("") || `<div class="empty">No evaluation yet.</div>`;
   const tasks = (state.tasks || []).slice(0, 12);
-  $("tasks").innerHTML = tasks.length ? `
-    <table>
-      <thead><tr><th>Task</th><th>Status</th><th>Owner</th><th>Priority</th><th>Due</th></tr></thead>
-      <tbody>
-        ${tasks.map(task => `<tr>
-          <td>
-            <div class="task-title">${esc(task.title)}</div>
-            ${task.blocked_by ? `<div class="task-subtle">Blocked by ${esc(label(task.blocked_by))}</div>` : ""}
-          </td>
-          <td><span class="badge ${statusClass(task.status)}">${esc(label(task.status))}</span></td>
-          <td><span class="meta-chip">${esc(label(task.owner_id || "unowned"))}</span></td>
-          <td><span class="badge ${statusClass(task.priority)}">${esc(label(task.priority || ""))}</span></td>
-          <td>
-            <div>${esc(pretty(task.due_at))}</div>
-            ${task.due_at ? `<div class="task-subtle">Deadline</div>` : ""}
-          </td>
-        </tr>`).join("")}
-      </tbody>
-    </table>
-  ` : `<div class="empty">No tasks.</div>`;
+  $("tasks").innerHTML = tasks.length
+    ? `<div class="task-grid">${tasks.map(taskCard).join("")}</div>`
+    : `<div class="empty">No tasks.</div>`;
 }
 
 async function refresh() {
