@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,7 +21,7 @@ from .formatters import (
     format_output,
     format_concept_progress,
 )
-from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
+from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH, REPO_ROOT
 from .scenario import load_scenario
 from .state import get_state_value, observe, reset, set_state_value
 from .timeline import timeline
@@ -219,7 +220,32 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
         "authored_schedule": _authored_schedule(scenario),
         "scripted_demo": _scripted_demo_state(db_path, scenario_path),
         "llm_session": llm_state,
+        "runtime": _runtime_payload(),
     }
+
+
+def _runtime_payload() -> dict[str, Any]:
+    _load_dotenv()
+    concept_mode = os.environ.get("PM_SIM_CONCEPT_MODE", "llm").strip().lower()
+    coworker_mode = os.environ.get("PM_SIM_COWORKER_MODE", "llm").strip().lower()
+    return {
+        "concept_mode": "local" if concept_mode == "local" else "llm",
+        "coworker_mode": "deterministic" if coworker_mode == "deterministic" else "llm",
+        "concept_model": os.environ.get("PM_SIM_CONCEPT_MODEL") or os.environ.get("OPENAI_MODEL") or "",
+        "coworker_model": os.environ.get("PM_SIM_COWORKER_MODEL") or os.environ.get("OPENAI_MODEL") or "",
+    }
+
+
+def _load_dotenv() -> None:
+    env_path = REPO_ROOT / ".env"
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
 def _brief_payload(scenario: dict[str, Any]) -> dict[str, Any]:
@@ -764,6 +790,7 @@ section { margin:14px 0; overflow:hidden; }
 .meta-chip { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; background:#f1f4f8; color:var(--muted); }
 .project-copy { font-size:13px; color:var(--muted); }
 .project-footer { display:flex; flex-wrap:wrap; gap:6px; }
+.runtime-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
 .blocker-groups { padding:14px; display:grid; gap:12px; }
 .blocker-group { display:grid; gap:8px; }
 .blocker-group-title { color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
@@ -838,6 +865,7 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
       <h1 id="title">PM Sim</h1>
       <p id="subtitle"></p>
       <p>Simulated time: <strong id="sim-time"></strong></p>
+      <div class="runtime-row" id="runtime-row"></div>
     </div>
     <div class="brief-card" id="agent-brief"></div>
   </header>
@@ -1166,6 +1194,13 @@ function render(state) {
   $("title").textContent = scenario.name || obs.scenario_id || "PM Sim";
   $("subtitle").textContent = scenario.company || "";
   $("sim-time").textContent = pretty(obs.current_time);
+  const runtime = state.runtime || {};
+  const conceptLabel = runtime.concept_mode === "local" ? "Local" : "LLM";
+  const coworkerLabel = runtime.coworker_mode === "deterministic" ? "Deterministic" : "LLM";
+  $("runtime-row").innerHTML = `
+    <span class="meta-chip">Concept match: ${esc(conceptLabel)}${runtime.concept_model && runtime.concept_mode !== "local" ? ` · ${esc(runtime.concept_model)}` : ""}</span>
+    <span class="meta-chip">Coworkers: ${esc(coworkerLabel)}${runtime.coworker_model && runtime.coworker_mode !== "deterministic" ? ` · ${esc(runtime.coworker_model)}` : ""}</span>
+  `;
   renderBrief(scenario.agent_brief || {});
   const demo = state.scripted_demo || {};
   const llm = state.llm_session || {};
@@ -1175,6 +1210,8 @@ function render(state) {
     : `step ${demo.index ?? 0} / ${demo.total ?? 0} · ${state.display_timeline.length} visible item(s)`;
 
   $("summary").innerHTML = [
+    card("Concept Match", conceptLabel),
+    card("Coworkers", coworkerLabel),
     card("Milestones", evaluation.milestone_count ?? 0),
     card("Outcome", label((evaluation.final_outcome || {}).outcome || "pending")),
     card("Status", evaluation.score === evaluation.max_score ? "passed" : "incomplete")
