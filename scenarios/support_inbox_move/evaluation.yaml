@@ -241,7 +241,7 @@ outcome_rules:
     status: missed
     risk_level: high
     final_outcome: inbox_move_not_ready
-    summary: Thursday arrived without a written support inbox move plan across saved replies and VIP routing.
+    summary: Friday arrived without a written support inbox move plan across saved replies and VIP routing.
 scripted_policy:
 - name: read_inbox_move_brief
   tool: read_doc
@@ -293,9 +293,9 @@ scripted_policy:
 - name: advance_to_support_inbox_deadline
   tool: advance_time
   args:
-    target: to:2026-06-25T15:00:00
+    target: to:2026-06-26T15:00:00
 baseline:
-  description: No-op baseline waits for Tuesday reminders and reaches Thursday without the move plan or owner updates.
+  description: No-op baseline waits for Tuesday reminders and reaches Friday without the move plan or owner updates.
   expected_score: 50
   expected_outcome: The two risks may become visible, but the move is not ready because the PM never writes the plan or sends final updates.
 milestone_rules:

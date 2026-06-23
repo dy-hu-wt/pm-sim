@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2360" height="1520" viewBox="0 0 1180 760" role="img" aria-labelledby="title desc">
   <title id="title">Support Inbox Move Week Calendar</title>
-  <desc id="desc">A Google Calendar style week view showing support inbox move events from Monday June 22 through Thursday June 25.</desc>
+  <desc id="desc">A Google Calendar style week view showing support inbox move events from Monday June 22 through Friday June 26.</desc>
   <defs>
     <style>
       .bg { fill: #ffffff; }
@@ -25,7 +25,7 @@
   <line x1="0" y1="78" x2="1180" y2="78" class="major"/>
 
   <text x="32" y="34" class="text label">Support inbox move week</text>
-  <text x="32" y="56" class="text small muted">Simulated calendar: June 22-25, 2026</text>
+  <text x="32" y="56" class="text small muted">Simulated calendar: June 22-26, 2026</text>
 
   <g transform="translate(782 24)">
     <rect x="0" y="0" width="18" height="10" rx="5" fill="#1a73e8"/>
@@ -130,9 +130,13 @@
         <text x="712" y="133" class="event-title">Bob needs note</text>
         <text x="712" y="151" class="event-meta">VIP test plan due</text>
 
-        <rect x="700" y="420" width="182" height="58" rx="8" fill="#d93025"/>
-        <text x="712" y="441" class="event-title">Inbox move deadline</text>
-        <text x="712" y="459" class="event-meta">Outcome is graded</text>
+        <rect x="700" y="420" width="182" height="58" rx="8" fill="#a142f4"/>
+        <text x="712" y="441" class="event-title">Switch readiness</text>
+        <text x="712" y="459" class="event-meta">Owners need updates</text>
+
+        <rect x="906" y="420" width="182" height="58" rx="8" fill="#d93025"/>
+        <text x="918" y="441" class="event-title">Inbox move outcome</text>
+        <text x="918" y="459" class="event-meta">Friday result is graded</text>
       </g>
     </g>
   </g>

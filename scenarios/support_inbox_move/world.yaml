@@ -2,7 +2,7 @@ projects:
 - id: support_inbox_move
   name: Support Inbox Move
   customer: Support Team
-  deadline: '2026-06-25T15:00:00'
+  deadline: '2026-06-26T15:00:00'
   status: at_risk
   risk_level: medium
   stakeholder_pressure: The team wants to switch to the new help desk on Thursday without losing customer replies.
@@ -305,7 +305,7 @@ events:
     blocker_id: vip_email_routing_gap
 - id: event_support_inbox_move_deadline
   event_type: project_deadline
-  scheduled_at: '2026-06-25T15:00:00'
+  scheduled_at: '2026-06-26T15:00:00'
   status: pending
   priority: 100
   payload:

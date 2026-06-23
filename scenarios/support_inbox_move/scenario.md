@@ -1,6 +1,6 @@
 # Support Inbox Move
 
-Poppy is moving customer support from an old shared inbox to a new help desk by Thursday afternoon. The switch only works if two separate streams are ready.
+Poppy is moving customer support from an old shared inbox to a new help desk. The work happens during a Monday-Friday week: Thursday is the switch-readiness checkpoint, and Friday is the final outcome deadline.
 
 ![Support Inbox Move Week](../../docs/assets/support-inbox-move-calendar.svg)
 
@@ -59,7 +59,7 @@ The PM needs both streams:
 2. Discover Bob's VIP-routing risk.
 3. Write the Thursday Inbox Move Plan.
 4. Email Alice and Bob their parts of the plan.
-5. Reach Thursday with both written updates complete.
+5. Reach Friday with both written updates complete.
 
 ## Guaranteed Events
 
@@ -67,7 +67,7 @@ The PM needs both streams:
 - Tuesday 11:00 AM: Bob reminds the PM if VIP routing has not been handled.
 - Thursday 9:30 AM: Alice nudges again if she lacks written support-team wording.
 - Thursday 10:00 AM: Bob nudges again if he lacks the routing note.
-- Thursday 3:00 PM: the inbox move deadline is evaluated.
+- Friday 3:00 PM: the inbox move outcome is evaluated.
 
 ## Starts Visible vs Hidden
 
@@ -123,6 +123,6 @@ pm-sim advance-time until_next_event
 pm-sim update-doc inbox_move_plan "Thursday inbox move plan: move the top 12 saved replies to the new help desk before Thursday. VIP forwarding is tested by adding VIP aliases to the forwarding rule and sending a test email. The old inbox stays read-only for one week as backup. Alice owns saved replies and Bob owns VIP routing; Alice and Bob are aligned."
 pm-sim send-email alice "Support inbox move saved replies" "Support team can use this wording: the top 12 saved replies move to the new help desk before Thursday, and the old inbox stays read-only for one week as backup."
 pm-sim send-email bob "Support inbox move VIP routing" "VIP aliases are on the forwarding allowlist, VIP forwarding is tested to the new help desk, and the old inbox stays open as backup for one week."
-pm-sim advance-time to:2026-06-25T15:00:00
+pm-sim advance-time to:2026-06-26T15:00:00
 pm-sim evaluate --explain
 ```
