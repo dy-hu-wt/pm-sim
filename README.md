@@ -49,7 +49,7 @@ Then run the tests:
 python -m unittest discover -s tests
 ```
 
-Install the LLM extra and configure an OpenAI key. The simulator can load scenarios and exercise basic tools without a key, but full scoring uses LLM-backed concept matching for authored communication rules.
+Install the LLM extra and configure an OpenAI key. The simulator can load scenarios and exercise basic tools without a key, but full scoring and any path that depends on authored concept matching require `OPENAI_API_KEY`.
 
 ```bash
 cp .env.example .env
@@ -57,6 +57,20 @@ python -m pip install -e ".[llm]"
 ```
 
 Set `OPENAI_API_KEY` in `.env`. The model-driven agent policy uses `OPENAI_MODEL`; concept matching uses `PM_SIM_CONCEPT_MODEL` if set, then `OPENAI_MODEL`, then its built-in default. `.env.example` sets demo-friendly model names. Override `OPENAI_MODEL`, `PM_SIM_CONCEPT_MODEL`, or pass `--model` when you want a different agent model.
+
+Without an OpenAI key you can still:
+
+- reset the scenario,
+- inspect state with `observe`, `timeline`, and `read-doc`,
+- use basic tool surfaces manually,
+- run the test suite where concept matching is mocked.
+
+Without an OpenAI key you should not expect:
+
+- `120 / 120` evaluation results,
+- full scripted happy-path grading,
+- `llm` policy runs,
+- final authored communication milestones to score.
 
 ## Start
 
@@ -128,11 +142,11 @@ pm-sim advance-time to:2026-06-26T15:00:00
 pm-sim read-doc doc_friday_outcome
 ```
 
-Expected evaluation result before the Friday deadline: `120 / 120`. The important evidence is recorded through delivered coworker reply events, the decision record, the Daisy launch email, the Koopa scope update, the security interruption, and Daisy's Thursday final-readiness check: `blocker_discovered`, `stakeholder_alignment`, `customer_message_ready`, `peach_unblocked`, `draft_mode_approved`, `decision_record_written`, `final_readiness_confirmed`, `koopa_scoped`, `koopa_update_sent`, `security_doc_found`, and `security_question_answered`. The security answer only scores after Daisy's security question is visible, and the final readiness note only scores after Daisy asks for the Thursday go/no-go. Advancing to Friday then records the final project outcome.
+Expected evaluation result before the Friday deadline, with `OPENAI_API_KEY` configured: `120 / 120`. The important evidence is recorded through delivered coworker reply events, the decision record, the Daisy launch email, the Koopa scope update, the security interruption, and Daisy's Thursday final-readiness check: `blocker_discovered`, `stakeholder_alignment`, `customer_message_ready`, `peach_unblocked`, `draft_mode_approved`, `decision_record_written`, `final_readiness_confirmed`, `koopa_scoped`, `koopa_update_sent`, `security_doc_found`, and `security_question_answered`. The security answer only scores after Daisy's security question is visible, and the final readiness note only scores after Daisy asks for the Thursday go/no-go. Advancing to Friday then records the final project outcome.
 
 The path demonstrates good PM behavior by turning a hidden technical risk into a clear launch tradeoff, aligning the customer-facing owner, unblocking implementation work, handling a smaller competing request without stealing the launch team, and confirming readiness after late-week interruptions.
 
-The same path can be run by the deterministic scripted agent:
+The same path can be run by the deterministic scripted agent, but full scoring still requires `OPENAI_API_KEY` because the authored communication checks use LLM-backed concept matching:
 
 ```bash
 pm-sim run-agent --policy scripted --reset
