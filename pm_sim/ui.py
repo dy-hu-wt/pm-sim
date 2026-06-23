@@ -715,6 +715,10 @@ p { margin:0 0 8px; }
 .card { padding:14px; border-left:4px solid var(--blue); }
 .label { color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; }
 .value { font-size:20px; font-weight:850; margin-top:4px; }
+.summary-grid { padding:10px 14px 0; display:grid; gap:8px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+.summary-card { border:1px solid var(--line); border-left:3px solid var(--blue); border-radius:8px; background:#fff; padding:9px 10px; }
+.summary-label { color:var(--muted); font-size:11px; font-weight:850; text-transform:uppercase; letter-spacing:.04em; }
+.summary-value { color:var(--ink); font-size:14px; font-weight:850; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 section { margin:14px 0; overflow:hidden; }
 .section-head { padding:13px 15px; border-bottom:1px solid var(--line); background:#fbfcfe; }
 .playback-controls { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:8px; padding:14px 14px 0; }
@@ -890,7 +894,7 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
   <details class="operator">
     <summary>Operator inspector: current evaluation</summary>
     <p class="helper">This is for debugging and grading. It is computed from current visible state and milestones, and is not shown as part of the agent-facing playback.</p>
-    <div class="grid" id="summary"></div>
+    <div class="summary-grid" id="summary"></div>
     <div class="score-grid" id="evaluation"></div>
     <div class="inspector-section">
     <div class="inspector-title">Task State</div>
@@ -984,6 +988,10 @@ function setLoading(active) {
 
 function card(labelText, value) {
   return `<div class="card"><div class="label">${esc(labelText)}</div><div class="value">${esc(value)}</div></div>`;
+}
+
+function summaryCard(labelText, value) {
+  return `<div class="summary-card"><div class="summary-label">${esc(labelText)}</div><div class="summary-value" title="${esc(value)}">${esc(value)}</div></div>`;
 }
 
 function row(title, detail, meta = "") {
@@ -1209,12 +1217,15 @@ function render(state) {
     ? `llm turn ${llm.turns ?? 0}${modelLabel} · ${llm.steps ?? 0} tool step(s) · ${state.display_timeline.length} visible item(s)`
     : `step ${demo.index ?? 0} / ${demo.total ?? 0} · ${state.display_timeline.length} visible item(s)`;
 
+  const scoreText = `${evaluation.score ?? 0} / ${evaluation.max_score ?? 0}`;
+  const readinessText = evaluation.score === evaluation.max_score ? "Full score" : "Needs work";
   $("summary").innerHTML = [
-    card("Concept Match", conceptLabel),
-    card("Coworkers", coworkerLabel),
-    card("Milestones", evaluation.milestone_count ?? 0),
-    card("Outcome", label((evaluation.final_outcome || {}).outcome || "pending")),
-    card("Status", evaluation.score === evaluation.max_score ? "passed" : "incomplete")
+    summaryCard("Concept Match", conceptLabel),
+    summaryCard("Coworkers", coworkerLabel),
+    summaryCard("Score", scoreText),
+    summaryCard("Milestones", evaluation.milestone_count ?? 0),
+    summaryCard("Outcome", label((evaluation.final_outcome || {}).outcome || "pending")),
+    summaryCard("Readiness", readinessText)
   ].join("");
 
   renderReplay(state.display_timeline || [], scenario);

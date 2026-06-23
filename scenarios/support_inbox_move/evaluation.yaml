@@ -126,6 +126,22 @@ grading_rules:
   milestone:
     key: vip_routing_update_sent
     note: Bob has the VIP routing test plan.
+evidence_promotion_rules:
+- id: owner_updates_task_complete
+  priority: 10
+  when:
+  - coworker_state:
+      person_id: alice
+      key: support_update_ready
+      equals: true
+  - coworker_state:
+      person_id: bob
+      key: routing_update_ready
+      equals: true
+  effects:
+  - type: update_task
+    task_id: send_owner_updates
+    status: complete
 task_gate_rules:
 - task_id: move_saved_replies
   statuses:
