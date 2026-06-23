@@ -229,7 +229,7 @@ The first implementation should focus on the backend simulator:
 - evaluator
 - CLI/operator commands
 
-UI, APIs, and richer observability can come after the simulation semantics work.
+UI and APIs can come after the simulation semantics work. Richer observability is useful when it stays read-only: the generated operator report should summarize SQLite state, evaluation, timeline, and logs without owning separate state or changing the simulation.
 
 ### Storage
 

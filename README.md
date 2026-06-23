@@ -220,6 +220,13 @@ pm-sim timeline --kind event
 pm-sim timeline --kind evidence
 ```
 
+Write a single-file operator report with current projects, calendar obligations, evidence, timeline, and logs:
+
+```bash
+pm-sim report
+pm-sim report --output tmp/demo_report.html
+```
+
 Advance simulated time without using wall-clock time:
 
 ```bash
@@ -271,7 +278,7 @@ Task updates are checked against the surrounding world state to resist reward ha
 
 After the Friday deadline event is delivered, `evaluate` also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
-The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, and `rules.json`. Most scenario semantics now live in data: task gates, coworker memory, chat/email/doc-derived evidence rules, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger terms, transcript lines, and effects.
+The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, and `rules.json`. Most scenario semantics now live in data: task gates, coworker memory, chat/email/doc-derived evidence rules, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger terms, transcript lines, and effects. The `report` command is a read-only operator surface over that same state, not a separate application state store.
 
 The backend is covered by:
 

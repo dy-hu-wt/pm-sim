@@ -22,6 +22,7 @@ from .agents.scripted import run_scripted_agent
 from .evaluator import evaluate
 from .formatters import format_output
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
+from .report import DEFAULT_REPORT_PATH, generate_report
 from .scenario import ScenarioError
 from .state import action_log, event_log, observe, reset
 from .time import advance_time
@@ -154,6 +155,27 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     evaluate_parser.set_defaults(func=_evaluate_command)
 
+    report_parser = subparsers.add_parser("report", help="Write an HTML operator report.")
+    report_parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_REPORT_PATH,
+        help=f"Report path. Default: {DEFAULT_REPORT_PATH}",
+    )
+    report_parser.add_argument(
+        "--timeline-limit",
+        type=int,
+        default=80,
+        help="Number of recent timeline rows to include. Default: 80.",
+    )
+    report_parser.add_argument(
+        "--scenario",
+        type=Path,
+        default=DEFAULT_SCENARIO_PATH,
+        help=f"Scenario JSON path. Default: {DEFAULT_SCENARIO_PATH}",
+    )
+    report_parser.set_defaults(func=_report_command)
+
     advance_parser = subparsers.add_parser("advance-time", help="Advance simulated time.")
     advance_parser.add_argument(
         "target",
@@ -209,6 +231,10 @@ def _evaluate_command(args: argparse.Namespace) -> dict[str, Any]:
     if args.explain:
         result = {**result, "explain": True}
     return result
+
+
+def _report_command(args: argparse.Namespace) -> dict[str, Any]:
+    return generate_report(args.db, args.scenario, args.output, args.timeline_limit)
 
 
 def _run_agent_command(args: argparse.Namespace) -> dict[str, Any]:

@@ -28,6 +28,8 @@ def format_output(command: str | None, value: Any) -> str:
         return _format_timeline(value)
     if command == "run-agent":
         return _format_run_agent(value)
+    if command == "report":
+        return _format_report(value)
     return str(value)
 
 
@@ -342,6 +344,22 @@ def _format_timeline(entries: list[dict[str, Any]]) -> str:
             if "scheduled_reply_ids" in result:
                 lines.append(f"    Scheduled replies: {', '.join(result['scheduled_reply_ids']) or 'none'}")
     return "\n".join(lines)
+
+
+def _format_report(value: dict[str, Any]) -> str:
+    if not value.get("ok"):
+        return f"Error: {value.get('error')}"
+    return "\n".join(
+        [
+            "Report written",
+            f"  Path:     {value.get('path')}",
+            f"  Time:     {_pretty_time(value.get('current_time'))}",
+            f"  Score:    {value.get('score')} / {value.get('max_score')}",
+            f"  Timeline: {value.get('timeline_entries')} rows",
+            f"  Actions:  {value.get('action_log_entries')} rows",
+            f"  Events:   {value.get('event_log_entries')} rows",
+        ]
+    )
 
 
 def _format_evaluate(value: dict[str, Any]) -> str:
