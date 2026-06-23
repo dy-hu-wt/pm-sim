@@ -80,7 +80,7 @@ class EffectApplicationTests(unittest.TestCase):
                         "decision": "draft_mode_approved",
                     },
                     {
-                        "type": "add_evaluation_evidence",
+                        "type": "record_milestone",
                         "key": "blocker_discovered",
                         "note": "Luigi disclosed stale repo sync risk.",
                     },
@@ -104,7 +104,7 @@ class EffectApplicationTests(unittest.TestCase):
                 "SELECT metadata_json FROM projects WHERE id = 'project_pr_review_agent'"
             ).fetchone()
             evidence = conn.execute(
-                "SELECT evidence_key FROM evaluation_evidence WHERE evidence_key = 'blocker_discovered'"
+                "SELECT milestone_id FROM milestones WHERE milestone_id = 'blocker_discovered'"
             ).fetchone()
 
             self.assertEqual(fact["visible_at"], "2026-06-22T11:00:00")
@@ -112,7 +112,7 @@ class EffectApplicationTests(unittest.TestCase):
             self.assertEqual(blocker["visible_at"], "2026-06-22T11:00:00")
             self.assertEqual(task["status"], "in_progress")
             self.assertEqual(loads(project["metadata_json"])["decision"], "draft_mode_approved")
-            self.assertEqual(evidence["evidence_key"], "blocker_discovered")
+            self.assertEqual(evidence["milestone_id"], "blocker_discovered")
         finally:
             conn.close()
 
@@ -228,7 +228,7 @@ class EffectApplicationTests(unittest.TestCase):
 
     def test_llm_semantic_match_failure_fails_closed(self) -> None:
         original = semantic_match_module._llm_match
-        semantic_match_module._llm_match = lambda text, criteria: (_ for _ in ()).throw(
+        semantic_match_module._llm_match = lambda text, criteria, *, model=None: (_ for _ in ()).throw(
             json.JSONDecodeError("Expecting value", "", 0)
         )
         conn = connect(self.db_path)
@@ -257,14 +257,81 @@ class EffectApplicationTests(unittest.TestCase):
             semantic_match_module._llm_match = original
             conn.close()
 
-    def test_duplicate_evaluation_evidence_is_idempotent(self) -> None:
+    def test_semantic_match_defaults_to_deterministic_without_openai(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            with unittest.mock.patch.dict("os.environ", {}, clear=True), unittest.mock.patch.object(
+                semantic_match_module,
+                "_load_dotenv",
+                lambda: None,
+            ):
+                result = semantic_match_module.semantic_match(
+                    conn,
+                    text="Draft mode with human approval.",
+                    criteria={
+                        "required": [
+                            {
+                                "description": "Draft mode with human approval.",
+                                "signals": ["draft mode", "human approval"],
+                            }
+                        ]
+                    },
+                    rule_id="test_default_mode",
+                )
+
+            self.assertTrue(result["matches"])
+            self.assertEqual(result["mode"], "deterministic")
+        finally:
+            conn.close()
+
+    def test_semantic_cache_separates_mode_and_model(self) -> None:
+        conn = connect(self.db_path)
+        original = semantic_match_module._llm_match
+        try:
+            deterministic = semantic_match_module.semantic_match(
+                conn,
+                text="Draft mode with human approval.",
+                criteria={"required": ["Draft mode with human approval."]},
+                rule_id="test_cache_key",
+            )
+            semantic_match_module._llm_match = lambda text, criteria, *, model=None: {
+                "matches": False,
+                "mode": "llm",
+                "model": model,
+                "required": [],
+                "forbidden": [],
+            }
+            with unittest.mock.patch.dict(
+                "os.environ",
+                {
+                    "PM_SIM_SEMANTIC_MATCHER": "llm",
+                    "PM_SIM_SEMANTIC_MODEL": "cache-model",
+                    "OPENAI_API_KEY": "test-key",
+                },
+                clear=False,
+            ):
+                llm = semantic_match_module.semantic_match(
+                    conn,
+                    text="Draft mode with human approval.",
+                    criteria={"required": ["Draft mode with human approval."]},
+                    rule_id="test_cache_key",
+                )
+
+            self.assertEqual(deterministic["mode"], "deterministic")
+            self.assertEqual(llm["mode"], "llm")
+            self.assertNotEqual(deterministic["cache_key"], llm["cache_key"])
+        finally:
+            semantic_match_module._llm_match = original
+            conn.close()
+
+    def test_duplicate_milestones_is_idempotent(self) -> None:
         conn = connect(self.db_path)
         try:
             first = apply_effects(
                 conn,
                 [
                     {
-                        "type": "add_evaluation_evidence",
+                        "type": "record_milestone",
                         "key": "blocker_discovered",
                         "note": "Luigi disclosed stale repo sync risk.",
                     }
@@ -276,7 +343,7 @@ class EffectApplicationTests(unittest.TestCase):
                 conn,
                 [
                     {
-                        "type": "add_evaluation_evidence",
+                        "type": "record_milestone",
                         "key": "blocker_discovered",
                         "note": "Luigi disclosed stale repo sync risk.",
                     }
@@ -289,8 +356,8 @@ class EffectApplicationTests(unittest.TestCase):
             count = conn.execute(
                 """
                 SELECT COUNT(*) AS count
-                FROM evaluation_evidence
-                WHERE evidence_key = 'blocker_discovered'
+                FROM milestones
+                WHERE milestone_id = 'blocker_discovered'
                   AND note = 'Luigi disclosed stale repo sync risk.'
                 """
             ).fetchone()["count"]
@@ -406,10 +473,10 @@ class EffectApplicationTests(unittest.TestCase):
                 (calendar_event["transcript_doc_id"],),
             ).fetchone()
             evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
-            evidence_keys = {
+            milestone_ids = {
                 evidence["key"]
                 for component in evaluation["components"]
-                for evidence in component.get("evidence", [])
+                for evidence in component.get("milestones", [])
             }
 
             delivered = result["delivered_events"][0]
@@ -427,9 +494,9 @@ class EffectApplicationTests(unittest.TestCase):
             self.assertIn("blocker_repo_sync_stale", blocker_ids)
             self.assertIn("fact_repo_sync_stale", fact_ids)
             self.assertIn("fact_draft_mode_approved", fact_ids)
-            self.assertIn("blocker_discovered", evidence_keys)
-            self.assertIn("stakeholder_alignment", evidence_keys)
-            self.assertIn("draft_mode_approved", evidence_keys)
+            self.assertIn("blocker_discovered", milestone_ids)
+            self.assertIn("stakeholder_alignment", milestone_ids)
+            self.assertIn("draft_mode_approved", milestone_ids)
         finally:
             conn.close()
 
@@ -515,10 +582,10 @@ class EffectApplicationTests(unittest.TestCase):
         advance_time(self.db_path, "to:2026-06-22T10:30:00")
         state = observe(self.db_path)
         evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
-        evidence_keys = {
+        milestone_ids = {
             evidence["key"]
             for component in evaluation["components"]
-            for evidence in component.get("evidence", [])
+            for evidence in component.get("milestones", [])
         }
 
         fact_ids = {fact["id"] for fact in state["discovered_facts"]}
@@ -527,7 +594,7 @@ class EffectApplicationTests(unittest.TestCase):
         self.assertIn("fact_nimbus_values_reliability", fact_ids)
         self.assertIn("fact_draft_mode_scope_confirmed", fact_ids)
         self.assertIn("fact_draft_mode_approved", fact_ids)
-        self.assertIn("blocker_discovered", evidence_keys)
-        self.assertIn("stakeholder_alignment", evidence_keys)
-        self.assertIn("peach_unblocked", evidence_keys)
-        self.assertIn("draft_mode_approved", evidence_keys)
+        self.assertIn("blocker_discovered", milestone_ids)
+        self.assertIn("stakeholder_alignment", milestone_ids)
+        self.assertIn("peach_unblocked", milestone_ids)
+        self.assertIn("draft_mode_approved", milestone_ids)

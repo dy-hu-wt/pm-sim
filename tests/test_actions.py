@@ -120,7 +120,7 @@ class ToolActionTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("not visible", result["error"])
 
-    def test_decision_record_evidence_requires_approval_and_complete_content(self) -> None:
+    def test_decision_record_milestone_requires_approval_and_complete_content(self) -> None:
         early = update_doc(
             self.db_path,
             "doc_launch_decision_record",
@@ -293,9 +293,9 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         try:
             evidence = conn.execute(
                 """
-                SELECT evidence_key
-                FROM evaluation_evidence
-                WHERE evidence_key = 'security_doc_found'
+                SELECT milestone_id
+                FROM milestones
+                WHERE milestone_id = 'security_doc_found'
                 """
             ).fetchone()
         finally:
@@ -376,11 +376,11 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         events = event_log(self.db_path, limit=20)
         conn = connect(self.db_path)
         try:
-            evidence_count = conn.execute(
+            milestone_count = conn.execute(
                 """
                 SELECT COUNT(*) AS count
-                FROM evaluation_evidence
-                WHERE evidence_key = 'stakeholder_alignment'
+                FROM milestones
+                WHERE milestone_id = 'stakeholder_alignment'
                 """
             ).fetchone()["count"]
         finally:
@@ -391,7 +391,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertEqual(result["time_cost"]["to"], "2026-06-22T09:10:00")
         self.assertEqual(observe(self.db_path)["current_time"], "2026-06-22T09:10:00")
         self.assertEqual(result["applied_effects"], [])
-        self.assertEqual(evidence_count, 0)
+        self.assertEqual(milestone_count, 0)
         self.assertEqual(len(result["scheduled_reply_ids"]), 1)
         reply_events = [event for event in events if event["event_type"] == "coworker_reply"]
         self.assertEqual(len(reply_events), 1)
@@ -419,9 +419,9 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         try:
             evidence = conn.execute(
                 """
-                SELECT evidence_key, note
-                FROM evaluation_evidence
-                WHERE evidence_key = 'stakeholder_alignment'
+                SELECT milestone_id, note
+                FROM milestones
+                WHERE milestone_id = 'stakeholder_alignment'
                 """
             ).fetchone()
         finally:
@@ -516,7 +516,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertTrue(loads(row["value_json"]))
         self.assertIn(
             "customer_message_ready",
-            {evidence["key"] for evidence in stakeholder_component["evidence"]},
+            {evidence["key"] for evidence in stakeholder_component["milestones"]},
         )
 
     def test_guessed_customer_message_before_discovery_is_not_customer_ready(self) -> None:
@@ -533,9 +533,9 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         try:
             evidence = conn.execute(
                 """
-                SELECT evidence_key
-                FROM evaluation_evidence
-                WHERE evidence_key = 'customer_message_ready'
+                SELECT milestone_id
+                FROM milestones
+                WHERE milestone_id = 'customer_message_ready'
                 """
             ).fetchone()
             coworker_state = conn.execute(
@@ -559,7 +559,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertEqual(result["applied_effects"], [])
         self.assertIsNone(evidence)
         self.assertFalse(loads(coworker_state["value_json"]))
-        self.assertIn("customer_message_ready", stakeholder_component["missing_evidence"])
+        self.assertIn("customer_message_ready", stakeholder_component["missing_milestones"])
         self.assertEqual(stakeholder_component["earned"], 0)
 
     def test_security_answer_email_before_daisy_question_does_not_score(self) -> None:
@@ -577,9 +577,9 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         try:
             evidence = conn.execute(
                 """
-                SELECT evidence_key, note
-                FROM evaluation_evidence
-                WHERE evidence_key = 'security_question_answered'
+                SELECT milestone_id, note
+                FROM milestones
+                WHERE milestone_id = 'security_question_answered'
                 """
             ).fetchone()
         finally:
@@ -591,7 +591,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         )
         self.assertIsNone(evidence)
 
-    def test_security_answer_email_records_security_question_evidence_after_daisy_asks(self) -> None:
+    def test_security_answer_email_records_security_question_milestone_after_daisy_asks(self) -> None:
         advance_time(self.db_path, "to:2026-06-24T14:00:00")
         send_chat(
             self.db_path,
@@ -631,7 +631,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         )
         evidence = next(
             item
-            for item in security_component["evidence"]
+            for item in security_component["milestones"]
             if item["key"] == "security_question_answered"
         )
 
@@ -680,6 +680,40 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertFalse(result["ok"])
         self.assertIn("at least 10 minutes", result["error"])
         self.assertFalse(any(event["event_type"] == "meeting_occurs" for event in events))
+
+    def test_schedule_meeting_rejects_unavailable_attendee_window(self) -> None:
+        result = schedule_meeting(
+            self.db_path,
+            "Too-early risk review",
+            "2026-06-22T09:00:00",
+            "2026-06-22T09:30:00",
+            ["luigi"],
+        )
+        events = event_log(self.db_path, limit=20)
+
+        self.assertFalse(result["ok"])
+        self.assertIn("luigi is not available", result["error"])
+        self.assertFalse(any(event["event_type"] == "meeting_occurs" for event in events))
+
+    def test_schedule_meeting_rejects_attendee_calendar_conflict(self) -> None:
+        first = schedule_meeting(
+            self.db_path,
+            "Draft-mode risk review",
+            "2026-06-22T10:00:00",
+            "2026-06-22T10:30:00",
+            ["luigi", "daisy"],
+        )
+        second = schedule_meeting(
+            self.db_path,
+            "Overlapping launch review",
+            "2026-06-22T10:15:00",
+            "2026-06-22T10:45:00",
+            ["luigi", "toad"],
+        )
+
+        self.assertTrue(first["ok"])
+        self.assertFalse(second["ok"])
+        self.assertIn("already has a meeting", second["error"])
 
     def test_action_time_cost_delivers_events_crossed_during_work(self) -> None:
         advance_time(self.db_path, "to:2026-06-24T13:55:00")

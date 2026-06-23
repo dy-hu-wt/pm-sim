@@ -77,14 +77,15 @@ def semantic_match(
         return {"matches": True, "mode": "none", "required": [], "forbidden": []}
 
     _load_dotenv()
-    cache_key = _cache_key(text, criteria, rule_id)
+    mode = os.environ.get("PM_SIM_SEMANTIC_MATCHER", "deterministic").lower()
+    model = _semantic_model() if mode == "llm" else None
+    cache_key = _cache_key(text, criteria, rule_id, mode=mode, model=model)
     cache = _load_cache(conn)
     if cache_key in cache:
         return dict(cache[cache_key])
 
-    mode = os.environ.get("PM_SIM_SEMANTIC_MATCHER", "llm").lower()
     if mode == "llm":
-        result = _safe_llm_match(text, criteria)
+        result = _safe_llm_match(text, criteria, model=model)
     else:
         result = _deterministic_match(text, criteria)
 
@@ -108,7 +109,7 @@ def _deterministic_match(text: str, criteria: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _llm_match(text: str, criteria: dict[str, Any]) -> dict[str, Any]:
+def _llm_match(text: str, criteria: dict[str, Any], *, model: str | None = None) -> dict[str, Any]:
     try:
         from openai import OpenAI
     except ImportError as exc:
@@ -118,7 +119,7 @@ def _llm_match(text: str, criteria: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("PM_SIM_SEMANTIC_MATCHER=llm requires OPENAI_API_KEY.")
 
     client = OpenAI()
-    model = os.environ.get("PM_SIM_SEMANTIC_MODEL") or os.environ.get("OPENAI_MODEL") or DEFAULT_MODEL
+    model = model or _semantic_model()
     prompt = {
         "task": "Decide whether the message satisfies the required semantic criteria without satisfying forbidden criteria. Return strict JSON only.",
         "message": text,
@@ -152,13 +153,19 @@ def _llm_match(text: str, criteria: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _safe_llm_match(text: str, criteria: dict[str, Any]) -> dict[str, Any]:
+def _safe_llm_match(
+    text: str,
+    criteria: dict[str, Any],
+    *,
+    model: str | None = None,
+) -> dict[str, Any]:
     try:
-        return _llm_match(text, criteria)
+        return _llm_match(text, criteria, model=model)
     except Exception as exc:
         return {
             "matches": False,
             "mode": "llm",
+            "model": model or _semantic_model(),
             "error": f"{type(exc).__name__}: {exc}",
             "required": [],
             "forbidden": [],
@@ -220,13 +227,30 @@ def _normalize(value: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", value.lower()))
 
 
-def _cache_key(text: str, criteria: dict[str, Any], rule_id: str) -> str:
+def _cache_key(
+    text: str,
+    criteria: dict[str, Any],
+    rule_id: str,
+    *,
+    mode: str,
+    model: str | None,
+) -> str:
     payload = json.dumps(
-        {"rule_id": rule_id, "criteria": criteria, "text": text},
+        {
+            "rule_id": rule_id,
+            "criteria": criteria,
+            "text": text,
+            "mode": mode,
+            "model": model,
+        },
         sort_keys=True,
         separators=(",", ":"),
     )
     return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _semantic_model() -> str:
+    return os.environ.get("PM_SIM_SEMANTIC_MODEL") or os.environ.get("OPENAI_MODEL") or DEFAULT_MODEL
 
 
 def _load_cache(conn: sqlite3.Connection) -> dict[str, Any]:

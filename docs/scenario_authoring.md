@@ -210,7 +210,7 @@ Meetings should be useful but not magical. They must be at least 10 minutes long
 
 `evaluation.yaml` should describe outcomes, not reward busywork. The evaluator should not score a message just because it contains the right words. It should score state that changed after the agent had enough information to act responsibly.
 
-Use `grading_rules` for important communications. A grading rule has four parts: prerequisites, the action to recognize, the state mutation, and the evidence derived from that state.
+Use `grading_rules` for important communications. A grading rule has four parts: prerequisites, the action to recognize, the state mutation, and the milestone derived from that state.
 
 ```yaml
 grading_rules:
@@ -250,18 +250,18 @@ grading_rules:
       person_id: daisy
       key: customer_update_received
       value: true
-    evidence:
+    milestone:
       key: customer_message_ready
       note: Daisy received grounded customer-ready launch wording.
 ```
 
 This rule is causal. The agent must discover the risk and get the decision before the email can update Daisy's state. The evaluator later scores `customer_message_ready` from Daisy's state, not from the raw email body.
 
-State-derived evidence looks like this:
+State-derived milestones look like this:
 
 ```yaml
-state_evidence_rules:
-  - evidence_key: customer_message_ready
+milestone_rules:
+  - id: customer_message_ready
     note: Daisy has received customer-ready launch wording.
     when:
       - coworker_state:
@@ -274,11 +274,11 @@ state_evidence_rules:
         key: customer_update_received
 ```
 
-Do not directly write scored evidence from an action or event. The validator rejects that for evidence keys used in `evaluation_targets`.
+Do not directly write scored milestones from an action or event. The validator rejects that for milestone ids used in `score_components`.
 
 ```yaml
-# Do not do this for scored evidence.
-- type: add_evaluation_evidence
+# Do not do this for scored milestones.
+- type: record_milestone
   key: customer_message_ready
 ```
 

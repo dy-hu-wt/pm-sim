@@ -476,11 +476,11 @@ class CoreSimulationTests(unittest.TestCase):
         schedule_meeting(
             self.db_path,
             "Late draft-mode risk review for Nimbus launch",
+            "2026-06-25T15:30:00",
             "2026-06-25T16:00:00",
-            "2026-06-25T16:30:00",
             ["luigi", "daisy", "mario", "toad", "peach"],
         )
-        advance_time(self.db_path, "to:2026-06-25T16:30:00")
+        advance_time(self.db_path, "to:2026-06-25T16:00:00")
         self._send_customer_ready_email()
 
         advance_time(self.db_path, "to:2026-06-26T15:00:00")
@@ -508,7 +508,7 @@ class CoreSimulationTests(unittest.TestCase):
                         "fact_id": "fact_draft_mode_approved",
                     },
                     {
-                        "type": "add_evaluation_evidence",
+                        "type": "record_milestone",
                         "key": "stakeholder_alignment",
                         "note": "Test-only customer alignment.",
                     },
@@ -715,7 +715,7 @@ class CoreSimulationTests(unittest.TestCase):
             ),
         )
 
-    def test_timeline_shows_actions_events_messages_and_evidence_in_order(self) -> None:
+    def test_timeline_shows_actions_events_messages_and_milestones_in_order(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
         advance_time(self.db_path, "until_next_event")
 
@@ -728,22 +728,22 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertIn("event_scheduled", kinds)
         self.assertIn("event_delivered", kinds)
         self.assertIn("message", kinds)
-        self.assertIn("evidence", kinds)
+        self.assertIn("milestone", kinds)
 
         delivered = [
             entry
             for entry in entries
             if entry["kind"] == "event_delivered" and entry["event_type"] == "coworker_reply"
         ]
-        evidence = [
+        milestones = [
             entry
             for entry in entries
-            if entry["kind"] == "evidence" and entry["evidence_key"] == "blocker_discovered"
+            if entry["kind"] == "milestone" and entry["milestone_id"] == "blocker_discovered"
         ]
 
         self.assertEqual(len(delivered), 1)
         self.assertTrue(delivered[0]["result"]["applied_effects"])
-        self.assertTrue(evidence)
+        self.assertTrue(milestones)
 
     def test_timeline_filters_by_kind(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
@@ -752,16 +752,16 @@ class CoreSimulationTests(unittest.TestCase):
         actions = timeline(self.db_path, kind="action")
         events = timeline(self.db_path, kind="event")
         messages = timeline(self.db_path, kind="message")
-        evidence = timeline(self.db_path, kind="evidence")
+        milestones = timeline(self.db_path, kind="milestone")
 
         self.assertTrue(actions)
         self.assertTrue(events)
         self.assertTrue(messages)
-        self.assertTrue(evidence)
+        self.assertTrue(milestones)
         self.assertEqual({entry["kind"] for entry in actions}, {"action"})
         self.assertTrue(all(entry["kind"].startswith("event_") for entry in events))
         self.assertEqual({entry["kind"] for entry in messages}, {"message"})
-        self.assertEqual({entry["kind"] for entry in evidence}, {"evidence"})
+        self.assertEqual({entry["kind"] for entry in milestones}, {"milestone"})
 
     def test_static_ui_writes_operator_html(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
@@ -813,7 +813,7 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertTrue(any("agent-prefix" in entry["html"] for entry in log_entries))
         self.assertTrue(any("agent-tool-read" in entry["html"] for entry in log_entries))
 
-    def test_live_ui_inspector_renders_causal_evidence_hooks(self) -> None:
+    def test_live_ui_inspector_renders_causal_milestone_hooks(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
         advance_time(self.db_path, "until_next_event")
 
@@ -823,15 +823,15 @@ class CoreSimulationTests(unittest.TestCase):
             for component in payload["evaluation"]["components"]
             if component["key"] == "blocker_discovery"
         )
-        evidence = blocker_component["evidence"][0]
+        milestone = blocker_component["milestones"][0]
         html = _html()
 
-        self.assertEqual(evidence["key"], "blocker_discovered")
-        self.assertIn("created_at", evidence)
-        self.assertIn("source", evidence)
-        self.assertIn("note", evidence)
-        self.assertIn("evidence-list", html)
-        self.assertIn("evidenceItem", html)
+        self.assertEqual(milestone["key"], "blocker_discovered")
+        self.assertIn("created_at", milestone)
+        self.assertIn("source", milestone)
+        self.assertIn("note", milestone)
+        self.assertIn("milestone-list", html)
+        self.assertIn("milestoneItem", html)
         self.assertIn("Source:", html)
 
     def test_live_ui_keeps_tasks_in_operator_inspector(self) -> None:

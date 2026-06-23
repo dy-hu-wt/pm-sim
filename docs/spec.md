@@ -83,7 +83,7 @@ They should have:
 - actor behaviors
 - autonomous actor policies
 
-Coworker behavior should be autonomous enough to create PM-relevant pressure, but deterministic at the state-transition level. I do not want grading-critical facts to depend on an LLM improvising.
+Coworker behavior should be autonomous enough to create PM-relevant pressure, but deterministic at the state-transition level. Direct replies are not just first-match rules: the coworker decision step loads actor memory, goals, workload, commitments, visible facts, and project decisions; turns matched behaviors and agenda constraints into candidates; ranks them; and composes a delayed response. I do not want grading-critical facts to depend on an LLM improvising.
 
 An LLM could later help turn a known fact into more natural wording, but it should not decide the fact.
 

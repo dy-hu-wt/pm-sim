@@ -291,7 +291,7 @@ p { margin: 0 0 8px; }
   background: #f2f7ff;
 }
 .calendar-card.event { border-left-color: var(--purple); }
-.calendar-card.evidence { border-left-color: var(--good); }
+.calendar-card.milestone { border-left-color: var(--good); }
 .calendar-card.message { border-left-color: var(--warn); }
 .calendar-time { color: var(--muted); font-size: 11px; font-weight: 800; }
 .calendar-title { font-weight: 800; margin-top: 2px; }
@@ -443,7 +443,7 @@ def _summary_cards(evaluation: dict[str, Any], final_outcome: dict[str, Any]) ->
     return (
         '<div class="stat-grid">'
         + _card("Score", f"{evaluation.get('score')} / {evaluation.get('max_score')}", "good" if status == "passed" else "warn")
-        + _card("Evidence Found", str(evaluation.get("evidence_count", 0)))
+        + _card("Milestones", str(evaluation.get("milestone_count", 0)))
         + _card("Outcome", outcome_title)
         + _card("Status", status, "good" if status == "passed" else "warn")
         + "</div>"
@@ -700,8 +700,8 @@ def _calendar_title(entry: dict[str, Any]) -> str:
         return _human_label(action_type)
     if kind == "event_delivered":
         return _human_event(entry.get("event_type"))
-    if kind == "evidence":
-        return "Evidence recorded"
+    if kind == "milestone":
+        return "Milestone recorded"
     if kind == "message":
         return f"{_person_name(entry.get('sender_id'))} sent {entry.get('channel')}"
     return _human_label(entry.get("title"))
@@ -723,8 +723,8 @@ def _calendar_detail(entry: dict[str, Any]) -> str:
         return _h(_human_label(action_type))
     if kind == "event_delivered":
         return _h(_human_event_detail(entry))
-    if kind == "evidence":
-        return _h(f"{_human_label(entry.get('evidence_key'))}: {entry.get('note', '')}")
+    if kind == "milestone":
+        return _h(f"{_human_label(entry.get('milestone_id'))}: {entry.get('note', '')}")
     if kind == "message":
         return _h(_short_text(entry.get("body", ""), 120))
     return _h(entry.get("title", ""))

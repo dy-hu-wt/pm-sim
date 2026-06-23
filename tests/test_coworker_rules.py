@@ -87,6 +87,182 @@ class ActorBehaviorTests(unittest.TestCase):
         self.assertIn("email as the source of truth", replies[0].body)
         self.assertEqual(replies[0].effects, ())
 
+    def test_coworker_combines_multiple_matched_concerns(self) -> None:
+        behaviors = [
+            {
+                "id": "luigi_risk_answer",
+                "kind": "reply",
+                "person_id": "luigi",
+                "channel": "chat",
+                "priority": 100,
+                "match": {
+                    "mode": "deterministic",
+                    "intents": [
+                        {
+                            "id": "risk",
+                            "description": "Agent asks about risk.",
+                            "signals": ["risk"],
+                        }
+                    ],
+                    "require_all": ["risk"],
+                },
+                "reply": {"delay_minutes": 20, "body": "Repo sync risk exists."},
+                "effects": [{"type": "discover_fact", "fact_id": "fact_repo_sync_stale"}],
+            },
+            {
+                "id": "luigi_security_answer",
+                "kind": "reply",
+                "person_id": "luigi",
+                "channel": "chat",
+                "priority": 90,
+                "match": {
+                    "mode": "deterministic",
+                    "intents": [
+                        {
+                            "id": "security",
+                            "description": "Agent asks about security.",
+                            "signals": ["security"],
+                        }
+                    ],
+                    "require_all": ["security"],
+                },
+                "reply": {"delay_minutes": 10, "body": "Use the security baseline."},
+                "effects": [{"type": "reveal_doc", "doc_id": "doc_private_repo_security_baseline"}],
+            },
+        ]
+
+        replies = replies_for_chat(
+            "luigi",
+            "Can you cover repo risk and security?",
+            {"actor_behaviors": behaviors, "response_delays": {"luigi": 120}},
+        )
+
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(replies[0].delay_minutes, 20)
+        self.assertIn("Repo sync risk exists.", replies[0].body)
+        self.assertIn("Use the security baseline.", replies[0].body)
+        self.assertEqual(
+            replies[0].matched_rule_ids,
+            ("luigi_risk_answer", "luigi_security_answer"),
+        )
+        self.assertEqual({effect["type"] for effect in replies[0].effects}, {"discover_fact", "reveal_doc"})
+
+    def test_coworker_does_not_combine_generic_fallback_with_specific_reply(self) -> None:
+        behaviors = [
+            {
+                "id": "specific",
+                "kind": "reply",
+                "person_id": "luigi",
+                "channel": "chat",
+                "priority": 100,
+                "match": {
+                    "mode": "deterministic",
+                    "intents": [
+                        {"id": "risk", "description": "Risk question.", "signals": ["risk"]}
+                    ],
+                },
+                "reply": {"delay_minutes": 10, "body": "Specific risk answer."},
+            },
+            {
+                "id": "fallback",
+                "kind": "reply",
+                "person_id": "luigi",
+                "channel": "chat",
+                "priority": 0,
+                "match": {"mode": "deterministic"},
+                "reply": {"delay_minutes": 10, "body": "Generic fallback."},
+            },
+        ]
+
+        replies = replies_for_chat(
+            "luigi",
+            "risk?",
+            {"actor_behaviors": behaviors, "response_delays": {"luigi": 120}},
+        )
+
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(replies[0].body, "Specific risk answer.")
+
+    def test_actor_planner_combines_matched_reply_with_capacity_constraint(self) -> None:
+        behaviors = [
+            {
+                "id": "luigi_risk_answer",
+                "kind": "reply",
+                "person_id": "luigi",
+                "channel": "chat",
+                "priority": 100,
+                "match": {
+                    "mode": "deterministic",
+                    "intents": [
+                        {"id": "risk", "description": "Risk question.", "signals": ["risk"]}
+                    ],
+                },
+                "reply": {"delay_minutes": 20, "body": "Repo sync risk exists."},
+            },
+        ]
+
+        replies = replies_for_chat(
+            "luigi",
+            "Can you explain the risk and can you implement the export today?",
+            {
+                "actor_behaviors": behaviors,
+                "response_delays": {"luigi": 120},
+                "actor_workload": {
+                    "luigi": {
+                        "current_focus": "repo sync hardening",
+                        "load_level": "overloaded",
+                        "capacity_minutes_remaining": 0,
+                    }
+                },
+            },
+        )
+
+        self.assertEqual(len(replies), 1)
+        self.assertIn("Repo sync risk exists.", replies[0].body)
+        self.assertIn("I am at capacity on repo sync hardening", replies[0].body)
+        self.assertIn("agenda_capacity_constraint", replies[0].matched_rule_ids)
+
+    def test_actor_planner_references_open_commitment_memory(self) -> None:
+        replies = replies_for_chat(
+            "daisy",
+            "What is happening with the Koopa scoped answer?",
+            {
+                "actor_behaviors": [],
+                "response_delays": {"daisy": 45},
+                "actor_commitments": [
+                    {
+                        "id": "commitment_daisy_koopa_scoped_answer",
+                        "person_id": "daisy",
+                        "description": "Send Koopa a scoped audit export answer.",
+                        "status": "open",
+                    }
+                ],
+            },
+        )
+
+        self.assertEqual(len(replies), 1)
+        self.assertIn("open commitment", replies[0].body)
+        self.assertIn("Koopa", replies[0].body)
+        self.assertIn(
+            "agenda_commitment_commitment_daisy_koopa_scoped_answer",
+            replies[0].matched_rule_ids,
+        )
+
+    def test_actor_planner_challenges_message_that_contradicts_recorded_decision(self) -> None:
+        replies = replies_for_chat(
+            "toad",
+            "Let's switch back to auto-commenting for Friday.",
+            {
+                "actor_behaviors": [],
+                "response_delays": {"toad": 90},
+                "project_decisions": {"project_pr_review_agent": "draft_mode_approved"},
+            },
+        )
+
+        self.assertEqual(len(replies), 1)
+        self.assertIn("conflicts with the recorded draft-mode decision", replies[0].body)
+        self.assertIn("agenda_contradicts_draft_decision", replies[0].matched_rule_ids)
+
     def test_luigi_repeat_risk_reply_does_not_duplicate_discovery_effects(self) -> None:
         replies = replies_for_chat(
             "luigi",

@@ -362,19 +362,19 @@ def _discovered_fact_ids(conn: sqlite3.Connection) -> set[str]:
 def _meeting_state(conn: sqlite3.Connection) -> dict[str, Any]:
     return {
         "discovered_facts": sorted(_discovered_fact_ids(conn)),
-        "evidence_keys": sorted(_evidence_keys(conn)),
+        "milestone_ids": sorted(_milestone_ids(conn)),
         "meeting_rules": meeting_rules(conn),
     }
 
 
-def _evidence_keys(conn: sqlite3.Connection) -> set[str]:
+def _milestone_ids(conn: sqlite3.Connection) -> set[str]:
     rows = conn.execute(
         """
-        SELECT DISTINCT evidence_key
-        FROM evaluation_evidence
+        SELECT DISTINCT milestone_id
+        FROM milestones
         """
     ).fetchall()
-    return {row["evidence_key"] for row in rows}
+    return {row["milestone_id"] for row in rows}
 
 
 def _next_action_number(conn: sqlite3.Connection) -> int:

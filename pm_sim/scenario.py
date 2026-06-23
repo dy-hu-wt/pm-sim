@@ -23,6 +23,7 @@ def load_scenario(path: Path | str) -> dict[str, Any]:
 
     data = _normalize_author_references(_load_scenario_data(scenario_path))
     data = _compile_grading_rules(data)
+    data = _compile_behaviors(data)
     _validate_scenario(data, scenario_path)
     return data
 
@@ -74,11 +75,11 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
         for rule in grading_rules
         if isinstance(rule, dict)
     }
-    generated_evidence_keys = {
+    generated_milestone_keys = {
         _required_string(
-            _required_object(rule, "evidence", f"grading rule {rule.get('id')}"),
+            _required_object(rule, "milestone", f"grading rule {rule.get('id')}"),
             "key",
-            f"grading rule {rule.get('id')} evidence",
+            f"grading rule {rule.get('id')} milestone",
         )
         for rule in grading_rules
         if isinstance(rule, dict)
@@ -88,10 +89,10 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
         for rule in compiled.get("action_rules", [])
         if rule.get("id") not in generated_action_ids
     ]
-    state_evidence_rules = [
+    milestone_rules = [
         rule
-        for rule in compiled.get("state_evidence_rules", [])
-        if rule.get("evidence_key") not in generated_evidence_keys
+        for rule in compiled.get("milestone_rules", [])
+        if rule.get("id") not in generated_milestone_keys
     ]
     for rule in grading_rules:
         if not isinstance(rule, dict):
@@ -102,7 +103,7 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
         rule_id = _required_string(rule, "id", "grading rule")
         action = _required_object(rule, "action", f"grading rule {rule_id}")
         state = _required_object(rule, "state", f"grading rule {rule_id}")
-        evidence = _required_object(rule, "evidence", f"grading rule {rule_id}")
+        milestone = _required_object(rule, "milestone", f"grading rule {rule_id}")
 
         action_type = _required_string(action, "type", f"grading rule {rule_id} action")
         recipient_id = _required_string(
@@ -114,8 +115,8 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
         key = _required_string(state, "key", f"grading rule {rule_id} state")
         if "value" not in state:
             raise ScenarioError(f"grading rule {rule_id} state must include value.")
-        evidence_key = _required_string(evidence, "key", f"grading rule {rule_id} evidence")
-        note = _required_string(evidence, "note", f"grading rule {rule_id} evidence")
+        milestone_key = _required_string(milestone, "key", f"grading rule {rule_id} milestone")
+        note = _required_string(milestone, "note", f"grading rule {rule_id} milestone")
 
         action_rules.append(
             {
@@ -136,9 +137,9 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
                 ],
             }
         )
-        state_evidence_rules.append(
+        milestone_rules.append(
             {
-                "evidence_key": evidence_key,
+                "id": milestone_key,
                 "note": note,
                 "when": [
                     {
@@ -159,73 +160,179 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
         )
 
     compiled["action_rules"] = action_rules
-    compiled["state_evidence_rules"] = state_evidence_rules
+    compiled["milestone_rules"] = milestone_rules
+    return compiled
+
+
+def _compile_behaviors(data: dict[str, Any]) -> dict[str, Any]:
+    behaviors = data.get("behaviors", [])
+    if not behaviors:
+        return data
+    if not isinstance(behaviors, list):
+        raise ScenarioError("behaviors must be a list.")
+
+    compiled = copy_object(data)
+    actor_behaviors = list(compiled.get("actor_behaviors", []))
+    event_rules = list(compiled.get("event_rules", []))
+    meeting_rules = list(compiled.get("meeting_rules", []))
+    action_rules = list(compiled.get("action_rules", []))
+    seen = set()
+
+    for behavior in behaviors:
+        if not isinstance(behavior, dict):
+            raise ScenarioError("behaviors entries must be objects.")
+        behavior_id = behavior.get("id")
+        if not isinstance(behavior_id, str) or not behavior_id:
+            raise ScenarioError("Behavior must have a string id.")
+        if behavior_id in seen:
+            raise ScenarioError(f"Behaviors have duplicate id: {behavior_id}")
+        seen.add(behavior_id)
+
+        kind = behavior.get("kind")
+        row = {key: value for key, value in behavior.items() if key != "kind"}
+        if kind in {"reply", "policy"}:
+            row["kind"] = kind
+            actor_behaviors.append(row)
+        elif kind == "event":
+            event_rules.append(row)
+        elif kind == "meeting":
+            meeting_rules.append(row)
+        elif kind == "action":
+            action_rules.append(row)
+        else:
+            raise ScenarioError(f"Behavior {behavior_id} has unsupported kind: {kind}")
+
+    compiled.pop("behaviors", None)
+    compiled["actor_behaviors"] = actor_behaviors
+    compiled["event_rules"] = event_rules
+    compiled["meeting_rules"] = meeting_rules
+    compiled["action_rules"] = action_rules
     return compiled
 
 
 def _normalize_author_references(data: dict[str, Any]) -> dict[str, Any]:
     normalized = copy_object(data)
-    task_aliases = _task_aliases(normalized.get("tasks", []))
-    if task_aliases:
-        _canonicalize_task_ids(normalized.get("tasks", []), task_aliases)
-        _rewrite_task_references(normalized, task_aliases)
+    aliases = _resource_aliases(normalized)
+    _canonicalize_resource_ids(normalized, aliases)
+    _rewrite_resource_references(normalized, aliases)
     return normalized
 
 
-def _task_aliases(tasks: list[dict[str, Any]]) -> dict[str, str]:
+RESOURCE_PREFIXES = {
+    "projects": "project_",
+    "facts": "fact_",
+    "blockers": "blocker_",
+    "docs": "doc_",
+    "tasks": "task_",
+}
+
+RESOURCE_REF_KEYS = {
+    "project_id": "projects",
+    "fact_id": "facts",
+    "fact_discovered": "facts",
+    "fact_ids": "facts",
+    "private_fact_ids": "facts",
+    "required_facts": "facts",
+    "required_facts_any": "facts",
+    "absent_facts": "facts",
+    "blocker_id": "blockers",
+    "blocked_by": "blockers",
+    "doc_id": "docs",
+    "task_id": "tasks",
+    "upstream_task_id": "tasks",
+    "downstream_task_id": "tasks",
+}
+
+CONDITION_REF_SECTIONS = {
+    "project_decision": "projects",
+    "blocker_status": "blockers",
+    "task_status": "tasks",
+}
+
+
+def _resource_aliases(data: dict[str, Any]) -> dict[str, dict[str, str]]:
+    return {
+        section: _section_aliases(data.get(section, []), prefix)
+        for section, prefix in RESOURCE_PREFIXES.items()
+    }
+
+
+def _section_aliases(items: list[dict[str, Any]], prefix: str) -> dict[str, str]:
     aliases: dict[str, str] = {}
-    for task in tasks:
-        task_id = task.get("id")
-        if not isinstance(task_id, str) or not task_id:
+    for item in items:
+        item_id = item.get("id")
+        if not isinstance(item_id, str) or not item_id:
             continue
-        canonical = task_id if task_id.startswith("task_") else f"task_{task_id}"
-        names = {task_id, canonical}
-        if canonical.startswith("task_"):
-            names.add(canonical.removeprefix("task_"))
+        canonical = item_id if item_id.startswith(prefix) else f"{prefix}{item_id}"
+        names = {item_id, canonical}
+        if canonical.startswith(prefix):
+            names.add(canonical.removeprefix(prefix))
         for key in ("key", "slug", "ref"):
-            value = task.get(key)
+            value = item.get(key)
             if isinstance(value, str) and value:
                 names.add(value)
         for name in names:
             existing = aliases.get(name)
             if existing and existing != canonical:
                 raise ScenarioError(
-                    f"Ambiguous task reference {name!r}: {existing} and {canonical}"
+                    f"Ambiguous scenario reference {name!r}: {existing} and {canonical}"
                 )
             aliases[name] = canonical
     return aliases
 
 
-def _canonicalize_task_ids(tasks: list[dict[str, Any]], aliases: dict[str, str]) -> None:
-    for task in tasks:
-        task_id = task.get("id")
-        if isinstance(task_id, str) and task_id in aliases:
-            task["id"] = aliases[task_id]
+def _canonicalize_resource_ids(
+    data: dict[str, Any],
+    aliases: dict[str, dict[str, str]],
+) -> None:
+    for section, section_aliases in aliases.items():
+        for item in data.get(section, []):
+            item_id = item.get("id")
+            if isinstance(item_id, str) and item_id in section_aliases:
+                item["id"] = section_aliases[item_id]
 
 
-def _rewrite_task_references(value: Any, aliases: dict[str, str]) -> None:
-    task_reference_keys = {"task_id", "upstream_task_id", "downstream_task_id"}
+def _rewrite_resource_references(value: Any, aliases: dict[str, dict[str, str]]) -> None:
     if isinstance(value, list):
         for item in value:
-            _rewrite_task_references(item, aliases)
+            _rewrite_resource_references(item, aliases)
         return
     if not isinstance(value, dict):
         return
     for key, item in value.items():
-        if key in task_reference_keys and isinstance(item, str):
-            value[key] = _resolve_task_reference(item, aliases)
+        section = RESOURCE_REF_KEYS.get(key)
+        if section:
+            value[key] = _resolve_resource_value(item, aliases[section])
             continue
-        if key == "task_status" and isinstance(item, dict):
-            task_id = item.get("id")
-            if isinstance(task_id, str):
-                item["id"] = _resolve_task_reference(task_id, aliases)
-            _rewrite_task_references(item, aliases)
+        condition_section = CONDITION_REF_SECTIONS.get(key)
+        if condition_section and isinstance(item, dict):
+            item_id = item.get("id")
+            if isinstance(item_id, str):
+                item["id"] = _resolve_resource_reference(item_id, aliases[condition_section])
+            project_id = item.get("project_id")
+            if isinstance(project_id, str):
+                item["project_id"] = _resolve_resource_reference(project_id, aliases["projects"])
+            _rewrite_resource_references(item, aliases)
             continue
-        _rewrite_task_references(item, aliases)
+        if key == "first_time_at_or_after" and isinstance(item, dict):
+            fact_id = item.get("fact_id")
+            if isinstance(fact_id, str):
+                item["fact_id"] = _resolve_resource_reference(fact_id, aliases["facts"])
+            _rewrite_resource_references(item, aliases)
+            continue
+        _rewrite_resource_references(item, aliases)
 
 
-def _resolve_task_reference(task_id: str, aliases: dict[str, str]) -> str:
-    return aliases.get(task_id, task_id)
+def _resolve_resource_reference(resource_id: str, aliases: dict[str, str]) -> str:
+    return aliases.get(resource_id, resource_id)
+
+
+def _resolve_resource_value(value: Any, aliases: dict[str, str]) -> Any:
+    if isinstance(value, str):
+        return _resolve_resource_reference(value, aliases)
+    if isinstance(value, list):
+        return [_resolve_resource_value(item, aliases) for item in value]
+    return value
 
 
 def copy_object(data: dict[str, Any]) -> dict[str, Any]:
@@ -388,17 +495,17 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         if project_id and project_id not in projects:
             raise ScenarioError(f"Event {event.get('id')} references unknown project_id: {project_id}")
 
-    for key, target in data.get("evaluation_targets", {}).items():
+    for key, target in data.get("score_components", {}).items():
         points = target.get("points")
         if not isinstance(points, int) or points <= 0:
-            raise ScenarioError(f"Evaluation target {key} must have positive integer points.")
-        evidence_keys = target.get("evidence_keys")
-        if evidence_keys is not None:
-            if not isinstance(evidence_keys, list) or not evidence_keys:
-                raise ScenarioError(f"Evaluation target {key} evidence_keys must be a non-empty list.")
-            invalid = [value for value in evidence_keys if not isinstance(value, str) or not value.strip()]
+            raise ScenarioError(f"Score component {key} must have positive integer points.")
+        milestones = target.get("milestones")
+        if milestones is not None:
+            if not isinstance(milestones, list) or not milestones:
+                raise ScenarioError(f"Score component {key} milestones must be a non-empty list.")
+            invalid = [value for value in milestones if not isinstance(value, str) or not value.strip()]
             if invalid:
-                raise ScenarioError(f"Evaluation target {key} evidence_keys must be non-empty strings.")
+                raise ScenarioError(f"Score component {key} milestones must be non-empty strings.")
 
     response_delays = {
         person["id"]: person.get("response_delay_minutes")
@@ -452,7 +559,7 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         tasks,
         valid_actors,
     )
-    _validate_scored_evidence_is_state_derived(data)
+    _validate_scored_milestones_are_state_derived(data)
     _validate_scripted_policy(data.get("scripted_policy", []), people, docs, tasks)
 
 
@@ -714,7 +821,7 @@ def _validate_meeting_rules(
                         f"Meeting rule {rule_id} references unknown {key} fact: {fact_id}"
                     )
 
-        for key in ("required_evidence", "absent_evidence"):
+        for key in ("required_milestones", "absent_milestones"):
             _validate_string_list(rule.get(key, []), f"Meeting rule {rule_id} {key}")
 
         effects = rule.get("effects", [])
@@ -831,24 +938,24 @@ def _validate_match_spec(spec: dict[str, Any], label: str, *, facts: set[str]) -
                 raise ScenarioError(f"{label} match.{key} references unknown intent: {intent_id}")
 
 
-def _validate_scored_evidence_is_state_derived(data: dict[str, Any]) -> None:
+def _validate_scored_milestones_are_state_derived(data: dict[str, Any]) -> None:
     scored_keys = {
         key
-        for target in data.get("evaluation_targets", {}).values()
-        for key in target.get("evidence_keys", [])
+        for target in data.get("score_components", {}).values()
+        for key in target.get("milestones", [])
     }
     if not scored_keys:
         return
 
     allowed_state_keys = {
-        rule.get("evidence_key")
-        for rule in data.get("state_evidence_rules", [])
+        rule.get("id")
+        for rule in data.get("milestone_rules", [])
         if isinstance(rule, dict)
     }
     missing = sorted(scored_keys - allowed_state_keys)
     if missing:
         raise ScenarioError(
-            "Evaluation evidence keys must be derived from state_evidence_rules: "
+            "Scored milestones must be derived from milestone_rules: "
             + ", ".join(missing)
         )
 
@@ -864,12 +971,12 @@ def _validate_scored_evidence_is_state_derived(data: dict[str, Any]) -> None:
             rule_id = rule.get("id", "<unknown>")
             for effect in rule.get("effects", []):
                 if (
-                    effect.get("type") == "add_evaluation_evidence"
+                    effect.get("type") == "record_milestone"
                     and effect.get("key") in scored_keys
                 ):
                     raise ScenarioError(
-                        f"{section} {rule_id} directly writes scored evidence "
-                        f"{effect.get('key')}; use state mutation plus state_evidence_rules."
+                        f"{section} {rule_id} directly writes scored milestone "
+                        f"{effect.get('key')}; use state mutation plus milestone_rules."
                     )
 
 
@@ -962,6 +1069,9 @@ def _validate_condition(
         raise ScenarioError(
             f"{label} references unknown fact_discovered fact: {condition['fact_discovered']}"
         )
+    if "milestone_exists" in condition:
+        if not isinstance(condition["milestone_exists"], str) or not condition["milestone_exists"]:
+            raise ScenarioError(f"{label} milestone_exists condition must be a non-empty string.")
     if "message_exists" in condition:
         spec = condition["message_exists"]
         if not isinstance(spec, dict):
@@ -1050,10 +1160,10 @@ def _validate_effects(
                 raise ScenarioError(f"{label} references unknown message sender_id: {sender_id}")
             if recipient_id and recipient_id not in valid_actors:
                 raise ScenarioError(f"{label} references unknown message recipient_id: {recipient_id}")
-        if effect_type == "add_evaluation_evidence":
+        if effect_type == "record_milestone":
             key = effect.get("key")
             if not isinstance(key, str) or not key.strip():
-                raise ScenarioError(f"{label} has invalid evaluation evidence key.")
+                raise ScenarioError(f"{label} has invalid milestone key.")
 
 
 def _validate_string_list(values: Any, label: str) -> None:

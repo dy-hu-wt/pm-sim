@@ -33,8 +33,8 @@ def condition_matches(
         return project_id == condition["project_id"]
     if "fact_discovered" in condition:
         return fact_discovered_at(conn, condition["fact_discovered"]) is not None
-    if "evidence_exists" in condition:
-        return first_evidence_time(conn, condition["evidence_exists"]) is not None
+    if "milestone_exists" in condition:
+        return first_milestone_time(conn, condition["milestone_exists"]) is not None
     if "blocker_status" in condition:
         return _blocker_status_matches(conn, condition["blocker_status"])
     if "task_status" in condition:
@@ -104,20 +104,20 @@ def condition_description(conn: sqlite3.Connection, condition: dict[str, Any]) -
             (fact_id,),
         )
         return f"fact {fact_id} discovered (current visible_at={visible_at!r})"
-    if "evidence_exists" in condition:
-        key = condition["evidence_exists"]
+    if "milestone_exists" in condition:
+        key = condition["milestone_exists"]
         created_at = _single_value(
             conn,
             """
             SELECT created_at
-            FROM evaluation_evidence
-            WHERE evidence_key = ?
+            FROM milestones
+            WHERE milestone_id = ?
             ORDER BY created_at, id
             LIMIT 1
             """,
             (key,),
         )
-        return f"evidence {key} exists (current created_at={created_at!r})"
+        return f"milestone {key} exists (current created_at={created_at!r})"
     if "coworker_state" in condition:
         spec = condition["coworker_state"]
         person_id = spec["person_id"]
@@ -185,17 +185,17 @@ def condition_description(conn: sqlite3.Connection, condition: dict[str, Any]) -
 def condition_time(conn: sqlite3.Connection, source: dict[str, Any]) -> str | None:
     if "fact_discovered" in source:
         return fact_discovered_at(conn, source["fact_discovered"])
-    if "evidence" in source:
-        return first_evidence_time(conn, source["evidence"])
+    if "milestone" in source:
+        return first_milestone_time(conn, source["milestone"])
     if "coworker_state" in source:
         spec = source["coworker_state"]
         return coworker_state_updated_at(conn, spec["person_id"], spec["key"])
-    if "first_fact_or_evidence" in source:
-        spec = source["first_fact_or_evidence"]
-        return first_fact_or_evidence_time(
+    if "first_fact_or_milestone" in source:
+        spec = source["first_fact_or_milestone"]
+        return first_fact_or_milestone_time(
             conn,
             fact_id=spec.get("fact_id"),
-            evidence_key=spec.get("evidence_key"),
+            milestone_id=spec.get("milestone"),
         )
     raise ValueError(f"Unsupported time source: {source}")
 
@@ -213,31 +213,31 @@ def fact_discovered_at(conn: sqlite3.Connection, fact_id: str) -> str | None:
     return None if row is None else row["visible_at"]
 
 
-def first_evidence_time(conn: sqlite3.Connection, evidence_key: str) -> str | None:
+def first_milestone_time(conn: sqlite3.Connection, milestone_id: str) -> str | None:
     row = conn.execute(
         """
         SELECT created_at
-        FROM evaluation_evidence
-        WHERE evidence_key = ?
+        FROM milestones
+        WHERE milestone_id = ?
         ORDER BY created_at, id
         LIMIT 1
         """,
-        (evidence_key,),
+        (milestone_id,),
     ).fetchone()
     return None if row is None else row["created_at"]
 
 
-def first_fact_or_evidence_time(
+def first_fact_or_milestone_time(
     conn: sqlite3.Connection,
     *,
     fact_id: str | None = None,
-    evidence_key: str | None = None,
+    milestone_id: str | None = None,
 ) -> str | None:
     times = [
         value
         for value in (
             fact_discovered_at(conn, fact_id) if fact_id else None,
-            first_evidence_time(conn, evidence_key) if evidence_key else None,
+            first_milestone_time(conn, milestone_id) if milestone_id else None,
         )
         if value is not None
     ]
@@ -249,8 +249,8 @@ def _first_condition_time(conn: sqlite3.Connection, spec: dict[str, Any]) -> str
         value
         for value in (
             fact_discovered_at(conn, spec.get("fact_id")) if spec.get("fact_id") else None,
-            first_evidence_time(conn, spec.get("evidence_key"))
-            if spec.get("evidence_key")
+            first_milestone_time(conn, spec.get("milestone"))
+            if spec.get("milestone")
             else None,
             condition_time(conn, {"coworker_state": spec["coworker_state"]})
             if "coworker_state" in spec

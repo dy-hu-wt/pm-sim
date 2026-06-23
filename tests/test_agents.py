@@ -141,7 +141,7 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertIn(str(self.db_path), output.getvalue())
         self.assertTrue(self.db_path.exists())
 
-    def test_run_agent_summary_prints_missing_evidence(self) -> None:
+    def test_run_agent_summary_prints_missing_milestones(self) -> None:
         reset(self.db_path, DEFAULT_SCENARIO_PATH)
         result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
 

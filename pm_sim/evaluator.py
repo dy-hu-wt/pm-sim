@@ -18,18 +18,18 @@ def evaluate(
     scenario_path: Path | str = DEFAULT_SCENARIO_PATH,
 ) -> dict[str, Any]:
     scenario = load_scenario(scenario_path)
-    targets = scenario.get("evaluation_targets", {})
+    targets = scenario.get("score_components", {})
 
     conn = connect(db_path)
     try:
-        evidence = _load_evidence(conn) + _load_state_evidence(conn, scenario)
-        evidence.sort(key=lambda item: (item["created_at"], item["evidence_key"], item["source"]))
+        milestones = _load_milestone_records(conn) + _load_state_milestones(conn, scenario)
+        milestones.sort(key=lambda item: (item["created_at"], item["milestone_id"], item["source"]))
         components = []
         for key, target in targets.items():
             if key == "avoid_harmful_actions":
                 components.append(_score_harmful_actions(conn, key, target))
             else:
-                components.append(_score_evidence_component(conn, scenario, key, target, evidence))
+                components.append(_score_milestone_component(conn, scenario, key, target, milestones))
 
         score = round(sum(component["earned"] for component in components), 2)
         max_score = sum(component["points"] for component in components)
@@ -39,42 +39,43 @@ def evaluate(
             "score": score,
             "max_score": max_score,
             "final_outcome": _final_outcome(conn),
+            "state_delta": _state_delta(conn, scenario),
             "components": components,
-            "evidence_count": len(evidence),
+            "milestone_count": len(milestones),
             "baseline": scenario.get("baseline", {}),
         }
     finally:
         conn.close()
 
 
-def _load_evidence(conn) -> list[dict[str, Any]]:
+def _load_milestone_records(conn) -> list[dict[str, Any]]:
     return rows_to_dicts(
         conn.execute(
             """
-            SELECT id, evidence_key, note, created_at, source, metadata_json
-            FROM evaluation_evidence
+            SELECT id, milestone_id, note, created_at, source, metadata_json
+            FROM milestones
             ORDER BY created_at, id
             """
         ).fetchall()
     )
 
 
-def _load_state_evidence(conn, scenario: dict[str, Any]) -> list[dict[str, Any]]:
-    evidence = []
-    for rule in scenario.get("state_evidence_rules", []):
+def _load_state_milestones(conn, scenario: dict[str, Any]) -> list[dict[str, Any]]:
+    milestones = []
+    for rule in scenario.get("milestone_rules", []):
         if not all_conditions_match(conn, rule.get("when", [])):
             continue
         created_at = condition_time(conn, rule["created_at"])
         if created_at is None:
             continue
-        evidence.append(_state_evidence(rule["evidence_key"], rule["note"], created_at))
-    return evidence
+        milestones.append(_state_milestone(rule["id"], rule["note"], created_at))
+    return milestones
 
 
-def _state_evidence(key: str, note: str, created_at: str) -> dict[str, Any]:
+def _state_milestone(key: str, note: str, created_at: str) -> dict[str, Any]:
     return {
         "id": f"state:{key}:{created_at}",
-        "evidence_key": key,
+        "milestone_id": key,
         "note": note,
         "created_at": created_at,
         "source": "evaluator:state",
@@ -82,29 +83,29 @@ def _state_evidence(key: str, note: str, created_at: str) -> dict[str, Any]:
     }
 
 
-def _score_evidence_component(
+def _score_milestone_component(
     conn,
     scenario: dict[str, Any],
     key: str,
     target: dict[str, Any],
-    evidence: list[dict[str, Any]],
+    milestones: list[dict[str, Any]],
 ) -> dict[str, Any]:
     points = float(target.get("points", 0))
-    expected_keys = target.get("evidence_keys", [])
+    expected_keys = target.get("milestones", [])
     if not expected_keys:
-        return _component(key, points, 0, "No evidence keys configured.", [], [], [])
+        return _component(key, points, 0, "No milestones configured.", [], [], [])
 
     per_key_points = points / len(expected_keys)
     preferred_before = target.get("preferred_before")
     earned = 0.0
-    used_evidence = []
+    used_milestones = []
     missing = []
     late = []
 
-    for evidence_key in expected_keys:
-        matches = [item for item in evidence if item["evidence_key"] == evidence_key]
+    for milestone_id in expected_keys:
+        matches = [item for item in milestones if item["milestone_id"] == milestone_id]
         if not matches:
-            missing.append(evidence_key)
+            missing.append(milestone_id)
             continue
 
         on_time = [
@@ -112,22 +113,22 @@ def _score_evidence_component(
         ]
         if on_time:
             earned += per_key_points
-            used_evidence.append(_public_evidence(on_time[0], "on_time"))
+            used_milestones.append(_public_milestone(on_time[0], "on_time"))
         else:
             earned += per_key_points * LATE_CREDIT
-            late.append(evidence_key)
-            used_evidence.append(_public_evidence(matches[0], "late"))
+            late.append(milestone_id)
+            used_milestones.append(_public_milestone(matches[0], "late"))
 
     notes = []
     if missing:
-        notes.append(f"Missing evidence: {', '.join(missing)}.")
+        notes.append(f"Missing milestones: {', '.join(missing)}.")
     if late:
-        notes.append(f"Late evidence: {', '.join(late)}.")
+        notes.append(f"Late milestones: {', '.join(late)}.")
     if not notes:
-        notes.append("Required evidence is present.")
+        notes.append("Required milestones are present.")
 
-    failed_gates = _failed_gates_for_missing_evidence(conn, scenario, missing)
-    return _component(key, points, earned, " ".join(notes), used_evidence, missing, failed_gates)
+    failed_gates = _failed_gates_for_missing_milestones(conn, scenario, missing)
+    return _component(key, points, earned, " ".join(notes), used_milestones, missing, failed_gates)
 
 
 def _score_harmful_actions(conn, key: str, target: dict[str, Any]) -> dict[str, Any]:
@@ -155,7 +156,7 @@ def _score_harmful_actions(conn, key: str, target: dict[str, Any]) -> dict[str, 
     return component
 
 
-def _failed_gates_for_missing_evidence(
+def _failed_gates_for_missing_milestones(
     conn,
     scenario: dict[str, Any],
     missing_keys: list[str],
@@ -165,18 +166,18 @@ def _failed_gates_for_missing_evidence(
 
     gates = []
     state_rules = {
-        rule.get("evidence_key"): rule
-        for rule in scenario.get("state_evidence_rules", [])
+        rule.get("id"): rule
+        for rule in scenario.get("milestone_rules", [])
         if isinstance(rule, dict)
     }
     grading_rules = {
-        (rule.get("evidence") or {}).get("key"): rule
+        (rule.get("milestone") or {}).get("key"): rule
         for rule in scenario.get("grading_rules", [])
         if isinstance(rule, dict)
     }
-    for evidence_key in missing_keys:
+    for milestone_id in missing_keys:
         checks = []
-        state_rule = state_rules.get(evidence_key)
+        state_rule = state_rules.get(milestone_id)
         if state_rule:
             checks.extend(
                 failed_condition_descriptions(
@@ -186,7 +187,7 @@ def _failed_gates_for_missing_evidence(
                 )
             )
 
-        grading_rule = grading_rules.get(evidence_key)
+        grading_rule = grading_rules.get(milestone_id)
         if grading_rule:
             failed_requires = failed_condition_descriptions(
                 conn,
@@ -202,7 +203,7 @@ def _failed_gates_for_missing_evidence(
                 )
 
         if checks:
-            gates.append({"evidence_key": evidence_key, "failed": checks})
+            gates.append({"milestone": milestone_id, "failed": checks})
     return gates
 
 
@@ -263,12 +264,131 @@ def _final_outcome(conn) -> dict[str, Any] | None:
     return None
 
 
+def _state_delta(conn, scenario: dict[str, Any]) -> list[dict[str, Any]]:
+    deltas = []
+    deltas.extend(_project_deltas(conn, scenario))
+    deltas.extend(_blocker_deltas(conn, scenario))
+    deltas.extend(_task_deltas(conn, scenario))
+    deltas.extend(_coworker_state_deltas(conn, scenario))
+    return deltas
+
+
+def _project_deltas(conn, scenario: dict[str, Any]) -> list[dict[str, Any]]:
+    initial = {project["id"]: project for project in scenario.get("projects", [])}
+    rows = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT id, status, risk_level, metadata_json
+            FROM projects
+            ORDER BY id
+            """
+        ).fetchall()
+    )
+    deltas = []
+    for row in rows:
+        before = initial.get(row["id"], {})
+        before_decision = before.get("decision")
+        after_metadata = loads(row["metadata_json"], {})
+        after_decision = after_metadata.get("decision")
+        changes = {}
+        for field in ("status", "risk_level"):
+            if before.get(field) != row.get(field):
+                changes[field] = {"from": before.get(field), "to": row.get(field)}
+        if before_decision != after_decision:
+            changes["decision"] = {"from": before_decision, "to": after_decision}
+        if after_metadata.get("final_outcome"):
+            changes["final_outcome"] = {"from": None, "to": after_metadata.get("final_outcome")}
+        if changes:
+            deltas.append({"type": "project", "id": row["id"], "changes": changes})
+    return deltas
+
+
+def _blocker_deltas(conn, scenario: dict[str, Any]) -> list[dict[str, Any]]:
+    initial = {blocker["id"]: blocker for blocker in scenario.get("blockers", [])}
+    rows = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT id, status, visible_at, resolved_at
+            FROM blockers
+            ORDER BY id
+            """
+        ).fetchall()
+    )
+    deltas = []
+    for row in rows:
+        before = initial.get(row["id"], {})
+        changes = {}
+        for field in ("status", "visible_at", "resolved_at"):
+            if before.get(field) != row.get(field):
+                changes[field] = {"from": before.get(field), "to": row.get(field)}
+        if changes:
+            deltas.append({"type": "blocker", "id": row["id"], "changes": changes})
+    return deltas
+
+
+def _task_deltas(conn, scenario: dict[str, Any]) -> list[dict[str, Any]]:
+    initial = {task["id"]: task for task in scenario.get("tasks", [])}
+    rows = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT id, status, priority
+            FROM tasks
+            ORDER BY id
+            """
+        ).fetchall()
+    )
+    deltas = []
+    for row in rows:
+        before = initial.get(row["id"], {})
+        changes = {}
+        for field in ("status", "priority"):
+            if before.get(field) != row.get(field):
+                changes[field] = {"from": before.get(field), "to": row.get(field)}
+        if changes:
+            deltas.append({"type": "task", "id": row["id"], "changes": changes})
+    return deltas
+
+
+def _coworker_state_deltas(conn, scenario: dict[str, Any]) -> list[dict[str, Any]]:
+    initial = {
+        (row["person_id"], row["key"]): row.get("value")
+        for row in scenario.get("coworker_state", [])
+    }
+    rows = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT person_id, key, value_json, updated_at
+            FROM coworker_state
+            ORDER BY person_id, key
+            """
+        ).fetchall()
+    )
+    deltas = []
+    for row in rows:
+        key = (row["person_id"], row["key"])
+        before = initial.get(key)
+        after = loads(row["value_json"], None)
+        if before == after:
+            continue
+        deltas.append(
+            {
+                "type": "coworker_state",
+                "id": f"{row['person_id']}.{row['key']}",
+                "changes": {
+                    "value": {"from": before, "to": after},
+                    "updated_at": {"from": None, "to": row["updated_at"]},
+                },
+            }
+        )
+    return deltas
+
+
 def _component(
     key: str,
     points: float,
     earned: float,
     note: str,
-    evidence: list[dict[str, Any]],
+    milestones: list[dict[str, Any]],
     missing: list[str],
     failed_gates: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -278,8 +398,8 @@ def _component(
         "earned": _clean_number(earned),
         "status": _status(points, earned),
         "note": note,
-        "evidence": evidence,
-        "missing_evidence": missing,
+        "milestones": milestones,
+        "missing_milestones": missing,
         "failed_gates": failed_gates,
     }
 
@@ -292,9 +412,9 @@ def _status(points: float, earned: float) -> str:
     return "passed"
 
 
-def _public_evidence(row: dict[str, Any], timing: str) -> dict[str, Any]:
+def _public_milestone(row: dict[str, Any], timing: str) -> dict[str, Any]:
     return {
-        "key": row["evidence_key"],
+        "key": row["milestone_id"],
         "note": row["note"],
         "created_at": row["created_at"],
         "source": row["source"],

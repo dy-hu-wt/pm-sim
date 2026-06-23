@@ -160,7 +160,7 @@ def _build_parser() -> argparse.ArgumentParser:
     timeline_parser.add_argument(
         "--kind",
         choices=sorted(TIMELINE_KINDS),
-        help="Filter to action, event, event_scheduled, event_delivered, message, or evidence.",
+        help="Filter to action, event, event_scheduled, event_delivered, message, or milestone.",
     )
     timeline_parser.set_defaults(func=lambda args: timeline(args.db, args.limit, args.kind))
 

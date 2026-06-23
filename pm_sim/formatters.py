@@ -597,7 +597,7 @@ def _format_timeline(entries: list[dict[str, Any]]) -> str:
                 lines.append("    Effects:")
                 for effect in effects:
                     lines.append(f"      - {_format_effect(effect)}")
-        elif entry["kind"] == "evidence":
+        elif entry["kind"] == "milestone":
             lines.append(f"    {entry.get('note')}")
             if entry.get("source"):
                 lines.append(f"    Source: {entry['source']}")
@@ -643,7 +643,7 @@ def _format_evaluate(value: dict[str, Any]) -> str:
         "Evaluation",
         f"  Scenario: {value.get('scenario_id')}",
         f"  Score:    {value.get('score')} / {value.get('max_score')}",
-        f"  Evidence: {value.get('evidence_count')}",
+        f"  Milestones: {value.get('milestone_count')}",
     ]
     final_outcome = value.get("final_outcome")
     if isinstance(final_outcome, dict):
@@ -657,7 +657,7 @@ def _format_evaluate(value: dict[str, Any]) -> str:
             f"[{component['status']}]"
         )
         lines.append(f"    {component.get('note')}")
-        for evidence in component.get("evidence", []):
+        for evidence in component.get("milestones", []):
             lines.append(
                 f"    - {evidence['key']} at {_pretty_time(evidence['created_at'])}: "
                 f"{evidence['note']}"
@@ -690,21 +690,29 @@ def _format_evaluate_explain(value: dict[str, Any]) -> str:
         if final_outcome.get("summary"):
             lines.append(f"  {final_outcome.get('summary')}")
     lines.append("")
+    state_delta = value.get("state_delta") or []
+    if state_delta:
+        lines.append("State Improvements:")
+        for delta in state_delta[:12]:
+            lines.append(f"  - {delta.get('type')} {delta.get('id')}: {_format_delta_changes(delta)}")
+        if len(state_delta) > 12:
+            lines.append(f"  - ... {len(state_delta) - 12} more state change(s)")
+        lines.append("")
 
     for component in value.get("components", []):
         lines.append(
             f"+{component['earned']} {component['key']} "
             f"({component['status']}, max {component['points']})"
         )
-        missing = component.get("missing_evidence", [])
-        evidence = component.get("evidence", [])
+        missing = component.get("missing_milestones", [])
+        evidence = component.get("milestones", [])
         harms = component.get("detected_harms", [])
         has_detail = bool(evidence or missing or harms)
         if component.get("note") and not missing and has_detail:
             lines.append(f"    {component['note']}")
 
         if evidence:
-            lines.append("    Evidence:")
+            lines.append("    Milestones:")
             for item in evidence:
                 timing = f", {item['timing']}" if item.get("timing") else ""
                 lines.append(
@@ -718,7 +726,7 @@ def _format_evaluate_explain(value: dict[str, Any]) -> str:
         if failed_gates:
             lines.append("    Failed gates:")
             for gate in failed_gates:
-                lines.append(f"      - {gate.get('evidence_key')}")
+                lines.append(f"      - {gate.get('milestone')}")
                 for failed in gate.get("failed", []):
                     lines.append(f"        - {failed}")
 
@@ -728,8 +736,8 @@ def _format_evaluate_explain(value: dict[str, Any]) -> str:
                 lines.append(f"      - {harm}")
 
         if not has_detail:
-            lines.append("    Evidence:")
-            lines.append(f"      - {component.get('note', 'No missing evidence.')}")
+            lines.append("    Milestones:")
+            lines.append(f"      - {component.get('note', 'No missing milestones.')}")
 
         lines.append("")
 
@@ -769,7 +777,7 @@ def _format_run_agent(value: dict[str, Any]) -> str:
     if missing:
         lines.extend(["", "Missing Evaluation"])
         for component in missing:
-            evidence = component.get("missing_evidence") or []
+            evidence = component.get("missing_milestones") or []
             if evidence:
                 lines.append(f"  {component['key']}: {', '.join(evidence)}")
             else:
@@ -791,6 +799,15 @@ def _format_run_agent(value: dict[str, Any]) -> str:
             lines.append(f"  {index}. {step.get('name')} [{status}]")
 
     return "\n".join(lines)
+
+
+def _format_delta_changes(delta: dict[str, Any]) -> str:
+    parts = []
+    for field, change in (delta.get("changes") or {}).items():
+        if not isinstance(change, dict):
+            continue
+        parts.append(f"{field} {change.get('from')!r} -> {change.get('to')!r}")
+    return "; ".join(parts) if parts else "changed"
 
 
 def _step_counts(steps: list[dict[str, Any]]) -> dict[str, int]:
@@ -870,9 +887,9 @@ def _format_effect(effect: dict[str, Any]) -> str:
         return f"updated actor commitment {effect.get('id')}"
     if effect_type == "update_actor_goal":
         return f"updated actor goal {effect.get('id')}"
-    if effect_type == "add_evaluation_evidence":
+    if effect_type == "record_milestone":
         deduped = " (already recorded)" if effect.get("deduped") else ""
-        return f"added evidence {effect.get('key')}{deduped}"
+        return f"recorded milestone {effect.get('key')}{deduped}"
     if effect_type == "update_metric":
         return f"updated metric {effect.get('metric')} -> {effect.get('value')}"
     return str(effect)

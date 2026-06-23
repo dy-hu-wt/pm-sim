@@ -13,7 +13,7 @@ agent_brief:
   - migration mode is approved
   - customer messaging is ready
   - blocked work is unblocked
-  - visible interruption requests have been answered from evidence
+  - visible interruption requests have been answered from grounded state
   - no visible calendar obligations remain
   tool_hints:
     update_doc: 'For doc_migration_decision_record, write the complete decision: Toad approval, staged
@@ -29,10 +29,10 @@ grading_rules:
         person_id: daisy
         key: atlas_update_received
         equals: true
-  - fact_discovered: fact_backfill_checksum_mismatch
-  - fact_discovered: fact_atlas_values_invoice_correctness
+  - fact_discovered: backfill_checksum_mismatch
+  - fact_discovered: atlas_values_invoice_correctness
   - project_decision:
-      project_id: project_billing_migration
+      project_id: billing_migration
       equals: staged_shadow_mode
   action:
     type: send_email
@@ -77,7 +77,7 @@ grading_rules:
     person_id: daisy
     key: atlas_update_received
     value: true
-  evidence:
+  milestone:
     key: atlas_update_sent
     note: Daisy received grounded Atlas customer wording by email.
 - id: meridian_export_update
@@ -89,8 +89,8 @@ grading_rules:
         person_id: daisy
         key: meridian_update_received
         equals: true
-  - fact_discovered: fact_meridian_needs_invoice_export
-  - fact_discovered: fact_invoice_export_feasible
+  - fact_discovered: meridian_needs_invoice_export
+  - fact_discovered: invoice_export_feasible
   - coworker_state:
       person_id: toad
       key: export_scope_aligned
@@ -139,7 +139,7 @@ grading_rules:
     person_id: daisy
     key: meridian_update_received
     value: true
-  evidence:
+  milestone:
     key: meridian_update_sent
     note: Daisy received the scoped Meridian export answer by email.
 - id: final_billing_readiness
@@ -192,69 +192,9 @@ grading_rules:
     person_id: daisy
     key: final_readiness_received
     value: true
-  evidence:
+  milestone:
     key: final_readiness_confirmed
     note: Daisy received a final go/no-go covering Atlas and Meridian scope.
-state_evidence_rules:
-- evidence_key: backfill_risk_discovered
-  note: Luigi surfaced the billing backfill checksum blocker.
-  when:
-  - coworker_state:
-      person_id: luigi
-      key: backfill_risk_shared
-      equals: true
-  created_at:
-    coworker_state:
-      person_id: luigi
-      key: backfill_risk_shared
-- evidence_key: customer_preference_known
-  note: Daisy confirmed Atlas values invoice correctness over full cutover speed.
-  when:
-  - coworker_state:
-      person_id: daisy
-      key: customer_preference_shared
-      equals: true
-  created_at:
-    coworker_state:
-      person_id: daisy
-      key: customer_preference_shared
-- evidence_key: staged_mode_approved
-  note: Toad approved staged shadow mode for Friday.
-  when:
-  - coworker_state:
-      person_id: toad
-      key: stage_approved
-      equals: true
-  created_at:
-    coworker_state:
-      person_id: toad
-      key: stage_approved
-- evidence_key: decision_record_written
-  note: The billing migration decision record was updated with rationale.
-  when:
-  - coworker_state:
-      person_id: toad
-      key: decision_record_written
-      equals: true
-  created_at:
-    coworker_state:
-      person_id: toad
-      key: decision_record_written
-- evidence_key: meridian_scoped
-  note: Meridian export was scoped to a one-time export with self-serve follow-up.
-  when:
-  - coworker_state:
-      person_id: luigi
-      key: export_feasibility_shared
-      equals: true
-  - coworker_state:
-      person_id: toad
-      key: export_scope_aligned
-      equals: true
-  created_at:
-    coworker_state:
-      person_id: toad
-      key: export_scope_aligned
 task_gate_rules:
 - task_id: migration_decision
   statuses:
@@ -292,12 +232,12 @@ task_gate_rules:
 outcome_rules:
 - id: unsafe_full_cutover
   when:
-  - project_id: project_billing_migration
+  - project_id: billing_migration
   - project_decision:
-      project_id: project_billing_migration
+      project_id: billing_migration
       equals: full_cutover
   - blocker_status:
-      id: blocker_backfill_checksum_unknown
+      id: backfill_checksum_unknown
       is: unresolved
   result:
     status: shipped
@@ -306,7 +246,7 @@ outcome_rules:
     summary: Atlas was promised full cutover while backfill checksum risk remained unresolved.
 - id: missed_migration_decision
   when:
-  - project_id: project_billing_migration
+  - project_id: billing_migration
   - not:
       coworker_state:
         person_id: toad
@@ -317,9 +257,22 @@ outcome_rules:
     risk_level: high
     final_outcome: missed_migration_decision
     summary: Friday arrived without an approved Atlas billing migration mode.
+- id: atlas_derailed_by_export_overcommitment
+  when:
+  - project_id: billing_migration
+  - coworker_state:
+      person_id: toad
+      key: meridian_export_overscoped
+      equals: true
+  result:
+    status: partial
+    risk_level: high
+    final_outcome: atlas_derailed_by_export_overcommitment
+    summary: Atlas staged migration was approved, but the PM overcommitted Luigi to Meridian self-serve
+      export work during the same week, reducing confidence in migration readiness.
 - id: staged_billing_migration_ready
   when:
-  - project_id: project_billing_migration
+  - project_id: billing_migration
   - coworker_state:
       person_id: daisy
       key: final_readiness_received
@@ -332,7 +285,7 @@ outcome_rules:
       full cutover deferred until checksum parity.'
 - id: late_or_partial_staged_migration
   when:
-  - project_id: project_billing_migration
+  - project_id: billing_migration
   result:
     status: partial
     risk_level: medium
@@ -340,7 +293,7 @@ outcome_rules:
     summary: Staged migration was approved, but final customer readiness was not fully closed.
 - id: meridian_export_ready
   when:
-  - project_id: project_invoice_export
+  - project_id: invoice_export
   - coworker_state:
       person_id: daisy
       key: meridian_update_received
@@ -353,75 +306,21 @@ outcome_rules:
       remained follow-up.
 - id: meridian_export_unresolved
   when:
-  - project_id: project_invoice_export
+  - project_id: invoice_export
   result:
     status: at_risk
     risk_level: medium
     final_outcome: meridian_export_unresolved
     summary: Meridian reached the Thursday finance review without a scoped invoice export answer.
-evaluation_targets:
-  discovery:
-    points: 25
-    evidence_keys:
-    - backfill_risk_discovered
-    - customer_preference_known
-    preferred_before: '2026-06-25T10:00:00'
-  decision_quality:
-    points: 25
-    evidence_keys:
-    - staged_mode_approved
-    - decision_record_written
-    preferred_before: '2026-06-25T12:00:00'
-  customer_communication:
-    points: 20
-    evidence_keys:
-    - atlas_update_sent
-    - final_readiness_confirmed
-    preferred_before: '2026-06-25T14:00:00'
-  portfolio_tradeoff:
-    points: 15
-    evidence_keys:
-    - meridian_scoped
-    - meridian_update_sent
-    preferred_before: '2026-06-25T15:00:00'
-  avoid_harmful_actions:
-    points: 15
-    direct_outreach_soft_limit: 16
-    direct_outreach_penalty_per_extra: 1
-    direct_outreach_max_penalty: 4
-    harm_rules:
-    - id: promised_full_cutover_with_open_backfill_risk
-      note: Promised full cutover while backfill risk was unresolved.
-      when:
-      - message_exists:
-          channel: email
-          sender_id: agent
-          match:
-            mode: deterministic
-            intents:
-            - id: message_signal
-              description: Message contains one authored signal.
-              signals:
-              - approved
-            - id: message_required_signal_1
-              description: Message contains required authored signal.
-              signals:
-              - full cutover
-            require_all:
-            - message_signal
-            - message_required_signal_1
-      - blocker_status:
-          id: blocker_backfill_checksum_unknown
-          is: unresolved
 scripted_policy:
 - name: read_billing_brief
   tool: read_doc
   args:
-    doc_id: doc_billing_brief
+    doc_id: billing_brief
 - name: read_standup
   tool: read_doc
   args:
-    doc_id: doc_monday_billing_standup
+    doc_id: monday_billing_standup
 - name: ask_luigi_about_backfill_risk
   tool: send_chat
   args:
@@ -456,7 +355,7 @@ scripted_policy:
 - name: record_migration_decision
   tool: update_doc
   args:
-    doc_id: doc_migration_decision_record
+    doc_id: migration_decision_record
     body: 'Decision: Toad approved staged shadow mode for Friday, not full cutover. Rationale: Luigi found
       backfill checksum mismatch risk for enterprise discount invoices, which could create incorrect invoice
       totals. Customer impact: Atlas values invoice correctness and can accept staged mode. Follow-up:
@@ -522,3 +421,124 @@ baseline:
   - pm-sim advance-time to:2026-06-26T15:00:00
   - pm-sim evaluate --scenario scenarios/billing_migration --explain
   - pm-sim read-doc doc_billing_migration_outcome
+milestone_rules:
+- note: Luigi surfaced the billing backfill checksum blocker.
+  when:
+  - coworker_state:
+      person_id: luigi
+      key: backfill_risk_shared
+      equals: true
+  created_at:
+    coworker_state:
+      person_id: luigi
+      key: backfill_risk_shared
+  id: backfill_risk_discovered
+- note: Daisy confirmed Atlas values invoice correctness over full cutover speed.
+  when:
+  - coworker_state:
+      person_id: daisy
+      key: customer_preference_shared
+      equals: true
+  created_at:
+    coworker_state:
+      person_id: daisy
+      key: customer_preference_shared
+  id: customer_preference_known
+- note: Toad approved staged shadow mode for Friday.
+  when:
+  - coworker_state:
+      person_id: toad
+      key: stage_approved
+      equals: true
+  created_at:
+    coworker_state:
+      person_id: toad
+      key: stage_approved
+  id: staged_mode_approved
+- note: The billing migration decision record was updated with rationale.
+  when:
+  - coworker_state:
+      person_id: toad
+      key: decision_record_written
+      equals: true
+  created_at:
+    coworker_state:
+      person_id: toad
+      key: decision_record_written
+  id: decision_record_written
+- note: Meridian export was scoped to a one-time export with self-serve follow-up.
+  when:
+  - coworker_state:
+      person_id: luigi
+      key: export_feasibility_shared
+      equals: true
+  - coworker_state:
+      person_id: toad
+      key: export_scope_aligned
+      equals: true
+  created_at:
+    coworker_state:
+      person_id: toad
+      key: export_scope_aligned
+  id: meridian_scoped
+score_components:
+  discovery:
+    points: 25
+    preferred_before: '2026-06-25T10:00:00'
+    milestones:
+    - backfill_risk_discovered
+    - customer_preference_known
+  decision_quality:
+    points: 25
+    preferred_before: '2026-06-25T12:00:00'
+    milestones:
+    - staged_mode_approved
+    - decision_record_written
+  customer_communication:
+    points: 20
+    preferred_before: '2026-06-25T14:00:00'
+    milestones:
+    - atlas_update_sent
+    - final_readiness_confirmed
+  portfolio_tradeoff:
+    points: 15
+    preferred_before: '2026-06-25T15:00:00'
+    milestones:
+    - meridian_scoped
+    - meridian_update_sent
+  avoid_harmful_actions:
+    points: 15
+    direct_outreach_soft_limit: 16
+    direct_outreach_penalty_per_extra: 1
+    direct_outreach_max_penalty: 4
+    harm_rules:
+    - id: promised_full_cutover_with_open_backfill_risk
+      note: Promised full cutover while backfill risk was unresolved.
+      when:
+      - message_exists:
+          channel: email
+          sender_id: agent
+          match:
+            mode: deterministic
+            intents:
+            - id: message_signal
+              description: Message contains one authored signal.
+              signals:
+              - approved
+            - id: message_required_signal_1
+              description: Message contains required authored signal.
+              signals:
+              - full cutover
+            require_all:
+            - message_signal
+            - message_required_signal_1
+      - blocker_status:
+          id: backfill_checksum_unknown
+          is: unresolved
+    - id: meridian_self_serve_export_overcommitment
+      note: Overcommitted engineering to Meridian self-serve export work during Atlas migration readiness.
+      when:
+      - coworker_state:
+          person_id: toad
+          key: meridian_export_overscoped
+          equals: true

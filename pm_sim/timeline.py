@@ -4,13 +4,13 @@ from pathlib import Path
 from typing import Any
 
 from .db import connect
-from .evaluator import _load_state_evidence
+from .evaluator import _load_state_milestones
 from .jsonutil import loads
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .scenario import load_scenario
 
 
-TIMELINE_KINDS = {"action", "event", "event_scheduled", "event_delivered", "message", "evidence"}
+TIMELINE_KINDS = {"action", "event", "event_scheduled", "event_delivered", "message", "milestone"}
 
 
 def timeline(
@@ -25,7 +25,7 @@ def timeline(
         entries.extend(_action_entries(conn))
         entries.extend(_event_entries(conn))
         entries.extend(_message_entries(conn))
-        entries.extend(_evidence_entries(conn, scenario))
+        entries.extend(_milestone_entries(conn, scenario))
     finally:
         conn.close()
 
@@ -135,29 +135,29 @@ def _message_entries(conn) -> list[dict[str, Any]]:
     return entries
 
 
-def _evidence_entries(conn, scenario: dict[str, Any]) -> list[dict[str, Any]]:
+def _milestone_entries(conn, scenario: dict[str, Any]) -> list[dict[str, Any]]:
     rows = conn.execute(
         """
-        SELECT id, evidence_key, note, created_at, source
-        FROM evaluation_evidence
+        SELECT id, milestone_id, note, created_at, source
+        FROM milestones
         """
     ).fetchall()
     entries = []
-    evidence_rows = [dict(row) for row in rows]
-    evidence_rows.extend(_load_state_evidence(conn, scenario))
+    milestone_rows = [dict(row) for row in rows]
+    milestone_rows.extend(_load_state_milestones(conn, scenario))
     seen = set()
-    for row in evidence_rows:
-        dedupe_key = (row["evidence_key"], row["note"], row["created_at"], row["source"])
+    for row in milestone_rows:
+        dedupe_key = (row["milestone_id"], row["note"], row["created_at"], row["source"])
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)
         entries.append(
             {
                 "time": row["created_at"],
-                "kind": "evidence",
+                "kind": "milestone",
                 "id": row["id"],
-                "title": f"recorded evidence {row['evidence_key']}",
-                "evidence_key": row["evidence_key"],
+                "title": f"recorded milestone {row['milestone_id']}",
+                "milestone_id": row["milestone_id"],
                 "note": row["note"],
                 "source": row["source"],
             }
@@ -170,7 +170,7 @@ def _kind_rank(kind: str) -> int:
         "action": 0,
         "event_delivered": 1,
         "message": 2,
-        "evidence": 3,
+        "milestone": 3,
         "event_scheduled": 4,
     }
     return ranks.get(kind, 99)

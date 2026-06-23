@@ -44,8 +44,8 @@ def apply_effects(
             result = _apply_update_actor_goal(conn, effect)
         elif effect_type == "update_metric":
             result = _apply_update_metric(conn, effect)
-        elif effect_type == "add_evaluation_evidence":
-            result = _apply_add_evaluation_evidence(
+        elif effect_type == "record_milestone":
+            result = _apply_record_milestone(
                 conn, effect, now=now, source=source, index=index
             )
         else:
@@ -475,7 +475,7 @@ def _apply_update_metric(conn: sqlite3.Connection, effect: dict[str, Any]) -> di
     return {"metric": metric, "value": updated}
 
 
-def _apply_add_evaluation_evidence(
+def _apply_record_milestone(
     conn: sqlite3.Connection,
     effect: dict[str, Any],
     *,
@@ -483,39 +483,39 @@ def _apply_add_evaluation_evidence(
     source: str,
     index: int,
 ) -> dict[str, Any]:
-    evidence_key = _required(effect, "key")
+    milestone_id = _required(effect, "key")
     note = effect.get("note", "")
     existing = conn.execute(
         """
         SELECT id
-        FROM evaluation_evidence
-        WHERE evidence_key = ? AND note = ?
+        FROM milestones
+        WHERE milestone_id = ? AND note = ?
         LIMIT 1
         """,
-        (evidence_key, note),
+        (milestone_id, note),
     ).fetchone()
     if existing is not None:
-        return {"id": existing["id"], "key": evidence_key, "deduped": True}
+        return {"id": existing["id"], "key": milestone_id, "deduped": True}
 
-    evidence_id = effect.get("id") or _generated_id(
-        conn, "evaluation_evidence", f"evidence_{_source_slug(source)}", index
+    milestone_record_id = effect.get("id") or _generated_id(
+        conn, "milestones", f"milestone_{_source_slug(source)}", index
     )
     conn.execute(
         """
-        INSERT INTO evaluation_evidence
-          (id, evidence_key, note, created_at, source, metadata_json)
+        INSERT INTO milestones
+          (id, milestone_id, note, created_at, source, metadata_json)
         VALUES (?, ?, ?, ?, ?, ?)
         """,
         (
-            evidence_id,
-            evidence_key,
+            milestone_record_id,
+            milestone_id,
             note,
             effect.get("created_at", now),
             source,
             dumps(effect.get("metadata", {})),
         ),
     )
-    return {"id": evidence_id, "key": evidence_key, "deduped": False}
+    return {"id": milestone_record_id, "key": milestone_id, "deduped": False}
 
 
 def _required(effect: dict[str, Any], key: str) -> Any:

@@ -194,14 +194,14 @@ CREATE TABLE IF NOT EXISTS action_log (
 CREATE INDEX IF NOT EXISTS idx_action_log_created_at
   ON action_log(created_at, id);
 
-CREATE TABLE IF NOT EXISTS evaluation_evidence (
+CREATE TABLE IF NOT EXISTS milestones (
   id TEXT PRIMARY KEY,
-  evidence_key TEXT NOT NULL,
+  milestone_id TEXT NOT NULL,
   note TEXT NOT NULL,
   created_at TEXT NOT NULL,
   source TEXT NOT NULL DEFAULT '',
   metadata_json TEXT NOT NULL DEFAULT '{}'
 );
 
-CREATE INDEX IF NOT EXISTS idx_evaluation_evidence_key
-  ON evaluation_evidence(evidence_key, created_at);
+CREATE INDEX IF NOT EXISTS idx_milestones_id
+  ON milestones(milestone_id, created_at);

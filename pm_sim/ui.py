@@ -661,13 +661,13 @@ th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacin
 .score-points { font-size:12px; color:var(--muted); font-weight:800; }
 .score-note { font-size:13px; color:var(--muted); }
 .score-missing { font-size:12px; color:var(--bad); }
-.evidence-list { display:grid; gap:8px; margin-top:2px; }
-.evidence-item { border:1px solid var(--line); border-radius:8px; padding:9px; background:#fbfcfe; display:grid; gap:5px; }
-.evidence-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
-.evidence-key { font-size:12px; font-weight:850; color:var(--ink); overflow-wrap:anywhere; }
-.evidence-note { font-size:12px; color:var(--ink); }
-.evidence-meta { font-size:11px; color:var(--muted); overflow-wrap:anywhere; }
-.evidence-empty { font-size:12px; color:var(--muted); font-style:italic; }
+.milestone-list { display:grid; gap:8px; margin-top:2px; }
+.milestone-item { border:1px solid var(--line); border-radius:8px; padding:9px; background:#fbfcfe; display:grid; gap:5px; }
+.milestone-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.milestone-key { font-size:12px; font-weight:850; color:var(--ink); overflow-wrap:anywhere; }
+.milestone-note { font-size:12px; color:var(--ink); }
+.milestone-meta { font-size:11px; color:var(--muted); overflow-wrap:anywhere; }
+.milestone-empty { font-size:12px; color:var(--muted); font-style:italic; }
 .schedule-grid { padding:14px; display:grid; gap:8px; }
 .schedule-card { border:1px solid var(--line); border-left:4px solid var(--purple); border-radius:10px; padding:10px 12px; background:#fff; display:grid; gap:4px; }
 .schedule-top { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
@@ -733,7 +733,7 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
   </div>
   <details class="operator">
     <summary>Operator inspector: current evaluation</summary>
-    <p class="helper">This is for debugging and grading. It is computed from current visible state/evidence and is not shown as part of the agent-facing playback.</p>
+    <p class="helper">This is for debugging and grading. It is computed from current visible state and milestones, and is not shown as part of the agent-facing playback.</p>
     <div class="grid" id="summary"></div>
     <div class="score-grid" id="evaluation"></div>
     <div class="inspector-section">
@@ -905,8 +905,8 @@ function blockerGroups(blockers) {
 }
 
 function evaluationCard(component) {
-  const missing = component.missing_evidence || [];
-  const evidence = component.evidence || [];
+  const missing = component.missing_milestones || [];
+  const milestones = component.milestones || [];
   return `
     <div class="score-card">
       <div class="score-top">
@@ -916,22 +916,22 @@ function evaluationCard(component) {
       <div><span class="badge ${statusClass(component.status)}">${esc(label(component.status || ""))}</span></div>
       <div class="score-note">${esc(component.note || "")}</div>
       ${missing.length ? `<div class="score-missing">Missing: ${esc(missing.join(", "))}</div>` : ""}
-      <div class="evidence-list">
-        ${evidence.length ? evidence.map(evidenceItem).join("") : `<div class="evidence-empty">No causal evidence recorded for this component yet.</div>`}
+      <div class="milestone-list">
+        ${milestones.length ? milestones.map(milestoneItem).join("") : `<div class="milestone-empty">No causal milestone recorded for this component yet.</div>`}
       </div>
     </div>
   `;
 }
 
-function evidenceItem(item) {
+function milestoneItem(item) {
   return `
-    <div class="evidence-item">
-      <div class="evidence-head">
-        <div class="evidence-key">${esc(item.key || "")}</div>
+    <div class="milestone-item">
+      <div class="milestone-head">
+        <div class="milestone-key">${esc(item.key || "")}</div>
         ${item.timing ? `<span class="badge ${statusClass(item.timing)}">${esc(label(item.timing))}</span>` : ""}
       </div>
-      <div class="evidence-note">${esc(item.note || "")}</div>
-      <div class="evidence-meta">${esc(pretty(item.created_at))} · Source: ${esc(item.source || "")}</div>
+      <div class="milestone-note">${esc(item.note || "")}</div>
+      <div class="milestone-meta">${esc(pretty(item.created_at))} · Source: ${esc(item.source || "")}</div>
     </div>
   `;
 }
@@ -1027,7 +1027,7 @@ function render(state) {
     : `step ${demo.index ?? 0} / ${demo.total ?? 0} · ${state.display_timeline.length} visible item(s)`;
 
   $("summary").innerHTML = [
-    card("Evidence found", evaluation.evidence_count ?? 0),
+    card("Milestones", evaluation.milestone_count ?? 0),
     card("Outcome", label((evaluation.final_outcome || {}).outcome || "pending")),
     card("Status", evaluation.score === evaluation.max_score ? "passed" : "incomplete")
   ].join("");

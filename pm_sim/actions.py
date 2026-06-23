@@ -18,6 +18,7 @@ from .semantic_match import semantic_match
 from .state import AGENT_ID, get_current_time, log_action
 
 COMPLETED_STATUSES = {"complete", "completed", "done", "resolved"}
+WEEKDAY_NAMES = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 ACTION_TIME_COST_MINUTES = {
     "read_doc": 15,
     "update_doc": 20,
@@ -251,7 +252,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
         conn.close()
 
 
-# Email tool: records outreach and applies deterministic communication evidence when matched. Cost: 10m.
+# Email tool: records outreach and applies deterministic communication milestones when matched. Cost: 10m.
 def send_email(
     db_path: Path | str,
     person_id: str,
@@ -451,6 +452,14 @@ def schedule_meeting(
         missing = [person_id for person_id in attendees if _get_person(conn, person_id) is None]
         if missing:
             return {"ok": False, "error": f"Unknown attendees: {', '.join(missing)}"}
+        availability_error = _validate_meeting_availability(
+            conn,
+            attendees,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        if availability_error:
+            return {"ok": False, "error": availability_error}
 
         meeting_id = _next_id(conn, "calendar_events", "cal")
         transcript_doc_id = f"doc_transcript_{meeting_id}"
@@ -658,7 +667,77 @@ def _person_availability(conn: sqlite3.Connection, person_id: str) -> list[dict[
     if row is None:
         return []
     availability = loads(row["availability_json"], [])
-    return availability if isinstance(availability, list) else []
+    return _normalize_availability(availability)
+
+
+def _normalize_availability(availability: Any) -> list[dict[str, Any]]:
+    if isinstance(availability, list):
+        return [dict(window) for window in availability if isinstance(window, dict)]
+    if not isinstance(availability, dict):
+        return []
+
+    start = availability.get("start")
+    end = availability.get("end")
+    workdays = availability.get("workdays", [])
+    if not isinstance(workdays, list):
+        return []
+
+    windows = []
+    for day in workdays:
+        if not isinstance(day, int) or day < 0 or day >= len(WEEKDAY_NAMES):
+            continue
+        windows.append({"day": WEEKDAY_NAMES[day], "start": start, "end": end})
+    return windows
+
+
+def _validate_meeting_availability(
+    conn: sqlite3.Connection,
+    attendees: list[str],
+    *,
+    start_time: datetime,
+    end_time: datetime,
+) -> str | None:
+    for person_id in attendees:
+        availability = _person_availability(conn, person_id)
+        if availability and not _time_range_inside_availability(start_time, end_time, availability):
+            return f"{person_id} is not available for the full meeting window."
+        conflict = _calendar_conflict(conn, person_id, start_time, end_time)
+        if conflict:
+            return f"{person_id} already has a meeting during that window: {conflict}."
+    return None
+
+
+def _time_range_inside_availability(
+    start_time: datetime,
+    end_time: datetime,
+    availability: list[dict[str, Any]],
+) -> bool:
+    windows = _availability_windows_for_day(start_time, availability)
+    return any(start_time >= window_start and end_time <= window_end for window_start, window_end in windows)
+
+
+def _calendar_conflict(
+    conn: sqlite3.Connection,
+    person_id: str,
+    start_time: datetime,
+    end_time: datetime,
+) -> str | None:
+    rows = conn.execute(
+        """
+        SELECT title, start_at, end_at, attendees_json
+        FROM calendar_events
+        WHERE status IN ('scheduled', 'completed')
+          AND start_at < ?
+          AND end_at > ?
+        ORDER BY start_at, id
+        """,
+        (_format_time(end_time), _format_time(start_time)),
+    ).fetchall()
+    for row in rows:
+        attendees = loads(row["attendees_json"], [])
+        if person_id in attendees:
+            return row["title"]
+    return None
 
 
 def _add_available_minutes(

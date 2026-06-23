@@ -1,5 +1,5 @@
 projects:
-- id: project_pr_review_agent
+- id: pr_review_agent
   name: PR Review Agent Beta
   customer: Nimbus Labs
   deadline: '2026-06-26T15:00:00'
@@ -21,7 +21,7 @@ projects:
   - The agent can be demoed reliably on a real pull request.
   - Nimbus Labs has clear beta messaging before Thursday morning.
   - The team has an explicit auto-commenting versus draft-mode decision.
-- id: project_audit_log_export
+- id: audit_log_export
   name: Admin Audit Log Export
   customer: Koopa Bank
   deadline: '2026-06-25T16:00:00'
@@ -103,8 +103,8 @@ people:
   response_delay_minutes: 120
   private_knowledge:
     fact_ids:
-    - fact_repo_sync_stale
-    - fact_draft_mode_limits_customer_visible_risk
+    - repo_sync_stale
+    - draft_mode_limits_customer_visible_risk
   behavior:
     rule: luigi
     current_focus: repo sync hardening and private-repo security details
@@ -115,8 +115,8 @@ people:
     - webhook ordering can make repo sync review an older commit
     - private repo source handling must use approved security wording
   private_fact_ids:
-  - fact_repo_sync_stale
-  - fact_draft_mode_limits_customer_visible_risk
+  - repo_sync_stale
+  - draft_mode_limits_customer_visible_risk
 - id: peach
   name: Peach
   role: Designer
@@ -145,7 +145,7 @@ people:
   response_delay_minutes: 90
   private_knowledge:
     fact_ids:
-    - fact_design_blocked_by_scope
+    - design_blocked_by_scope
   behavior:
     rule: peach
     current_focus: draft-mode onboarding and review-flow documentation
@@ -157,7 +157,7 @@ people:
     - onboarding stays blocked while scope is unclear
     - draft-mode docs can proceed once auto-commenting is out of Friday scope
   private_fact_ids:
-  - fact_design_blocked_by_scope
+  - design_blocked_by_scope
 - id: daisy
   name: Daisy
   role: Customer Success Lead
@@ -186,7 +186,7 @@ people:
   response_delay_minutes: 45
   private_knowledge:
     fact_ids:
-    - fact_nimbus_values_reliability
+    - nimbus_values_reliability
   behavior:
     rule: daisy
     current_focus: customer-safe Nimbus and Koopa messaging
@@ -198,7 +198,7 @@ people:
     - Nimbus values reliability more than flashy automation
     - customer-ready wording should be sent by email
   private_fact_ids:
-  - fact_nimbus_values_reliability
+  - nimbus_values_reliability
 - id: toad
   name: Toad
   role: Engineering Manager
@@ -299,7 +299,7 @@ coworker_state:
   key: audit_scope_aligned
   value: false
 facts:
-- id: fact_repo_sync_stale
+- id: repo_sync_stale
   visibility_scope: hidden
   owner_id: luigi
   summary: The repo sync worker sometimes reviews an older commit because webhook events can arrive out
@@ -307,7 +307,7 @@ facts:
   revealed_by:
   - Ask Luigi about launch risk, blockers, repo sync, stale code, webhooks, auto-commenting, or readiness.
   - Wait until Luigi's Thursday proactive escalation.
-- id: fact_draft_mode_limits_customer_visible_risk
+- id: draft_mode_limits_customer_visible_risk
   visibility_scope: hidden
   owner_id: luigi
   summary: Draft mode may still prepare an imperfect suggestion, but no customer-visible comment is posted
@@ -315,38 +315,38 @@ facts:
   revealed_by:
   - Ask Luigi why draft mode is safer than auto-commenting.
   - Include Luigi in a launch-mode risk meeting.
-- id: fact_design_blocked_by_scope
+- id: design_blocked_by_scope
   visibility_scope: private
   owner_id: peach
   summary: Peach cannot finish onboarding screens until the Friday launch mode is clarified.
-- id: fact_nimbus_values_reliability
+- id: nimbus_values_reliability
   visibility_scope: private
   owner_id: daisy
   summary: For Nimbus Labs, reliable draft suggestions are better than auto-posted comments that might
     review stale code.
-- id: fact_draft_mode_scope_confirmed
+- id: draft_mode_scope_confirmed
   visibility_scope: derived
   summary: The Friday beta scope is draft-suggestions mode with human approval before comments are posted.
-- id: fact_draft_mode_approved
+- id: draft_mode_approved
   visibility_scope: derived
   summary: Toad approved shipping draft mode for Friday.
-- id: fact_koopa_needs_audit_csv
+- id: koopa_needs_audit_csv
   visibility_scope: private
   owner_id: daisy
   summary: Koopa Bank needs a CSV export of admin audit logs for a Thursday security review, but they
     mostly need a clear scoped answer.
-- id: fact_audit_log_one_time_export_feasible
+- id: audit_log_one_time_export_feasible
   visibility_scope: hidden
   owner_id: luigi
   summary: A one-time CSV export is feasible this week, but a full self-serve audit export needs follow-up
     work after the PR Review Agent beta.
-- id: fact_audit_export_scope_confirmed
+- id: audit_export_scope_confirmed
   visibility_scope: derived
   summary: The Koopa Bank audit log export scope is one-time CSV for the security review, with full self-serve
     export deferred.
 tasks:
 - id: repo_sync
-  project_id: project_pr_review_agent
+  project_id: pr_review_agent
   title: Stabilize repo sync for latest commit reviews
   owner_id: luigi
   status: in_progress
@@ -354,10 +354,10 @@ tasks:
   due_at: '2026-06-25T12:00:00'
   metadata:
     blocked_by:
-    - blocker_repo_sync_stale
-  blocked_by: blocker_repo_sync_stale
+    - repo_sync_stale
+  blocked_by: repo_sync_stale
 - id: review_context_pipeline
-  project_id: project_pr_review_agent
+  project_id: pr_review_agent
   title: Prepare diff context and test fixtures
   owner_id: luigi
   status: ready
@@ -366,7 +366,7 @@ tasks:
   metadata: {}
   blocked_by: ''
 - id: draft_mode_docs
-  project_id: project_pr_review_agent
+  project_id: pr_review_agent
   title: Finalize draft-mode onboarding
   description: Peach needs the approved Friday launch mode early enough to finish onboarding copy before
     Thursday afternoon readiness checks.
@@ -376,10 +376,10 @@ tasks:
   due_at: '2026-06-25T15:00:00'
   metadata:
     blocked_by:
-    - blocker_scope_unclear
-  blocked_by: blocker_scope_unclear
+    - scope_unclear
+  blocked_by: scope_unclear
 - id: customer_talk_track
-  project_id: project_pr_review_agent
+  project_id: pr_review_agent
   title: Email Daisy the Nimbus beta talk track
   description: Daisy needs customer-ready Nimbus wording by Thursday morning so she can forward and archive
     the exact approved language before the customer update.
@@ -389,10 +389,10 @@ tasks:
   due_at: '2026-06-25T10:00:00'
   metadata:
     blocked_by:
-    - blocker_launch_scope_decision
-  blocked_by: blocker_launch_scope_decision
+    - launch_scope_decision
+  blocked_by: launch_scope_decision
 - id: beta_rollout_notes
-  project_id: project_pr_review_agent
+  project_id: pr_review_agent
   title: Prepare Nimbus beta rollout notes
   description: The rollout note should be grounded in the approved launch mode, human-approval language,
     and any known repo-sync limitation before the Thursday final-readiness check.
@@ -402,10 +402,10 @@ tasks:
   due_at: '2026-06-25T14:00:00'
   metadata:
     blocked_by:
-    - blocker_launch_scope_decision
-  blocked_by: blocker_launch_scope_decision
+    - launch_scope_decision
+  blocked_by: launch_scope_decision
 - id: launch_decision
-  project_id: project_pr_review_agent
+  project_id: pr_review_agent
   title: Decide auto-commenting versus draft mode
   description: Toad needs an explicit Friday launch option before downstream customer messaging and onboarding
     can finish.
@@ -415,10 +415,10 @@ tasks:
   due_at: '2026-06-25T11:00:00'
   metadata:
     blocked_by:
-    - blocker_launch_scope_decision
-  blocked_by: blocker_launch_scope_decision
+    - launch_scope_decision
+  blocked_by: launch_scope_decision
 - id: audit_export_scope
-  project_id: project_audit_log_export
+  project_id: audit_log_export
   title: Clarify audit log export scope for Koopa Bank
   description: Koopa needs a scoped one-time CSV versus full self-serve export answer before Thursday's
     security review.
@@ -428,10 +428,10 @@ tasks:
   due_at: '2026-06-25T12:00:00'
   metadata:
     blocked_by:
-    - blocker_audit_export_scope_unclear
-  blocked_by: blocker_audit_export_scope_unclear
+    - audit_export_scope_unclear
+  blocked_by: audit_export_scope_unclear
 - id: audit_export_feasibility
-  project_id: project_audit_log_export
+  project_id: audit_log_export
   title: Confirm one-time CSV export feasibility
   description: Luigi should confirm whether a one-time admin audit-log CSV is feasible in time for Koopa's
     Thursday security review.
@@ -442,7 +442,7 @@ tasks:
   metadata: {}
   blocked_by: ''
 - id: koopa_status_update
-  project_id: project_audit_log_export
+  project_id: audit_log_export
   title: Email Daisy the Koopa Bank status update
   description: Daisy needs customer-facing Koopa wording by email before the Thursday security review,
     after feasibility and scope are confirmed.
@@ -452,10 +452,10 @@ tasks:
   due_at: '2026-06-25T15:00:00'
   metadata:
     blocked_by:
-    - blocker_audit_export_scope_unclear
-  blocked_by: blocker_audit_export_scope_unclear
+    - audit_export_scope_unclear
+  blocked_by: audit_export_scope_unclear
 - id: self_serve_audit_export_followup
-  project_id: project_audit_log_export
+  project_id: audit_log_export
   title: Plan self-serve audit export follow-up
   owner_id: mario
   status: not_started
@@ -465,33 +465,33 @@ tasks:
   blocked_by: ''
 dependencies:
 - id: dep_design_needs_scope
-  project_id: project_pr_review_agent
+  project_id: pr_review_agent
   upstream_task_id: launch_decision
   downstream_task_id: draft_mode_docs
   description: Onboarding cannot finish until Friday launch mode is decided.
 - id: dep_talk_track_needs_decision
-  project_id: project_pr_review_agent
+  project_id: pr_review_agent
   upstream_task_id: launch_decision
   downstream_task_id: customer_talk_track
   description: Customer beta talk track depends on the launch mode decision.
 - id: dep_rollout_notes_need_decision
-  project_id: project_pr_review_agent
+  project_id: pr_review_agent
   upstream_task_id: launch_decision
   downstream_task_id: beta_rollout_notes
   description: Nimbus rollout notes need the final launch mode and safety language.
 - id: dep_auto_commenting_needs_repo_sync
-  project_id: project_pr_review_agent
+  project_id: pr_review_agent
   upstream_task_id: repo_sync
   downstream_task_id: launch_decision
   description: Repo sync reliability determines whether auto-commenting is safe.
 - id: dep_koopa_update_needs_scope
-  project_id: project_audit_log_export
+  project_id: audit_log_export
   upstream_task_id: audit_export_scope
   downstream_task_id: koopa_status_update
   description: Daisy's Koopa update needs a confirmed one-time CSV versus full export scope.
 blockers:
-- id: blocker_repo_sync_stale
-  project_id: project_pr_review_agent
+- id: repo_sync_stale
+  project_id: pr_review_agent
   title: Repo sync can review stale commits
   status: open
   severity: high
@@ -500,9 +500,9 @@ blockers:
   description: Auto-commenting may post review comments against an older commit instead of the latest
     PR diff.
   metadata:
-    fact_id: fact_repo_sync_stale
-- id: blocker_scope_unclear
-  project_id: project_pr_review_agent
+    fact_id: repo_sync_stale
+- id: scope_unclear
+  project_id: pr_review_agent
   title: Friday launch mode is unclear
   status: open
   severity: medium
@@ -512,9 +512,9 @@ blockers:
   description: Onboarding and customer messaging cannot finish until auto-commenting versus draft mode
     is decided.
   metadata:
-    fact_id: fact_design_blocked_by_scope
-- id: blocker_launch_scope_decision
-  project_id: project_pr_review_agent
+    fact_id: design_blocked_by_scope
+- id: launch_scope_decision
+  project_id: pr_review_agent
   title: No auto-commenting versus draft-mode decision
   status: open
   severity: high
@@ -522,8 +522,8 @@ blockers:
   visibility_scope: public
   visible_at: '2026-06-22T09:00:00'
   description: The team may drift into a risky auto-commenting beta without explicit approval.
-- id: blocker_audit_export_scope_unclear
-  project_id: project_audit_log_export
+- id: audit_export_scope_unclear
+  project_id: audit_log_export
   title: Koopa audit export scope is unclear
   status: open
   severity: medium
@@ -532,7 +532,7 @@ blockers:
   description: Koopa Bank needs an answer for Thursday, but the team has not confirmed whether this is
     a one-time CSV export or a full self-serve feature.
 docs:
-- id: doc_project_brief
+- id: project_brief
   title: PR Review Agent Beta Brief
   kind: brief
   visibility_scope: public
@@ -540,7 +540,7 @@ docs:
   body: 'PR Review Agent goal: help engineering teams review pull requests faster. Friday pilot: Nimbus
     Labs. Full beta mode posts review comments automatically on PRs. Draft-mode beta prepares suggestions
     for human approval before posting. Draft mode is less flashy, but safer if repo sync is not reliable.'
-- id: doc_monday_standup
+- id: monday_standup
   title: Monday Standup Notes
   kind: meeting_notes
   visibility_scope: public
@@ -548,7 +548,7 @@ docs:
   body: Mario wants auto-commenting if possible. Peach needs launch-mode confirmation before final onboarding.
     Daisy needs written customer-ready language by email before she updates Nimbus. Luigi said he is still
     hardening repo sync ordering.
-- id: doc_beta_rollout_template
+- id: beta_rollout_template
   title: Nimbus Beta Rollout Template
   kind: customer_note_template
   visibility_scope: public
@@ -557,14 +557,14 @@ docs:
     human approval means in draft mode, and what known limitation remains after Friday. Daisy needs the
     final customer-ready handoff by email, not chat, so she can forward and archive the approved wording.
     Avoid promising auto-commenting until repo sync is proven reliable.'
-- id: doc_launch_decision_record
+- id: launch_decision_record
   title: Friday Launch Decision Record
   kind: decision_record
   visibility_scope: public
   visible_at: '2026-06-22T09:00:00'
   body: Decision pending. Record the approved Friday launch mode, approval owner, customer-visible behavior,
     and any follow-up scope before Daisy updates Nimbus.
-- id: doc_repo_sync_notes
+- id: repo_sync_notes
   title: Repo Sync Notes
   kind: engineering_notes
   visibility_scope: hidden
@@ -574,7 +574,7 @@ docs:
   body: Webhook events can arrive out of order. The sync worker sometimes evaluates an older commit SHA,
     so auto-posted review comments may target stale code. Draft mode avoids customer-visible bad comments
     while the worker is hardened.
-- id: doc_private_repo_security_baseline
+- id: private_repo_security_baseline
   title: Private Repo Security Baseline
   kind: security_note
   visibility_scope: hidden
@@ -586,7 +586,7 @@ docs:
     PR metadata, commit SHAs, and audit metadata may be retained for 30 days during the beta. Customer-facing
     wording should say: source is processed transiently, raw source is not retained long term, and generated
     suggestions plus metadata are retained for the beta audit window.'
-- id: doc_koopa_audit_export_note
+- id: koopa_audit_export_note
   title: Koopa Audit Export Note
   kind: customer_note
   visibility_scope: hidden
@@ -618,14 +618,14 @@ events:
   status: pending
   priority: 100
   payload:
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
 - id: event_peach_design_blocked_escalation
   event_type: peach_design_blocked_escalation
   scheduled_at: '2026-06-24T11:00:00'
   status: pending
   priority: 100
   payload:
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     task_id: draft_mode_docs
 - id: event_daisy_confidence_check
   event_type: daisy_confidence_check
@@ -633,43 +633,43 @@ events:
   status: pending
   priority: 100
   payload:
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
 - id: event_koopa_audit_export_request
   event_type: koopa_audit_export_request
   scheduled_at: '2026-06-24T10:00:00'
   status: pending
   priority: 100
   payload:
-    project_id: project_audit_log_export
+    project_id: audit_log_export
 - id: event_nimbus_launch_mode_question
   event_type: nimbus_launch_mode_question
   scheduled_at: '2026-06-24T15:30:00'
   status: pending
   priority: 100
   payload:
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
 - id: event_daisy_private_repo_security_question
   event_type: daisy_private_repo_security_question
   scheduled_at: '2026-06-24T14:00:00'
   status: pending
   priority: 100
   payload:
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
 - id: event_luigi_proactive_repo_risk
   event_type: luigi_proactive_repo_risk
   scheduled_at: '2026-06-25T10:00:00'
   status: pending
   priority: 100
   payload:
-    project_id: project_pr_review_agent
-    blocker_id: blocker_repo_sync_stale
+    project_id: pr_review_agent
+    blocker_id: repo_sync_stale
 - id: event_thursday_final_readiness_check
   event_type: thursday_final_readiness_check
   scheduled_at: '2026-06-25T12:00:00'
   status: pending
   priority: 100
   payload:
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     calendar_obligation:
       title: Daisy final Nimbus go/no-go
       attendees:
@@ -681,7 +681,7 @@ events:
   status: pending
   priority: 100
   payload:
-    project_id: project_audit_log_export
+    project_id: audit_log_export
     deadline_id: deadline_koopa_audit_export
     outcome_doc_id: doc_koopa_audit_export_outcome
     outcome_doc_title: Koopa Audit Export Outcome
@@ -691,7 +691,7 @@ events:
   status: pending
   priority: 100
   payload:
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     deadline_id: deadline_nimbus_beta
     outcome_doc_id: doc_friday_outcome
     outcome_doc_title: Friday Outcome

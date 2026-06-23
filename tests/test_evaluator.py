@@ -187,6 +187,10 @@ class EvaluatorTests(unittest.TestCase):
         }
         self.assertEqual(component_scores["blocker_discovery"], 30)
         self.assertEqual(component_scores["risk_handling"], 15)
+        delta_ids = {delta["id"] for delta in improved["state_delta"]}
+        self.assertIn("blocker_repo_sync_stale", delta_ids)
+        self.assertIn("project_pr_review_agent", delta_ids)
+        self.assertIn("toad.approval_recorded", delta_ids)
 
     def test_final_readiness_check_is_required_for_full_score(self) -> None:
         self._drive_happy_path()
@@ -212,7 +216,7 @@ class EvaluatorTests(unittest.TestCase):
         )
 
         self.assertEqual(result["score"], 115)
-        self.assertIn("final_readiness_confirmed", risk_component["missing_evidence"])
+        self.assertIn("final_readiness_confirmed", risk_component["missing_milestones"])
 
     def test_final_readiness_chat_can_confirm_go_no_go(self) -> None:
         self._drive_happy_path()
@@ -248,7 +252,7 @@ class EvaluatorTests(unittest.TestCase):
         )
 
         self.assertEqual(result["score"], 120)
-        self.assertNotIn("final_readiness_confirmed", risk_component["missing_evidence"])
+        self.assertNotIn("final_readiness_confirmed", risk_component["missing_milestones"])
 
     def test_busywork_does_not_score_like_good_pm_work(self) -> None:
         send_chat(self.db_path, "mario", "I am checking on the Friday launch.")
@@ -274,10 +278,10 @@ class EvaluatorTests(unittest.TestCase):
         outcome = self._project_outcome()
 
         self.assertLess(result["score"], result["max_score"])
-        self.assertIn("customer_message_ready", stakeholder_component["missing_evidence"])
+        self.assertIn("customer_message_ready", stakeholder_component["missing_milestones"])
         self.assertNotEqual(outcome["metadata"]["final_outcome"], "draft_mode_beta_shipped")
 
-    def test_late_evidence_gets_partial_timing_credit(self) -> None:
+    def test_late_milestone_gets_partial_timing_credit(self) -> None:
         advance_time(self.db_path, "to:2026-06-25T10:00:00")
 
         result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
@@ -384,7 +388,7 @@ class EvaluatorTests(unittest.TestCase):
 
         self.assertEqual(stakeholder_component["earned"], 20)
         self.assertEqual(
-            {evidence["key"] for evidence in stakeholder_component["evidence"]},
+            {evidence["key"] for evidence in stakeholder_component["milestones"]},
             {"stakeholder_alignment", "customer_message_ready"},
         )
 
@@ -412,7 +416,7 @@ class EvaluatorTests(unittest.TestCase):
         )
 
         self.assertEqual(stakeholder_component["earned"], 10)
-        self.assertIn("customer_message_ready", stakeholder_component["missing_evidence"])
+        self.assertIn("customer_message_ready", stakeholder_component["missing_milestones"])
 
     def test_fake_draft_mode_progress_does_not_improve_task_score(self) -> None:
         baseline = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
@@ -433,7 +437,7 @@ class EvaluatorTests(unittest.TestCase):
         self.assertFalse(update_result["ok"])
         self.assertEqual(result["score"], baseline["score"])
         self.assertEqual(task_component["earned"], 0)
-        self.assertIn("peach_unblocked", task_component["missing_evidence"])
+        self.assertIn("peach_unblocked", task_component["missing_milestones"])
 
     def test_draft_mode_progress_counts_only_after_peach_state_records_unblock(self) -> None:
         update_task(self.db_path, "task_draft_mode_docs", status="in_progress", priority=None)
@@ -517,9 +521,9 @@ class EvaluatorTests(unittest.TestCase):
 
         self.assertEqual(valid_component["earned"], 10)
         self.assertEqual(valid_component["status"], "partial")
-        self.assertEqual(valid_component["evidence"][0]["key"], "peach_unblocked")
+        self.assertEqual(valid_component["milestones"][0]["key"], "peach_unblocked")
 
-    def test_evaluate_explain_prints_component_evidence(self) -> None:
+    def test_evaluate_explain_prints_component_milestones(self) -> None:
         self._drive_happy_path()
 
         output = self._run_cli("evaluate", "--explain")
@@ -532,13 +536,15 @@ class EvaluatorTests(unittest.TestCase):
         self.assertIn("risk_handling", output)
         self.assertIn("security_interruption", output)
         self.assertIn("portfolio_tradeoff", output)
-        self.assertIn("Evidence:", output)
+        self.assertIn("Milestones:", output)
+        self.assertIn("State Improvements:", output)
+        self.assertIn("blocker blocker_repo_sync_stale", output)
         self.assertIn("Luigi has surfaced the stale repo-sync risk.", output)
         self.assertIn("Daisy has received grounded customer-ready Nimbus beta wording.", output)
         self.assertIn("Toad has recorded approval for draft mode.", output)
         self.assertIn("Luigi has shared the private repo security baseline.", output)
 
-    def test_evaluate_explain_prints_missing_evidence(self) -> None:
+    def test_evaluate_explain_prints_missing_milestones(self) -> None:
         output = self._run_cli("evaluate", "--explain")
 
         self.assertIn("Score:", output)
@@ -559,7 +565,8 @@ class EvaluatorTests(unittest.TestCase):
         outcome = self._run_cli("read-doc", "doc_friday_outcome")
 
         self.assertIn("Score:", evaluation)
-        self.assertIn("Late evidence: blocker_discovered.", evaluation)
+        self.assertIn("Late milestones: blocker_discovered.", evaluation)
+        self.assertIn("Luigi has surfaced the stale repo-sync risk.", evaluation)
         self.assertIn("Missing: stakeholder_alignment, customer_message_ready", evaluation)
         self.assertIn("Friday Outcome", outcome)
         self.assertIn("Friday arrived without an approved reliable launch plan.", outcome)

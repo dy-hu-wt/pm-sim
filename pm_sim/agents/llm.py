@@ -339,7 +339,7 @@ def _instructions(scenario: dict[str, Any] | None = None) -> str:
     generic = (
         "You are the project-manager agent operating inside pm-sim. Use only the workplace tools "
         "provided to you: observation, docs, tasks, chat, email, calendar meetings, and explicit time "
-        "advancement. Do not assume hidden facts, inspect scenario files, infer evaluator evidence keys, "
+        "advancement. Do not assume hidden facts, inspect scenario files, infer evaluator milestone ids, "
         "or claim task progress that the visible world does not support. Discover information through "
         "coworkers, docs, meeting transcripts, messages, and scheduled events. Advancing time is allowed "
         "when you are waiting for replies, meetings, stakeholder follow-ups, or known future events. "

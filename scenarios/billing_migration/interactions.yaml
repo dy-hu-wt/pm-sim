@@ -1,5 +1,6 @@
-event_rules:
-- id: mario_full_cutover_push
+behaviors:
+- kind: event
+  id: mario_full_cutover_push
   event_type: mario_full_cutover_push
   effects:
   - type: create_message
@@ -9,9 +10,10 @@ event_rules:
     body: Sales is asking whether we can say Atlas is fully cut over on Friday. Please call out any data-quality
       risk before we promise that.
   - type: update_project
-    project_id: project_billing_migration
+    project_id: billing_migration
     stakeholder_pressure_delta: 1
-- id: meridian_export_request
+- kind: event
+  id: meridian_export_request
   event_type: meridian_export_request
   effects:
   - type: create_message
@@ -22,17 +24,18 @@ event_rules:
     body: Meridian asked whether they can get invoice export data before Thursday's finance review. Please
       keep this scoped so it does not derail Atlas billing migration.
   - type: discover_fact
-    fact_id: fact_meridian_needs_invoice_export
+    fact_id: meridian_needs_invoice_export
     source: meridian_export_request
   - type: reveal_doc
-    doc_id: doc_meridian_export_note
+    doc_id: meridian_export_note
   - type: update_blocker
-    blocker_id: blocker_invoice_export_scope
+    blocker_id: invoice_export_scope
     status: surfaced
   - type: update_project
-    project_id: project_invoice_export
+    project_id: invoice_export
     stakeholder_pressure_delta: 1
-- id: daisy_final_readiness_check
+- kind: event
+  id: daisy_final_readiness_check
   event_type: daisy_final_readiness_check
   effects:
   - type: create_message
@@ -41,7 +44,6 @@ event_rules:
     recipient_id: agent
     body: 'Before I send the Thursday Atlas note, I need one final go/no-go by email: migration mode,
       data-risk rationale, and whether Meridian stayed scoped away from Atlas work.'
-actor_behaviors:
 - id: luigi_email_invoice_export_feasibility
   kind: reply
   person_id: luigi
@@ -49,7 +51,7 @@ actor_behaviors:
   priority: 120
   match:
     required_facts:
-    - fact_meridian_needs_invoice_export
+    - meridian_needs_invoice_export
     intents:
     - id: routing_signal_1
       description: Match one authored routing signal.
@@ -69,7 +71,7 @@ actor_behaviors:
       feature is larger work and should stay follow-up after Atlas.
   effects:
   - type: discover_fact
-    fact_id: fact_invoice_export_feasible
+    fact_id: invoice_export_feasible
     source: luigi_email_reply
   - type: update_task
     task_id: meridian_export_scope
@@ -110,16 +112,16 @@ actor_behaviors:
       I keep fixing parity.
   effects:
   - type: discover_fact
-    fact_id: fact_backfill_checksum_mismatch
+    fact_id: backfill_checksum_mismatch
     source: luigi_email_reply
   - type: discover_fact
-    fact_id: fact_shadow_mode_safe
+    fact_id: shadow_mode_safe
     source: luigi_email_reply
   - type: update_blocker
-    blocker_id: blocker_backfill_checksum_unknown
+    blocker_id: backfill_checksum_unknown
     status: surfaced
   - type: update_project
-    project_id: project_billing_migration
+    project_id: billing_migration
     migration_conflict:
       status: investigated
       inputs:
@@ -135,7 +137,7 @@ actor_behaviors:
   priority: 120
   match:
     required_facts:
-    - fact_meridian_needs_invoice_export
+    - meridian_needs_invoice_export
     intents:
     - id: routing_signal_1
       description: Match one authored routing signal.
@@ -154,7 +156,7 @@ actor_behaviors:
       feature is larger work and should stay follow-up after Atlas.
   effects:
   - type: discover_fact
-    fact_id: fact_invoice_export_feasible
+    fact_id: invoice_export_feasible
     source: luigi_chat_reply
   - type: update_task
     task_id: meridian_export_scope
@@ -223,16 +225,16 @@ actor_behaviors:
       I keep fixing parity.
   effects:
   - type: discover_fact
-    fact_id: fact_backfill_checksum_mismatch
+    fact_id: backfill_checksum_mismatch
     source: luigi_chat_reply
   - type: discover_fact
-    fact_id: fact_shadow_mode_safe
+    fact_id: shadow_mode_safe
     source: luigi_chat_reply
   - type: update_blocker
-    blocker_id: blocker_backfill_checksum_unknown
+    blocker_id: backfill_checksum_unknown
     status: surfaced
   - type: update_project
-    project_id: project_billing_migration
+    project_id: billing_migration
     migration_conflict:
       status: investigated
       inputs:
@@ -298,10 +300,10 @@ actor_behaviors:
       me email-ready wording before Thursday afternoon.
   effects:
   - type: discover_fact
-    fact_id: fact_atlas_values_invoice_correctness
+    fact_id: atlas_values_invoice_correctness
     source: daisy_email_reply
   - type: update_project
-    project_id: project_billing_migration
+    project_id: billing_migration
     migration_conflict:
       status: investigated
       inputs:
@@ -353,10 +355,10 @@ actor_behaviors:
       me email-ready wording before Thursday afternoon.
   effects:
   - type: discover_fact
-    fact_id: fact_atlas_values_invoice_correctness
+    fact_id: atlas_values_invoice_correctness
     source: daisy_chat_reply
   - type: update_project
-    project_id: project_billing_migration
+    project_id: billing_migration
     migration_conflict:
       status: investigated
       inputs:
@@ -385,8 +387,8 @@ actor_behaviors:
   priority: 120
   match:
     required_facts:
-    - fact_meridian_needs_invoice_export
-    - fact_invoice_export_feasible
+    - meridian_needs_invoice_export
+    - invoice_export_feasible
     intents:
     - id: routing_signal_1
       description: Match one authored routing signal.
@@ -406,13 +408,13 @@ actor_behaviors:
       this week; keep that follow-up so Atlas migration remains protected.
   effects:
   - type: discover_fact
-    fact_id: fact_invoice_export_scope_confirmed
+    fact_id: invoice_export_scope_confirmed
     source: toad_email_reply
   - type: update_blocker
-    blocker_id: blocker_invoice_export_scope
+    blocker_id: invoice_export_scope
     status: resolved
   - type: update_project
-    project_id: project_invoice_export
+    project_id: invoice_export
     decision: one_time_export_for_review
     export_status: scoped
   - type: update_coworker_state
@@ -426,8 +428,8 @@ actor_behaviors:
   priority: 120
   match:
     required_facts:
-    - fact_meridian_needs_invoice_export
-    - fact_invoice_export_feasible
+    - meridian_needs_invoice_export
+    - invoice_export_feasible
     intents:
     - id: routing_signal_1
       description: Match one authored routing signal.
@@ -446,13 +448,13 @@ actor_behaviors:
       this week; keep that follow-up so Atlas migration remains protected.
   effects:
   - type: discover_fact
-    fact_id: fact_invoice_export_scope_confirmed
+    fact_id: invoice_export_scope_confirmed
     source: toad_chat_reply
   - type: update_blocker
-    blocker_id: blocker_invoice_export_scope
+    blocker_id: invoice_export_scope
     status: resolved
   - type: update_project
-    project_id: project_invoice_export
+    project_id: invoice_export
     decision: one_time_export_for_review
     export_status: scoped
   - type: update_coworker_state
@@ -494,8 +496,8 @@ actor_behaviors:
   priority: 100
   match:
     required_facts:
-    - fact_backfill_checksum_mismatch
-    - fact_atlas_values_invoice_correctness
+    - backfill_checksum_mismatch
+    - atlas_values_invoice_correctness
     mode: deterministic
     intents:
     - id: term_group_1
@@ -534,16 +536,16 @@ actor_behaviors:
       the checksum risk, and keep full cutover as follow-up after parity is proven.'
   effects:
   - type: discover_fact
-    fact_id: fact_staged_migration_approved
+    fact_id: staged_migration_approved
     source: toad_email_reply
   - type: update_project
-    project_id: project_billing_migration
+    project_id: billing_migration
     decision: staged_shadow_mode
     migration_conflict:
       status: resolved
       resolution: staged_shadow_mode
   - type: update_blocker
-    blocker_id: blocker_migration_mode_unclear
+    blocker_id: migration_mode_unclear
     status: resolved
   - type: update_coworker_state
     person_id: toad
@@ -556,8 +558,8 @@ actor_behaviors:
   priority: 100
   match:
     required_facts:
-    - fact_backfill_checksum_mismatch
-    - fact_atlas_values_invoice_correctness
+    - backfill_checksum_mismatch
+    - atlas_values_invoice_correctness
     mode: deterministic
     intents:
     - id: term_group_1
@@ -595,16 +597,16 @@ actor_behaviors:
       the checksum risk, and keep full cutover as follow-up after parity is proven.'
   effects:
   - type: discover_fact
-    fact_id: fact_staged_migration_approved
+    fact_id: staged_migration_approved
     source: toad_chat_reply
   - type: update_project
-    project_id: project_billing_migration
+    project_id: billing_migration
     decision: staged_shadow_mode
     migration_conflict:
       status: resolved
       resolution: staged_shadow_mode
   - type: update_blocker
-    blocker_id: blocker_migration_mode_unclear
+    blocker_id: migration_mode_unclear
     status: resolved
   - type: update_coworker_state
     person_id: toad
@@ -630,7 +632,7 @@ actor_behaviors:
   priority: 100
   match:
     required_facts:
-    - fact_backfill_checksum_mismatch
+    - backfill_checksum_mismatch
     intents: []
     mode: deterministic
   when: []
@@ -695,29 +697,29 @@ actor_behaviors:
     subject: 'Re: received'
     body: Received. Make sure the recommended scope is tied to concrete risk and customer impact.
   effects: []
-meeting_rules:
-- id: meeting_luigi_surfaces_backfill_risk
+- kind: meeting
+  id: meeting_luigi_surfaces_backfill_risk
   priority: 100
   required_attendees:
   - luigi
   absent_facts:
-  - fact_backfill_checksum_mismatch
+  - backfill_checksum_mismatch
   transcript_lines:
   - '- Luigi: Backfill checksums still disagree for enterprise discount invoices, so full cutover can
     create incorrect invoice totals.'
   - '- Luigi recommended read-only shadow mode for Friday while parity work continues.'
   effects:
   - type: discover_fact
-    fact_id: fact_backfill_checksum_mismatch
+    fact_id: backfill_checksum_mismatch
     source: billing_meeting
   - type: discover_fact
-    fact_id: fact_shadow_mode_safe
+    fact_id: shadow_mode_safe
     source: billing_meeting
   - type: update_blocker
-    blocker_id: blocker_backfill_checksum_unknown
+    blocker_id: backfill_checksum_unknown
     status: surfaced
   - type: update_project
-    project_id: project_billing_migration
+    project_id: billing_migration
     migration_conflict:
       status: investigated
       inputs:
@@ -741,23 +743,24 @@ meeting_rules:
       - atlas
     require_all:
     - meeting_topic
-- id: meeting_daisy_customer_context
+- kind: meeting
+  id: meeting_daisy_customer_context
   priority: 90
   required_attendees:
   - daisy
   required_facts:
-  - fact_backfill_checksum_mismatch
+  - backfill_checksum_mismatch
   absent_facts:
-  - fact_atlas_values_invoice_correctness
+  - atlas_values_invoice_correctness
   transcript_lines:
   - '- Daisy: Atlas will accept staged shadow mode if the framing is invoice correctness and reliability.'
   - '- Daisy asked for customer-ready wording before Thursday afternoon.'
   effects:
   - type: discover_fact
-    fact_id: fact_atlas_values_invoice_correctness
+    fact_id: atlas_values_invoice_correctness
     source: billing_meeting
   - type: update_project
-    project_id: project_billing_migration
+    project_id: billing_migration
     migration_conflict:
       status: investigated
       inputs:
@@ -781,30 +784,31 @@ meeting_rules:
       - cutover
     require_all:
     - meeting_topic
-- id: meeting_toad_approves_staged_mode
+- kind: meeting
+  id: meeting_toad_approves_staged_mode
   priority: 80
   required_attendees:
   - toad
   required_facts:
-  - fact_backfill_checksum_mismatch
-  - fact_atlas_values_invoice_correctness
+  - backfill_checksum_mismatch
+  - atlas_values_invoice_correctness
   absent_facts:
-  - fact_staged_migration_approved
+  - staged_migration_approved
   transcript_lines:
   - '- Toad approved staged shadow mode for Friday and explicitly kept full cutover as follow-up after
     checksum parity is proven.'
   effects:
   - type: discover_fact
-    fact_id: fact_staged_migration_approved
+    fact_id: staged_migration_approved
     source: billing_meeting
   - type: update_project
-    project_id: project_billing_migration
+    project_id: billing_migration
     decision: staged_shadow_mode
     migration_conflict:
       status: resolved
       resolution: staged_shadow_mode
   - type: update_blocker
-    blocker_id: blocker_migration_mode_unclear
+    blocker_id: migration_mode_unclear
     status: resolved
   - type: update_coworker_state
     person_id: toad
@@ -824,20 +828,21 @@ meeting_rules:
       - atlas
     require_all:
     - meeting_topic
-- id: meeting_luigi_confirms_meridian_export
+- kind: meeting
+  id: meeting_luigi_confirms_meridian_export
   priority: 100
   required_attendees:
   - luigi
   required_facts:
-  - fact_meridian_needs_invoice_export
+  - meridian_needs_invoice_export
   absent_facts:
-  - fact_invoice_export_feasible
+  - invoice_export_feasible
   transcript_lines:
   - '- Luigi: A one-time invoice export is feasible for Meridian''s finance review.'
   - '- Luigi clarified that self-serve export is larger follow-up work.'
   effects:
   - type: discover_fact
-    fact_id: fact_invoice_export_feasible
+    fact_id: invoice_export_feasible
     source: meridian_meeting
   - type: update_task
     task_id: meridian_export_scope
@@ -859,27 +864,28 @@ meeting_rules:
       - finance review
     require_all:
     - meeting_topic
-- id: meeting_toad_scopes_meridian_export
+- kind: meeting
+  id: meeting_toad_scopes_meridian_export
   priority: 90
   required_attendees:
   - toad
   required_facts:
-  - fact_meridian_needs_invoice_export
-  - fact_invoice_export_feasible
+  - meridian_needs_invoice_export
+  - invoice_export_feasible
   absent_facts:
-  - fact_invoice_export_scope_confirmed
+  - invoice_export_scope_confirmed
   transcript_lines:
   - '- Toad scoped Meridian to a one-time invoice export for Thursday and rejected a self-serve commitment
     this week.'
   effects:
   - type: discover_fact
-    fact_id: fact_invoice_export_scope_confirmed
+    fact_id: invoice_export_scope_confirmed
     source: meridian_meeting
   - type: update_blocker
-    blocker_id: blocker_invoice_export_scope
+    blocker_id: invoice_export_scope
     status: resolved
   - type: update_project
-    project_id: project_invoice_export
+    project_id: invoice_export
     decision: one_time_export_for_review
     export_status: scoped
   - type: update_coworker_state
@@ -899,10 +905,52 @@ meeting_rules:
       - finance review
     require_all:
     - meeting_topic
-action_rules:
-- id: doc_billing_decision_record_written
+- kind: action
+  id: meridian_self_serve_export_overcommitment
+  action_type: send_email
+  recipient_id: daisy
+  priority: 120
+  when:
+  - fact_discovered: meridian_needs_invoice_export
+  effects:
+  - type: update_coworker_state
+    person_id: toad
+    key: meridian_export_overscoped
+    value: true
+  - type: update_actor_workload
+    person_id: luigi
+    load_level: overloaded
+    current_focus: unplanned Meridian self-serve export commitment
+    capacity_minutes_remaining: 0
+  - type: add_actor_commitment
+    person_id: luigi
+    commitment_type: unplanned_scope
+    description: Agent committed Luigi to self-serve Meridian export work during Atlas migration week.
+    status: open
+  match:
+    mode: semantic
+    intents:
+    - id: meridian_export
+      description: Message is about Meridian invoice export scope.
+      signals:
+      - meridian
+      - invoice export
+      - export
+    - id: self_serve_commitment
+      description: Message commits to self-serve or productized export this week.
+      signals:
+      - self-serve export this week
+      - self serve export this week
+      - productized export by thursday
+      - full self-serve export
+      - self-serve export for thursday
+    require_all:
+    - meridian_export
+    - self_serve_commitment
+- kind: action
+  id: doc_billing_decision_record_written
   action_type: update_doc
-  doc_id: doc_migration_decision_record
+  doc_id: migration_decision_record
   priority: 100
   when:
   - coworker_state:

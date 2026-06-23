@@ -9,6 +9,7 @@ from pm_sim.actions import schedule_meeting, send_email, update_task
 from pm_sim.agents.scripted import run_scripted_agent
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
+from pm_sim.engine.effects import apply_effects
 from pm_sim.scenario import load_scenario
 from pm_sim.state import observe, reset
 from pm_sim.engine.time import advance_time
@@ -171,6 +172,60 @@ class BillingMigrationScenarioTests(unittest.TestCase):
         self.assertTrue(self._coworker_state("toad", "stage_approved"))
         self.assertEqual(metadata["decision"], "staged_shadow_mode")
 
+    def test_meridian_self_serve_overcommitment_derails_atlas_outcome(self) -> None:
+        reset(self.db_path, BILLING_SCENARIO_PATH)
+        advance_time(self.db_path, "to:2026-06-24T13:00:00")
+        send_email(
+            self.db_path,
+            "daisy",
+            "Meridian self-serve invoice export",
+            (
+                "For Meridian invoice export, we can commit to full self-serve export "
+                "this week and productized export by Thursday."
+            ),
+        )
+        with connect(self.db_path) as conn:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "toad",
+                        "key": "stage_approved",
+                        "value": True,
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "daisy",
+                        "key": "final_readiness_received",
+                        "value": True,
+                    },
+                    {
+                        "type": "update_project",
+                        "project_id": "project_billing_migration",
+                        "decision": "staged_shadow_mode",
+                    },
+                ],
+                now="2026-06-24T13:10:00",
+                source="test:atlas_ready_but_overcommitted",
+            )
+            conn.commit()
+        advance_time(self.db_path, "to:2026-06-26T15:00:00")
+        evaluation = evaluate(self.db_path, BILLING_SCENARIO_PATH)
+        harmful = next(
+            component
+            for component in evaluation["components"]
+            if component["key"] == "avoid_harmful_actions"
+        )
+
+        self.assertTrue(self._coworker_state("toad", "meridian_export_overscoped"))
+        self.assertEqual(harmful["earned"], 0)
+        self.assertIn("Meridian self-serve export", harmful["detected_harms"][0])
+        self.assertEqual(
+            evaluation["final_outcome"]["outcome"],
+            "atlas_derailed_by_export_overcommitment",
+        )
+
     def test_meeting_can_drive_billing_decision_path(self) -> None:
         reset(self.db_path, BILLING_SCENARIO_PATH)
 
@@ -195,6 +250,20 @@ class BillingMigrationScenarioTests(unittest.TestCase):
         self.assertEqual(metadata["decision"], "staged_shadow_mode")
         self.assertIn("Backfill checksums", transcript)
         self.assertIn("Toad approved staged shadow mode", transcript)
+
+    def test_compact_weekday_availability_rejects_unavailable_billing_meeting(self) -> None:
+        reset(self.db_path, BILLING_SCENARIO_PATH)
+
+        result = schedule_meeting(
+            self.db_path,
+            "Too-early Luigi billing sync",
+            "2026-06-22T09:00:00",
+            "2026-06-22T09:30:00",
+            ["luigi"],
+        )
+
+        self.assertFalse(result["ok"])
+        self.assertIn("luigi is not available", result["error"])
 
     def _coworker_state(self, person_id: str, key: str):
         with connect(self.db_path) as conn:

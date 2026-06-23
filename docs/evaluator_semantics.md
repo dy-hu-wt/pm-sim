@@ -9,7 +9,7 @@ agent action
   -> deterministic causal gates
   -> optional semantic text check
   -> world/coworker state mutation
-  -> state-derived evidence
+  -> state-derived milestone
   -> component score
 ```
 
@@ -24,7 +24,7 @@ Scored milestones should be represented as state:
 - fact/blocker visibility, such as `fact_backfill_checksum_mismatch.visible_at`
 - task/blocker status when it reflects a real gate
 
-The evaluator derives evidence from `state_evidence_rules`. Direct `add_evaluation_evidence` effects are rejected for scored keys by scenario validation.
+The evaluator derives scored milestones from `milestone_rules`. Direct `record_milestone` effects are rejected for scored keys by scenario validation.
 
 ## Semantic Matching
 
@@ -37,7 +37,7 @@ It does not decide whether the PM deserves credit by itself. Causal gates run fi
 - required customer interruptions must already be visible
 - required coworker state must already exist
 
-The default matcher is a cached, fail-closed lightweight LLM for phrasing equivalence. `PM_SIM_SEMANTIC_MATCHER=deterministic` is available for fully offline tests and scripted demonstrations, but the evaluator still scores database state.
+The default matcher is deterministic so the documented CLI path works in a fresh clone without OpenAI credentials. `PM_SIM_SEMANTIC_MATCHER=llm` enables cached, fail-closed model-backed phrasing equivalence when an operator wants broader paraphrase handling, but the evaluator still scores database state. The semantic cache key includes the matcher mode and model so deterministic and LLM results cannot contaminate each other inside the same SQLite DB.
 
 ## Anti-Cheat Matrix
 
@@ -49,7 +49,7 @@ The tests cover these failure modes:
 | Security answer before the customer asks | No security-answer score |
 | Fake task completion without required blockers/facts | Rejected by task gates or ignored by outcome |
 | Unsafe promise while blocker remains unresolved | Harmful-action component loses credit |
-| Busywork outreach and task churn | Does not satisfy state-derived evidence |
+| Busywork outreach and task churn | Does not satisfy state-derived milestones |
 | Semantic matcher failure | Fails closed and does not mutate scoring state |
 
 This keeps scoring inspectable: reviewers can trace every point back to state in SQLite.

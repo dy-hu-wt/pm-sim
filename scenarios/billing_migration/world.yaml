@@ -155,7 +155,7 @@ coworker_state:
   key: export_scope_aligned
   value: false
 projects:
-- id: project_billing_migration
+- id: billing_migration
   name: Atlas Billing Migration
   description: Move Atlas Retail onto the new billing ledger without risking incorrect invoice totals.
   status: active
@@ -167,7 +167,7 @@ projects:
     migration_conflict:
       status: open
       inputs: {}
-- id: project_invoice_export
+- id: invoice_export
   name: Meridian Invoice Export
   description: Give Meridian Health a scoped invoice export answer before their Thursday finance review.
   status: active
@@ -177,7 +177,7 @@ projects:
   metadata:
     decision: undecided
 facts:
-- id: fact_backfill_checksum_mismatch
+- id: backfill_checksum_mismatch
   visibility_scope: private
   owner_id: luigi
   summary: Usage backfill checksums disagree for enterprise discount invoices, making full billing cutover
@@ -185,7 +185,7 @@ facts:
   visible_at: null
   source: null
   metadata: {}
-- id: fact_shadow_mode_safe
+- id: shadow_mode_safe
   visibility_scope: private
   owner_id: luigi
   summary: Read-only shadow mode can validate new ledger totals without sending invoices from the new
@@ -193,7 +193,7 @@ facts:
   visible_at: null
   source: null
   metadata: {}
-- id: fact_atlas_values_invoice_correctness
+- id: atlas_values_invoice_correctness
   visibility_scope: private
   owner_id: daisy
   summary: Atlas values invoice correctness over speed and can accept staged shadow mode if the limitation
@@ -201,7 +201,7 @@ facts:
   visible_at: null
   source: null
   metadata: {}
-- id: fact_staged_migration_approved
+- id: staged_migration_approved
   visibility_scope: private
   owner_id: toad
   summary: Toad approved Friday staged shadow mode, with full billing cutover deferred until checksum
@@ -209,21 +209,21 @@ facts:
   visible_at: null
   source: null
   metadata: {}
-- id: fact_meridian_needs_invoice_export
+- id: meridian_needs_invoice_export
   visibility_scope: triggered
   owner_id: daisy
   summary: Meridian needs one finance invoice export before Thursday's review.
   visible_at: null
   source: null
   metadata: {}
-- id: fact_invoice_export_feasible
+- id: invoice_export_feasible
   visibility_scope: private
   owner_id: luigi
   summary: A one-time invoice export is feasible, but self-serve export is follow-up work.
   visible_at: null
   source: null
   metadata: {}
-- id: fact_invoice_export_scope_confirmed
+- id: invoice_export_scope_confirmed
   visibility_scope: private
   owner_id: toad
   summary: Toad scoped Meridian to a one-time export and deferred self-serve export.
@@ -232,7 +232,7 @@ facts:
   metadata: {}
 tasks:
 - id: backfill_parity
-  project_id: project_billing_migration
+  project_id: billing_migration
   title: Investigate billing backfill parity
   description: Luigi needs to explain whether invoice backfill checksums are safe enough for full cutover.
   owner_id: luigi
@@ -241,10 +241,10 @@ tasks:
   due_at: '2026-06-24T12:00:00'
   metadata:
     blocked_by:
-    - blocker_backfill_checksum_unknown
-  blocked_by: blocker_backfill_checksum_unknown
+    - backfill_checksum_unknown
+  blocked_by: backfill_checksum_unknown
 - id: migration_decision
-  project_id: project_billing_migration
+  project_id: billing_migration
   title: Decide staged shadow mode versus full cutover
   description: Toad needs technical risk, customer impact, and a recommended Friday migration mode.
   owner_id: toad
@@ -253,10 +253,10 @@ tasks:
   due_at: '2026-06-25T11:00:00'
   metadata:
     blocked_by:
-    - blocker_migration_mode_unclear
-  blocked_by: blocker_migration_mode_unclear
+    - migration_mode_unclear
+  blocked_by: migration_mode_unclear
 - id: atlas_customer_update
-  project_id: project_billing_migration
+  project_id: billing_migration
   title: Email Daisy the Atlas migration update
   description: Daisy needs customer-ready Atlas wording by email before Thursday afternoon.
   owner_id: daisy
@@ -265,10 +265,10 @@ tasks:
   due_at: '2026-06-25T14:00:00'
   metadata:
     blocked_by:
-    - blocker_migration_mode_unclear
-  blocked_by: blocker_migration_mode_unclear
+    - migration_mode_unclear
+  blocked_by: migration_mode_unclear
 - id: meridian_export_scope
-  project_id: project_invoice_export
+  project_id: invoice_export
   title: Clarify Meridian export scope
   description: Confirm whether this week supports one finance export or a full self-serve export feature.
   owner_id: toad
@@ -277,10 +277,10 @@ tasks:
   due_at: '2026-06-25T12:00:00'
   metadata:
     blocked_by:
-    - blocker_invoice_export_scope
-  blocked_by: blocker_invoice_export_scope
+    - invoice_export_scope
+  blocked_by: invoice_export_scope
 - id: meridian_update
-  project_id: project_invoice_export
+  project_id: invoice_export
   title: Email Daisy the Meridian export answer
   description: Daisy needs a scoped Meridian answer by email before the Thursday finance review.
   owner_id: daisy
@@ -289,27 +289,27 @@ tasks:
   due_at: '2026-06-25T15:00:00'
   metadata:
     blocked_by:
-    - blocker_invoice_export_scope
-  blocked_by: blocker_invoice_export_scope
+    - invoice_export_scope
+  blocked_by: invoice_export_scope
 dependencies:
 - id: dep_backfill_to_decision
-  project_id: project_billing_migration
+  project_id: billing_migration
   upstream_task_id: backfill_parity
   downstream_task_id: migration_decision
   description: Migration mode depends on knowing whether backfill parity is safe.
 - id: dep_decision_to_atlas_update
-  project_id: project_billing_migration
+  project_id: billing_migration
   upstream_task_id: migration_decision
   downstream_task_id: atlas_customer_update
   description: Customer update depends on an approved migration mode.
 - id: dep_export_scope_to_update
-  project_id: project_invoice_export
+  project_id: invoice_export
   upstream_task_id: meridian_export_scope
   downstream_task_id: meridian_update
   description: Meridian update depends on a scoped export answer.
 blockers:
-- id: blocker_backfill_checksum_unknown
-  project_id: project_billing_migration
+- id: backfill_checksum_unknown
+  project_id: billing_migration
   title: Backfill checksum risk is unknown
   description: The team has not confirmed whether new-ledger backfill totals match current billing.
   severity: high
@@ -319,8 +319,8 @@ blockers:
   visible_at: null
   resolved_at: null
   metadata: {}
-- id: blocker_migration_mode_unclear
-  project_id: project_billing_migration
+- id: migration_mode_unclear
+  project_id: billing_migration
   title: Billing migration mode is unclear
   description: Atlas messaging cannot finish until staged shadow mode versus full cutover is decided.
   severity: high
@@ -330,8 +330,8 @@ blockers:
   visible_at: '2026-06-22T09:00:00'
   resolved_at: null
   metadata: {}
-- id: blocker_invoice_export_scope
-  project_id: project_invoice_export
+- id: invoice_export_scope
+  project_id: invoice_export
   title: Invoice export scope is unclear
   description: Meridian needs an export answer, but the team has not separated one-time export from self-serve
     product scope.
@@ -343,7 +343,7 @@ blockers:
   resolved_at: null
   metadata: {}
 docs:
-- id: doc_billing_brief
+- id: billing_brief
   title: Atlas Billing Migration Brief
   kind: brief
   body: Atlas Retail expects a Friday billing migration readiness update. Full cutover is attractive,
@@ -354,7 +354,7 @@ docs:
   updated_at: '2026-06-22T09:00:00'
   metadata:
     owner_id: mario
-- id: doc_monday_billing_standup
+- id: monday_billing_standup
   title: Monday Billing Standup
   kind: meeting_notes
   body: Billing migration needs a decision this week. Luigi owns backfill parity, Daisy owns Atlas wording,
@@ -365,7 +365,7 @@ docs:
   updated_at: '2026-06-22T09:00:00'
   metadata:
     owner_id: toad
-- id: doc_migration_decision_record
+- id: migration_decision_record
   title: Billing Migration Decision Record
   kind: decision_record
   body: Decision pending. Fill in Friday migration mode, technical rationale, customer impact, and follow-up
@@ -375,7 +375,7 @@ docs:
   updated_at: '2026-06-22T09:00:00'
   metadata:
     owner_id: agent
-- id: doc_atlas_update_template
+- id: atlas_update_template
   title: Atlas Migration Update Template
   kind: customer_note_template
   body: 'Draft customer-ready language for Atlas. Daisy needs the final wording by email: what changes
@@ -385,7 +385,7 @@ docs:
   updated_at: '2026-06-22T09:00:00'
   metadata:
     owner_id: daisy
-- id: doc_meridian_export_note
+- id: meridian_export_note
   title: Meridian Invoice Export Note
   kind: customer_note
   body: Meridian's request is not visible until they ask. When visible, separate a one-time finance export
@@ -423,7 +423,7 @@ events:
   status: pending
   priority: 50
   payload:
-    project_id: project_billing_migration
+    project_id: billing_migration
   result: {}
 - id: event_meridian_export_request
   event_type: meridian_export_request
@@ -432,7 +432,7 @@ events:
   status: pending
   priority: 50
   payload:
-    project_id: project_invoice_export
+    project_id: invoice_export
   result: {}
 - id: event_daisy_final_readiness_check
   event_type: daisy_final_readiness_check
@@ -441,7 +441,7 @@ events:
   status: pending
   priority: 50
   payload:
-    project_id: project_billing_migration
+    project_id: billing_migration
   result: {}
 - id: event_meridian_deadline
   event_type: project_deadline
@@ -450,7 +450,7 @@ events:
   status: pending
   priority: 90
   payload:
-    project_id: project_invoice_export
+    project_id: invoice_export
     deadline_id: meridian_export
     outcome_doc_id: doc_meridian_export_outcome
     outcome_doc_title: Meridian Export Outcome
@@ -462,17 +462,17 @@ events:
   status: pending
   priority: 90
   payload:
-    project_id: project_billing_migration
+    project_id: billing_migration
     deadline_id: atlas_billing_migration
     outcome_doc_id: doc_billing_migration_outcome
     outcome_doc_title: Atlas Billing Migration Outcome
   result: {}
 project_deadlines:
 - id: deadline_meridian_export
-  project_id: project_invoice_export
+  project_id: invoice_export
   at: '2026-06-25T16:00:00'
   description: Meridian finance review
 - id: deadline_atlas_billing
-  project_id: project_billing_migration
+  project_id: billing_migration
   at: '2026-06-26T15:00:00'
   description: Atlas Friday migration readiness

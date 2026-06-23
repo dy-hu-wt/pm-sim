@@ -155,7 +155,7 @@ class ScenarioValidationTests(unittest.TestCase):
 
     def test_invalid_action_match_intent_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.base)
-        scenario["action_rules"][0]["match"] = {
+        scenario["grading_rules"][0]["action"]["match"] = {
             "mode": "semantic",
             "intents": [{"id": "missing_description"}],
             "require_all": ["missing_description"],
@@ -164,17 +164,17 @@ class ScenarioValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ScenarioError, "must include description"):
             load_scenario(self._write_scenario(scenario))
 
-    def test_direct_scored_evidence_effect_raises_scenario_error(self) -> None:
+    def test_direct_scored_milestone_effect_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.base)
         scenario["event_rules"][0]["effects"].append(
             {
-                "type": "add_evaluation_evidence",
+                "type": "record_milestone",
                 "key": "blocker_discovered",
-                "note": "Direct scoring evidence should not be authored.",
+                "note": "Direct scoring milestone should not be authored.",
             }
         )
 
-        with self.assertRaisesRegex(ScenarioError, "directly writes scored evidence"):
+        with self.assertRaisesRegex(ScenarioError, "directly writes scored milestone"):
             load_scenario(self._write_scenario(scenario))
 
     def test_manifest_scenario_includes_files(self) -> None:

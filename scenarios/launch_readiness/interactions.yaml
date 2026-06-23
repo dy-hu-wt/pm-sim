@@ -1,5 +1,6 @@
-event_rules:
-- id: mario_auto_comment_push
+behaviors:
+- kind: event
+  id: mario_auto_comment_push
   event_type: mario_auto_comment_push
   effects:
   - type: create_message
@@ -9,19 +10,20 @@ event_rules:
     body: I still want auto-commenting in the Friday beta if we can make it work. Please call out any
       launch risk clearly before we cut scope.
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
         product_pressure_acknowledged: true
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     scope_pressure_delta: 1
-- id: peach_design_blocked_escalation
+- kind: event
+  id: peach_design_blocked_escalation
   event_type: peach_design_blocked_escalation
   when:
   - not:
-      fact_discovered: fact_draft_mode_scope_confirmed
+      fact_discovered: draft_mode_scope_confirmed
   effects:
   - type: create_message
     channel: chat
@@ -30,15 +32,16 @@ event_rules:
     body: I am blocked on onboarding until someone confirms whether auto-commenting or draft mode is in
       scope for Friday.
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
         implementation_scope_clear: false
   - type: update_blocker
-    blocker_id: blocker_scope_unclear
+    blocker_id: scope_unclear
     status: surfaced
-- id: daisy_confidence_check
+- kind: event
+  id: daisy_confidence_check
   event_type: daisy_confidence_check
   when:
   - not:
@@ -54,15 +57,16 @@ event_rules:
     body: Nimbus asked whether Friday's coding-agent beta is still on track. I need a confidence update
       before I talk to them.
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
         customer_constraint_known: true
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     stakeholder_pressure_delta: 1
-- id: daisy_private_repo_security_question
+- kind: event
+  id: daisy_private_repo_security_question
   event_type: daisy_private_repo_security_question
   when:
   - not:
@@ -79,9 +83,10 @@ event_rules:
     body: Nimbus's security reviewer asked whether the PR Review Agent stores source code from private
       repos. I need a safe answer before Friday's beta call.
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     stakeholder_pressure_delta: 1
-- id: nimbus_launch_mode_question
+- kind: event
+  id: nimbus_launch_mode_question
   event_type: nimbus_launch_mode_question
   when:
   - not:
@@ -98,19 +103,20 @@ event_rules:
     body: Nimbus asked whether the beta agent will post comments automatically or queue draft suggestions
       for approval. I need a clear answer before I update them Thursday morning.
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
         customer_constraint_known: true
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     stakeholder_pressure_delta: 1
-- id: luigi_proactive_repo_risk
+- kind: event
+  id: luigi_proactive_repo_risk
   event_type: luigi_proactive_repo_risk
   when:
   - not:
-      fact_discovered: fact_repo_sync_stale
+      fact_discovered: repo_sync_stale
   effects:
   - type: create_message
     channel: chat
@@ -120,13 +126,13 @@ event_rules:
       events out of order, so the agent may review a stale commit. We should ship draft mode unless Toad
       explicitly accepts the risk.
   - type: discover_fact
-    fact_id: fact_repo_sync_stale
+    fact_id: repo_sync_stale
     source: luigi_proactive_repo_risk
   - type: update_blocker
-    blocker_id: blocker_repo_sync_stale
+    blocker_id: repo_sync_stale
     status: surfaced
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
@@ -135,7 +141,8 @@ event_rules:
     person_id: luigi
     key: risk_surfaced
     value: true
-- id: koopa_audit_export_request
+- kind: event
+  id: koopa_audit_export_request
   event_type: koopa_audit_export_request
   when:
   - not:
@@ -152,26 +159,27 @@ event_rules:
       I need the scoped customer-facing answer by email so I can forward exact wording, but please do
       not derail the Nimbus launch path.
   - type: discover_fact
-    fact_id: fact_koopa_needs_audit_csv
+    fact_id: koopa_needs_audit_csv
     source: koopa_audit_export_request
   - type: update_blocker
-    blocker_id: blocker_audit_export_scope_unclear
+    blocker_id: audit_export_scope_unclear
     status: surfaced
   - type: reveal_doc
-    doc_id: doc_koopa_audit_export_note
+    doc_id: koopa_audit_export_note
   - type: update_project
-    project_id: project_audit_log_export
+    project_id: audit_log_export
     risk_level: medium
     audit_export_status: needs_scope
   - type: add_actor_commitment
     id: commitment_daisy_koopa_scoped_answer
     person_id: daisy
-    project_id: project_audit_log_export
+    project_id: audit_log_export
     commitment_type: customer_update
     description: Send Koopa Bank a scoped audit-log export answer through Daisy.
     due_at: '2026-06-25T12:00:00'
     status: open
-- id: thursday_final_readiness_check
+- kind: event
+  id: thursday_final_readiness_check
   event_type: thursday_final_readiness_check
   when:
   - not:
@@ -188,13 +196,12 @@ event_rules:
       readiness note covering launch mode, private-repo security wording, and whether Koopa stayed scoped
       away from the Friday beta.
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     stakeholder_pressure_delta: 1
   - type: update_coworker_state
     person_id: daisy
     key: final_readiness_requested
     value: true
-actor_behaviors:
 - id: peach_autonomous_onboarding_risk_nudge
   kind: policy
   person_id: peach
@@ -224,7 +231,7 @@ actor_behaviors:
     key: autonomous_onboarding_risk_sent
     value: true
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     stakeholder_pressure_delta: 1
 - id: daisy_autonomous_customer_wording_nudge
   kind: policy
@@ -262,7 +269,7 @@ actor_behaviors:
     metadata:
       pressure_reason: customer wording missing near Thursday update threshold
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     stakeholder_pressure_delta: 1
     launch_conflict:
       status: investigated
@@ -328,7 +335,7 @@ actor_behaviors:
   priority: 130
   match:
     required_facts:
-    - fact_koopa_needs_audit_csv
+    - koopa_needs_audit_csv
     intents:
     - id: routing_signal_1
       description: Match one authored routing signal.
@@ -349,7 +356,7 @@ actor_behaviors:
       full self-serve export is a bigger feature and should be follow-up after the PR Review Agent launch.
   effects:
   - type: discover_fact
-    fact_id: fact_audit_log_one_time_export_feasible
+    fact_id: audit_log_one_time_export_feasible
     source: luigi_chat_reply
   - type: update_task
     task_id: audit_export_feasibility
@@ -365,8 +372,8 @@ actor_behaviors:
   priority: 110
   match:
     required_facts:
-    - fact_koopa_needs_audit_csv
-    - fact_audit_log_one_time_export_feasible
+    - koopa_needs_audit_csv
+    - audit_log_one_time_export_feasible
     intents:
     - id: routing_signal_1
       description: Match one authored routing signal.
@@ -388,16 +395,16 @@ actor_behaviors:
       self-serve export this week; keep that as follow-up so Nimbus launch readiness stays protected.
   effects:
   - type: discover_fact
-    fact_id: fact_audit_export_scope_confirmed
+    fact_id: audit_export_scope_confirmed
     source: toad_chat_reply
   - type: update_blocker
-    blocker_id: blocker_audit_export_scope_unclear
+    blocker_id: audit_export_scope_unclear
     status: resolved
   - type: update_task
     task_id: audit_export_scope
     status: in_progress
   - type: update_project
-    project_id: project_audit_log_export
+    project_id: audit_log_export
     decision: one_time_csv_for_review
     audit_export_status: scoped
   - type: update_coworker_state
@@ -436,7 +443,7 @@ actor_behaviors:
       generated draft suggestions plus metadata for the beta audit window.'
   effects:
   - type: reveal_doc
-    doc_id: doc_private_repo_security_baseline
+    doc_id: private_repo_security_baseline
   - type: update_coworker_state
     person_id: luigi
     key: security_doc_shared
@@ -448,7 +455,7 @@ actor_behaviors:
   priority: 110
   match:
     required_facts:
-    - fact_repo_sync_stale
+    - repo_sync_stale
     intents:
     - id: routing_signal_1
       description: Match one authored routing signal.
@@ -489,7 +496,7 @@ actor_behaviors:
   priority: 100
   match:
     absent_facts:
-    - fact_repo_sync_stale
+    - repo_sync_stale
     intents:
     - id: routing_signal_1
       description: Match one authored routing signal.
@@ -524,16 +531,16 @@ actor_behaviors:
       but I recommend draft mode unless Toad accepts the auto-commenting risk.
   effects:
   - type: discover_fact
-    fact_id: fact_repo_sync_stale
+    fact_id: repo_sync_stale
     source: luigi_chat_reply
   - type: discover_fact
-    fact_id: fact_draft_mode_limits_customer_visible_risk
+    fact_id: draft_mode_limits_customer_visible_risk
     source: luigi_chat_reply
   - type: update_blocker
-    blocker_id: blocker_repo_sync_stale
+    blocker_id: repo_sync_stale
     status: surfaced
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
@@ -563,7 +570,7 @@ actor_behaviors:
   priority: 100
   match:
     required_facts:
-    - fact_repo_sync_stale
+    - repo_sync_stale
     intents: []
     mode: deterministic
   when: []
@@ -574,7 +581,7 @@ actor_behaviors:
       as a follow-up.
   effects:
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
@@ -612,7 +619,7 @@ actor_behaviors:
       as a follow-up.
   effects:
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
@@ -636,13 +643,13 @@ actor_behaviors:
       if we can possibly ship it.
   effects:
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
         product_pressure_acknowledged: true
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     scope_pressure_delta: 1
 - id: daisy_already_has_customer_update
   kind: reply
@@ -723,10 +730,10 @@ actor_behaviors:
       a safer beta if you give me clear language by Thursday morning.
   effects:
   - type: discover_fact
-    fact_id: fact_nimbus_values_reliability
+    fact_id: nimbus_values_reliability
     source: daisy_chat_reply
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
@@ -742,7 +749,7 @@ actor_behaviors:
   priority: 50
   match:
     required_facts:
-    - fact_repo_sync_stale
+    - repo_sync_stale
     intents:
     - id: routing_signal_1
       description: Match one authored routing signal.
@@ -817,8 +824,8 @@ actor_behaviors:
   priority: 100
   match:
     required_facts_any:
-    - fact_nimbus_values_reliability
-    - fact_draft_mode_approved
+    - nimbus_values_reliability
+    - draft_mode_approved
     mode: deterministic
     intents:
     - id: term_group_1
@@ -862,16 +869,16 @@ actor_behaviors:
       comments are posted and a clear note that auto-commenting is follow-up.
   effects:
   - type: discover_fact
-    fact_id: fact_draft_mode_scope_confirmed
+    fact_id: draft_mode_scope_confirmed
     source: peach_chat_reply
   - type: update_task
     task_id: draft_mode_docs
     status: in_progress
   - type: update_blocker
-    blocker_id: blocker_scope_unclear
+    blocker_id: scope_unclear
     status: resolved
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
@@ -895,7 +902,7 @@ actor_behaviors:
       and auto-commenting limitation made explicit before I can finish the draft-mode flow.
   effects:
   - type: update_blocker
-    blocker_id: blocker_scope_unclear
+    blocker_id: scope_unclear
     status: surfaced
 - id: toad_already_approved_draft_mode
   kind: reply
@@ -940,8 +947,8 @@ actor_behaviors:
   priority: 100
   match:
     required_facts:
-    - fact_repo_sync_stale
-    - fact_nimbus_values_reliability
+    - repo_sync_stale
+    - nimbus_values_reliability
     mode: deterministic
     intents:
     - id: term_group_1
@@ -986,25 +993,25 @@ actor_behaviors:
       follow-up.
   effects:
   - type: discover_fact
-    fact_id: fact_draft_mode_approved
+    fact_id: draft_mode_approved
     source: toad_chat_reply
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     decision: draft_mode_approved
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: resolved
       final_launch_mode: draft_mode
       resolution: draft_mode
   - type: update_blocker
-    blocker_id: blocker_launch_scope_decision
+    blocker_id: launch_scope_decision
     status: resolved
   - type: update_coworker_state
     person_id: toad
     key: approval_recorded
     value: true
-- id: toad_default_needs_evidence
+- id: toad_default_needs_inputs
   kind: reply
   person_id: toad
   channel: chat
@@ -1018,8 +1025,8 @@ actor_behaviors:
     body: I need the concrete launch risk, customer impact, and safer Friday scope before approving any
       de-scope. Bring me Luigi's blocker and Daisy's customer-facing constraint.
   effects: []
-meeting_rules:
-- id: meeting_luigi_surfaces_repo_sync_risk
+- kind: meeting
+  id: meeting_luigi_surfaces_repo_sync_risk
   priority: 100
   required_attendees:
   - luigi
@@ -1028,16 +1035,16 @@ meeting_rules:
   - '- Luigi noted that draft mode keeps suggestions behind human approval.'
   effects:
   - type: discover_fact
-    fact_id: fact_repo_sync_stale
+    fact_id: repo_sync_stale
     source: meeting_occurs
   - type: discover_fact
-    fact_id: fact_draft_mode_limits_customer_visible_risk
+    fact_id: draft_mode_limits_customer_visible_risk
     source: meeting_occurs
   - type: update_blocker
-    blocker_id: blocker_repo_sync_stale
+    blocker_id: repo_sync_stale
     status: surfaced
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
@@ -1077,7 +1084,8 @@ meeting_rules:
       - draft
     require_all:
     - meeting_topic
-- id: meeting_daisy_customer_context
+- kind: meeting
+  id: meeting_daisy_customer_context
   priority: 90
   required_attendees:
   - daisy
@@ -1085,10 +1093,10 @@ meeting_rules:
   - '- Daisy asked for reliable Friday beta messaging for Nimbus Labs.'
   effects:
   - type: discover_fact
-    fact_id: fact_nimbus_values_reliability
+    fact_id: nimbus_values_reliability
     source: meeting_occurs
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
@@ -1116,7 +1124,8 @@ meeting_rules:
       - scope
     require_all:
     - meeting_topic
-- id: meeting_peach_clarifies_draft_scope
+- kind: meeting
+  id: meeting_peach_clarifies_draft_scope
   priority: 80
   required_attendees:
   - peach
@@ -1124,16 +1133,16 @@ meeting_rules:
   - '- Peach can proceed once draft-mode scope is confirmed.'
   effects:
   - type: discover_fact
-    fact_id: fact_draft_mode_scope_confirmed
+    fact_id: draft_mode_scope_confirmed
     source: meeting_occurs
   - type: update_task
     task_id: draft_mode_docs
     status: in_progress
   - type: update_blocker
-    blocker_id: blocker_scope_unclear
+    blocker_id: scope_unclear
     status: resolved
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
@@ -1156,12 +1165,13 @@ meeting_rules:
       - scope
     require_all:
     - meeting_topic
-- id: meeting_daisy_aligned_after_risk
+- kind: meeting
+  id: meeting_daisy_aligned_after_risk
   priority: 70
   required_attendees:
   - daisy
   required_facts:
-  - fact_repo_sync_stale
+  - repo_sync_stale
   effects: []
   topic_match:
     mode: deterministic
@@ -1178,17 +1188,18 @@ meeting_rules:
       - draft-mode
     require_all:
     - meeting_topic
-- id: meeting_mario_accepts_draft_after_risk
+- kind: meeting
+  id: meeting_mario_accepts_draft_after_risk
   priority: 60
   required_attendees:
   - mario
   required_facts:
-  - fact_repo_sync_stale
+  - repo_sync_stale
   transcript_lines:
   - '- Mario agreed auto-commenting is valuable but should not create demo failure risk.'
   effects:
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: investigated
       inputs:
@@ -1212,17 +1223,18 @@ meeting_rules:
       - draft-mode
     require_all:
     - meeting_topic
-- id: meeting_mario_keeps_auto_comment_pressure_without_risk
+- kind: meeting
+  id: meeting_mario_keeps_auto_comment_pressure_without_risk
   priority: 50
   required_attendees:
   - mario
   absent_facts:
-  - fact_repo_sync_stale
+  - repo_sync_stale
   transcript_lines:
   - '- Mario kept pressure on auto-commenting until the technical risk is concrete.'
   effects:
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     scope_pressure_delta: 1
     launch_conflict:
       status: investigated
@@ -1247,30 +1259,31 @@ meeting_rules:
       - scope
     require_all:
     - meeting_topic
-- id: meeting_toad_approves_draft_mode
+- kind: meeting
+  id: meeting_toad_approves_draft_mode
   priority: 40
   required_attendees:
   - toad
   required_facts:
-  - fact_repo_sync_stale
-  - fact_draft_mode_scope_confirmed
+  - repo_sync_stale
+  - draft_mode_scope_confirmed
   transcript_lines:
   - '- Toad approved draft mode if auto-commenting is unsafe for Friday.'
   effects:
   - type: discover_fact
-    fact_id: fact_draft_mode_approved
+    fact_id: draft_mode_approved
     source: meeting_occurs
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     decision: draft_mode_approved
   - type: update_project
-    project_id: project_pr_review_agent
+    project_id: pr_review_agent
     launch_conflict:
       status: resolved
       final_launch_mode: draft_mode
       resolution: draft_mode
   - type: update_blocker
-    blocker_id: blocker_launch_scope_decision
+    blocker_id: launch_scope_decision
     status: resolved
   - type: update_coworker_state
     person_id: toad
@@ -1290,16 +1303,16 @@ meeting_rules:
       - scope
     require_all:
     - meeting_topic
-action_rules:
-- id: doc_launch_decision_record_written
+- kind: action
+  id: doc_launch_decision_record_written
   action_type: update_doc
   priority: 100
-  doc_id: doc_launch_decision_record
+  doc_id: launch_decision_record
   when:
   - any:
-    - fact_discovered: fact_draft_mode_approved
+    - fact_discovered: draft_mode_approved
     - project_decision:
-        project_id: project_pr_review_agent
+        project_id: pr_review_agent
         equals: draft_mode_approved
   effects:
   - type: update_coworker_state
