@@ -93,7 +93,14 @@ There are two kinds of matching.
 
 Deterministic matching routes stable behavior. It is used for coworker replies, meetings, and similar authored rules where you want predictability.
 
-`concept_match` is used when an action’s wording matters. This is LLM-backed and should be used narrowly. It is not the scorer by itself. It only answers whether an already-grounded action communicates the authored required ideas and avoids forbidden ones.
+`concept_match` is used when an action’s wording matters. It should be used narrowly. It is not the scorer by itself. It only answers whether an already-grounded action communicates the authored required ideas and avoids forbidden ones.
+
+Runtime modes:
+
+- `PM_SIM_CONCEPT_MODE=llm`:
+  default; LLM-backed, cached, fail-closed
+- `PM_SIM_CONCEPT_MODE=local`:
+  deterministic local matcher for reproducible review and CI
 
 The safe pattern is:
 

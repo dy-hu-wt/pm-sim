@@ -466,6 +466,83 @@ class EffectApplicationTests(unittest.TestCase):
             concept_match_module._llm_match = original
             conn.close()
 
+    def test_local_concept_match_does_not_require_openai_api_key(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            with unittest.mock.patch.dict(
+                "os.environ",
+                {"PM_SIM_CONCEPT_MODE": "local"},
+                clear=True,
+            ):
+                result = concept_match_module.concept_match(
+                    conn,
+                    text="Use draft mode with human approval before posting.",
+                    criteria={
+                        "required": [
+                            {
+                                "id": "draft_mode",
+                                "description": "Friday launch mode is draft mode.",
+                                "exemplars": ["use draft mode with human approval before posting"],
+                                "must_be_asserted": True,
+                            }
+                        ]
+                    },
+                    rule_id="test_local_mode",
+                )
+
+            self.assertTrue(result["matches"])
+            self.assertEqual(result["matcher"], "local")
+        finally:
+            conn.close()
+
+    def test_concept_cache_separates_llm_and_local_modes(self) -> None:
+        conn = connect(self.db_path)
+        original = concept_match_module._llm_match
+        try:
+            concept_match_module._llm_match = lambda text, criteria, *, model=None: {
+                "matches": True,
+                "mode": "concept_match",
+                "matcher": "llm",
+                "model": model,
+                "required": [{"id": "draft_mode_approval", "matched": True, "rationale": "ok"}],
+                "forbidden": [],
+            }
+            with unittest.mock.patch.dict(
+                "os.environ", {"PM_SIM_CONCEPT_MODE": "llm", "PM_SIM_CONCEPT_MODEL": "model-a"}, clear=False
+            ):
+                first = concept_match_module.concept_match(
+                    conn,
+                    text="Use draft mode with human approval.",
+                    criteria={
+                        "required": [
+                            {"id": "draft_mode_approval", "description": "Use draft mode with human approval."}
+                        ]
+                    },
+                    rule_id="test_mode_cache_key",
+                )
+            with unittest.mock.patch.dict("os.environ", {"PM_SIM_CONCEPT_MODE": "local"}, clear=False):
+                second = concept_match_module.concept_match(
+                    conn,
+                    text="Use draft mode with human approval.",
+                    criteria={
+                        "required": [
+                            {
+                                "id": "draft_mode_approval",
+                                "description": "Use draft mode with human approval.",
+                                "exemplars": ["use draft mode with human approval"],
+                            }
+                        ]
+                    },
+                    rule_id="test_mode_cache_key",
+                )
+
+            self.assertEqual(first["matcher"], "llm")
+            self.assertEqual(second["matcher"], "local")
+            self.assertNotEqual(first["cache_key"], second["cache_key"])
+        finally:
+            concept_match_module._llm_match = original
+            conn.close()
+
     def test_llm_result_requires_authored_ids_and_rationales(self) -> None:
         criteria = {
             "required": [

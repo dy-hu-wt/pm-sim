@@ -37,7 +37,7 @@ It does not decide whether the PM deserves credit by itself. Causal gates run fi
 - required customer interruptions must already be visible
 - required coworker state must already exist
 
-Concept matching is LLM-backed and requires `OPENAI_API_KEY` for full scoring. The matcher receives only the authored criteria and the candidate action text, returns per-concept booleans and rationales, and fails closed on missing credentials, invalid output, missing concept IDs, or contradictory top-level results. A match records `action_evidence`; separate deterministic promotion rules re-check causal gates before mutating coworker state or pressure. The evaluator still scores database state. The concept-match cache key includes model, criteria, text, and rule id, so model changes cannot reuse stale results.
+Concept matching has two runtime modes. `PM_SIM_CONCEPT_MODE=llm` is the default: it is LLM-backed, requires `OPENAI_API_KEY`, returns per-concept booleans and rationales, and fails closed on missing credentials, invalid output, missing concept IDs, or contradictory top-level results. `PM_SIM_CONCEPT_MODE=local` is a deterministic fallback for reproducible local review and CI. In both modes, a match records `action_evidence`; separate deterministic promotion rules re-check causal gates before mutating coworker state or pressure. The evaluator still scores database state. The concept-match cache key includes matcher mode, model, criteria, text, and rule id, so LLM and local results cannot contaminate one another.
 
 ## Anti-Cheat Matrix
 

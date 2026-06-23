@@ -37,7 +37,14 @@ python -m pip install -e ".[llm]"
 python -m unittest discover -s tests
 ```
 
-Full scoring requires `OPENAI_API_KEY`. This repo now uses LLM-backed concept matching for authored communication checks, so no-key runs are useful for mechanics and inspection, not for final graded results.
+Concept matching has two runtime modes:
+
+- `PM_SIM_CONCEPT_MODE=llm`:
+  default; LLM-backed, cached, fail-closed
+- `PM_SIM_CONCEPT_MODE=local`:
+  deterministic local matcher for reproducible no-key review
+
+`OPENAI_API_KEY` is required for `PM_SIM_CONCEPT_MODE=llm` and for `pm-sim run-agent --policy llm`. No-key runs can still be fully scored in `PM_SIM_CONCEPT_MODE=local`.
 
 ```bash
 cp .env.example .env
@@ -48,6 +55,7 @@ Set `OPENAI_API_KEY` in `.env`.
 Relevant model settings:
 
 - `OPENAI_MODEL`: agent model default
+- `PM_SIM_CONCEPT_MODE`: `llm` or `local`
 - `PM_SIM_CONCEPT_MODEL`: concept-match model override
 - `--model`: per-run override for `run-agent` or `ui`
 
@@ -83,6 +91,12 @@ Run the scripted reference path:
 
 ```bash
 pm-sim run-agent --policy scripted --reset
+```
+
+Run the scripted reference path in deterministic local-review mode:
+
+```bash
+PM_SIM_CONCEPT_MODE=local pm-sim run-agent --policy scripted --reset
 ```
 
 Evaluate the current state:

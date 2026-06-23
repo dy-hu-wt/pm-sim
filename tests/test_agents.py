@@ -79,6 +79,14 @@ class ScriptedAgentTests(unittest.TestCase):
             ).fetchone()
         self.assertEqual(json.loads(row["metadata_json"])["final_outcome"], "draft_mode_beta_shipped")
 
+    def test_scripted_agent_reaches_full_score_with_local_concept_mode(self) -> None:
+        with unittest.mock.patch.dict("os.environ", {"PM_SIM_CONCEPT_MODE": "local"}, clear=False):
+            result = run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["evaluation"]["score"], 120)
+        self.assertEqual(result["evaluation"]["score"], result["evaluation"]["max_score"])
+
     def test_scripted_agent_uses_public_tool_actions(self) -> None:
         run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
 
