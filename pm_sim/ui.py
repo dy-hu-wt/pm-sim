@@ -399,17 +399,22 @@ def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
         if channel == "email" and entry.get("subject"):
             title = str(entry.get("subject"))
         else:
-            title = f"{sender} replied"
+            title = sender
         detail = str(entry.get("body") or "")
         card_kind = "message"
-        badge = channel.upper()
+        badge = _message_badge(channel)
         route = f"{sender} -> {recipient}".strip()
+        tone = _message_tone(channel)
+        direction = "reply"
     elif kind == "event_delivered":
-        title = _label(entry.get("event_type"))
+        event_type = str(entry.get("event_type") or "")
+        title = _label(event_type)
         detail = "Event delivered"
         card_kind = "event"
-        badge = "EVENT"
+        badge = _event_badge(event_type)
         route = ""
+        tone = _event_tone(event_type)
+        direction = "neutral"
     else:
         action_type = str(entry.get("action_type") or "")
         payload = entry.get("payload") or {}
@@ -419,6 +424,8 @@ def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
         card_kind = "action"
         badge = _action_badge(action_type)
         route = _action_route(action_type, payload)
+        tone = _action_tone(action_type)
+        direction = "neutral"
 
     return {
         "time": str(entry.get("time") or ""),
@@ -427,6 +434,8 @@ def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
         "route": route,
         "title": title,
         "detail": detail,
+        "tone": tone,
+        "direction": direction,
     }
 
 
@@ -473,7 +482,7 @@ def _action_title(action_type: str, payload: dict[str, Any]) -> str:
         subject = str(payload.get("subject") or "").strip()
         return subject or f"Email to {_label(payload.get('person_id'))}"
     if action_type == "read_doc":
-        return f"Read {_label(payload.get('doc_id'))}"
+        return _label(payload.get("doc_id"))
     if action_type == "update_doc":
         return f"Updated {_label(payload.get('doc_id'))}"
     if action_type == "update_task":
@@ -523,6 +532,74 @@ def _action_badge(action_type: str) -> str:
     if action_type == "schedule_meeting":
         return "MEETING"
     return _label(action_type).upper()
+
+
+def _action_tone(action_type: str) -> str:
+    if action_type == "send_chat":
+        return "chat"
+    if action_type == "send_email":
+        return "email"
+    if action_type in {"read_doc", "update_doc"}:
+        return "doc"
+    if action_type == "schedule_meeting":
+        return "meeting"
+    if action_type == "update_task":
+        return "task"
+    return "neutral"
+
+
+def _message_tone(channel: str) -> str:
+    if channel == "email":
+        return "email"
+    if channel == "chat":
+        return "chat"
+    return "neutral"
+
+
+def _message_badge(channel: str) -> str:
+    if channel == "email":
+        return "EMAIL REPLY"
+    if channel == "chat":
+        return "CHAT REPLY"
+    return "REPLY"
+
+
+def _event_badge(event_type: str) -> str:
+    if event_type == "project_deadline":
+        return "DEADLINE"
+    if event_type in {"luigi_proactive_repo_risk", "mario_auto_comment_push"}:
+        return "RISK"
+    if event_type in {"daisy_confidence_check", "nimbus_launch_mode_question"}:
+        return "CUSTOMER"
+    if event_type == "daisy_private_repo_security_question":
+        return "SECURITY"
+    if event_type == "koopa_audit_export_request":
+        return "PORTFOLIO"
+    if event_type == "peach_design_blocked_escalation":
+        return "BLOCKER"
+    if event_type == "thursday_final_readiness_check":
+        return "READINESS"
+    return "EVENT"
+
+
+def _event_tone(event_type: str) -> str:
+    if event_type == "project_deadline":
+        return "deadline"
+    if event_type == "luigi_proactive_repo_risk":
+        return "risk"
+    if event_type == "mario_auto_comment_push":
+        return "scope"
+    if event_type in {"daisy_confidence_check", "nimbus_launch_mode_question"}:
+        return "customer"
+    if event_type == "daisy_private_repo_security_question":
+        return "security"
+    if event_type == "koopa_audit_export_request":
+        return "portfolio"
+    if event_type == "peach_design_blocked_escalation":
+        return "blocker"
+    if event_type == "thursday_final_readiness_check":
+        return "readiness"
+    return "neutral"
 
 
 def _action_route(action_type: str, payload: dict[str, Any]) -> str:
@@ -604,16 +681,45 @@ section { margin:14px 0; overflow:hidden; }
 .day-head strong { display:block; }
 .day-head span { color:var(--muted); font-size:12px; }
 .calendar-event { margin:8px; padding:10px; border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:10px; background:#fff; display:grid; gap:6px; }
-.calendar-event.event { border-left-color:var(--purple); }
+.calendar-event.event { border-left-color:#7b61c8; }
 .calendar-event.message { border-left-color:#1a8f6a; }
+.calendar-event.tone-chat { border-left-color:#b54fd6; }
+.calendar-event.tone-email { border-left-color:#2a7fd1; }
+.calendar-event.tone-doc { border-left-color:#4a67d6; }
+.calendar-event.tone-meeting { border-left-color:#c2861b; }
+.calendar-event.tone-task { border-left-color:#6b7280; }
+.calendar-event.tone-risk { border-left-color:#1f8a5c; }
+.calendar-event.tone-scope { border-left-color:#d97706; }
+.calendar-event.tone-customer { border-left-color:#2563eb; }
+.calendar-event.tone-security { border-left-color:#0f766e; }
+.calendar-event.tone-portfolio { border-left-color:#7c3aed; }
+.calendar-event.tone-blocker { border-left-color:#dc2626; }
+.calendar-event.tone-readiness { border-left-color:#b45309; }
+.calendar-event.tone-deadline { border-left-color:#b91c1c; }
+.calendar-event.direction-reply { box-shadow:inset 0 0 0 1px rgba(23,32,42,.03); }
 .calendar-event.current { outline:2px solid rgba(37,92,153,.24); background:#f2f7ff; }
 .calendar-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
 .calendar-meta { display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 auto; }
 .tool-badge { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; letter-spacing:.04em; background:#eaf1fb; color:var(--blue); }
+.calendar-event.direction-reply .tool-badge { box-shadow:inset 0 0 0 1px rgba(255,255,255,.45); }
 .calendar-event.message .tool-badge { background:#e7f6f0; color:#136c50; }
 .calendar-event.event .tool-badge { background:#f2ebff; color:var(--purple); }
+.calendar-event.tone-chat .tool-badge { background:#f6e8fb; color:#8f2db0; }
+.calendar-event.tone-email .tool-badge { background:#e8f1fd; color:#1e5fb8; }
+.calendar-event.tone-doc .tool-badge { background:#eef0ff; color:#3e57c7; }
+.calendar-event.tone-meeting .tool-badge { background:#fff4dc; color:#9a6a0b; }
+.calendar-event.tone-task .tool-badge { background:#eef2f7; color:#596579; }
+.calendar-event.tone-risk .tool-badge { background:#e6f6ee; color:#166a46; }
+.calendar-event.tone-scope .tool-badge { background:#fff0dd; color:#b86700; }
+.calendar-event.tone-customer .tool-badge { background:#e8f1ff; color:#215fc4; }
+.calendar-event.tone-security .tool-badge { background:#e6f7f5; color:#0f766e; }
+.calendar-event.tone-portfolio .tool-badge { background:#f1eaff; color:#6d35d6; }
+.calendar-event.tone-blocker .tool-badge { background:#feeceb; color:#bc2d2d; }
+.calendar-event.tone-readiness .tool-badge { background:#fff2e3; color:#a85b00; }
+.calendar-event.tone-deadline .tool-badge { background:#fee8e8; color:#b42323; }
 .calendar-time { font-size:12px; font-weight:800; color:var(--muted); flex:0 0 auto; }
 .calendar-title { font-size:14px; font-weight:800; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.calendar-event.direction-reply .calendar-title { color:#111827; }
 .calendar-detail { display:none; }
 .calendar-event button.card-open { all:unset; display:grid; gap:6px; cursor:pointer; width:100%; }
 .calendar-event button.card-open:focus-visible { outline:2px solid rgba(37,92,153,.35); outline-offset:2px; border-radius:8px; }
@@ -992,7 +1098,7 @@ function renderReplay(items, scenario) {
         const cards = items
           .map((item, index) => ({ item, index }))
           .filter(row => dateKey(row.item.time) === day)
-          .map(row => `<div class="calendar-event ${esc(row.item.kind)} ${row.index === latest ? "current" : ""}">
+          .map(row => `<div class="calendar-event ${esc(row.item.kind)} tone-${esc(row.item.tone || "neutral")} direction-${esc(row.item.direction || "neutral")} ${row.index === latest ? "current" : ""}">
             <button class="card-open" type="button"
               data-time="${esc(row.item.time)}"
               data-badge="${esc(row.item.badge || row.item.kind)}"
