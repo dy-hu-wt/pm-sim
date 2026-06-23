@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 from .actions import list_tasks
 from .agents.finalize import finalize_to_deadline
-from .agents.llm import _load_llm_session, llm_session_state, start_llm_session, step_llm_session
+from .agents.llm import _agent_brief_text, _load_llm_session, llm_session_state, start_llm_session, step_llm_session
 from .agents.scripted import run_scripted_step, scripted_policy_steps
 from .db import connect
 from .evaluator import evaluate
@@ -200,6 +200,8 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
             "id": scenario.get("id"),
             "name": scenario.get("name") or scenario.get("id"),
             "company": scenario.get("company", ""),
+            "summary": scenario.get("summary", ""),
+            "agent_brief": _brief_payload(scenario),
             "start_time": scenario.get("start_time"),
             "project_deadlines": [
                 project.get("deadline")
@@ -217,6 +219,16 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
         "authored_schedule": _authored_schedule(scenario),
         "scripted_demo": _scripted_demo_state(db_path, scenario_path),
         "llm_session": llm_state,
+    }
+
+
+def _brief_payload(scenario: dict[str, Any]) -> dict[str, Any]:
+    brief = scenario.get("agent_brief") if isinstance(scenario.get("agent_brief"), dict) else {}
+    return {
+        "objective": brief.get("objective") or scenario.get("summary") or scenario.get("name") or scenario.get("id"),
+        "guidance": [item for item in brief.get("guidance", []) if isinstance(item, str)],
+        "finish_criteria": [item for item in brief.get("finish_criteria", []) if isinstance(item, str)],
+        "prompt": _agent_brief_text(scenario),
     }
 
 
@@ -660,11 +672,17 @@ button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
 .spinner { width:14px; height:14px; border:2px solid #c7d5e8; border-top-color:var(--blue); border-radius:999px; display:inline-block; animation:spin .8s linear infinite; }
 .spinner[hidden] { display:none; }
 .hero, section, .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); }
-.hero { display:flex; justify-content:space-between; gap:16px; align-items:flex-end; padding:22px; margin-bottom:14px; background:linear-gradient(135deg,#ffffff 0%,#edf5ff 100%); }
+.hero { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr); gap:16px; align-items:start; padding:22px; margin-bottom:14px; background:linear-gradient(135deg,#ffffff 0%,#edf5ff 100%); }
 .eyebrow { color:var(--blue); text-transform:uppercase; font-size:12px; font-weight:800; letter-spacing:.08em; margin:0 0 4px; }
 h1 { margin:0 0 6px; font-size:30px; letter-spacing:0; }
 h2 { margin:0; font-size:17px; }
 p { margin:0 0 8px; }
+.brief-card { border:1px solid var(--line); border-radius:10px; background:rgba(255,255,255,.78); padding:12px; display:grid; gap:8px; }
+.brief-title { color:var(--blue); font-size:12px; font-weight:850; text-transform:uppercase; letter-spacing:.06em; }
+.brief-objective { font-size:14px; font-weight:800; color:var(--ink); }
+.brief-list { display:grid; gap:5px; margin:0; padding:0; list-style:none; color:var(--muted); font-size:12px; }
+.brief-list li { padding-left:12px; position:relative; }
+.brief-list li::before { content:""; position:absolute; left:0; top:.62em; width:4px; height:4px; border-radius:999px; background:var(--blue); }
 .score { font-size:30px; font-weight:850; text-align:right; }
 .score span { display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }
 .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); margin-bottom:14px; }
@@ -802,7 +820,7 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
 .modal-label { color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
 .modal-text { font-size:14px; color:var(--ink); white-space:pre-wrap; overflow-wrap:anywhere; }
 @keyframes spin { to { transform:rotate(360deg); } }
-@media (max-width:800px) { .top,.hero { display:block; } .controls { margin-top:10px; } .score { text-align:left; margin-top:12px; } }
+@media (max-width:800px) { .top { display:block; } .hero { grid-template-columns:1fr; } .controls { margin-top:10px; } .score { text-align:left; margin-top:12px; } }
 </style>
 </head>
 <body>
@@ -821,6 +839,7 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
       <p id="subtitle"></p>
       <p>Simulated time: <strong id="sim-time"></strong></p>
     </div>
+    <div class="brief-card" id="agent-brief"></div>
   </header>
   <section id="playback-section">
     <div class="section-head"><h2>Live Playback</h2></div>
@@ -1070,6 +1089,24 @@ function modalClose() {
   $("card-modal").hidden = true;
 }
 
+function renderBrief(brief) {
+  if (!brief || !brief.objective) {
+    $("agent-brief").innerHTML = `<div class="brief-title">Agent prompt</div><div class="brief-objective">No scenario brief configured.</div>`;
+    return;
+  }
+  const guidance = (brief.guidance || []).slice(0, 3);
+  const finish = (brief.finish_criteria || []).slice(0, 2);
+  const rows = [
+    ...guidance.map(item => `Guidance: ${item}`),
+    ...finish.map(item => `Finish: ${item}`),
+  ];
+  $("agent-brief").innerHTML = `
+    <div class="brief-title">Agent prompt</div>
+    <div class="brief-objective">${esc(brief.objective)}</div>
+    ${rows.length ? `<ul class="brief-list">${rows.map(item => `<li>${esc(item)}</li>`).join("")}</ul>` : ""}
+  `;
+}
+
 function scenarioDays(scenario, items) {
   const values = [
     scenario.start_time,
@@ -1129,6 +1166,7 @@ function render(state) {
   $("title").textContent = scenario.name || obs.scenario_id || "PM Sim";
   $("subtitle").textContent = scenario.company || "";
   $("sim-time").textContent = pretty(obs.current_time);
+  renderBrief(scenario.agent_brief || {});
   const demo = state.scripted_demo || {};
   const llm = state.llm_session || {};
   const modelLabel = llm.model ? ` · model ${llm.model}` : "";

@@ -220,11 +220,13 @@ def run_llm_agent(
         _progress(progress, "resetting scenario")
         steps.append(_step("reset", reset(db_path, scenario_path)))
 
+    scenario = load_scenario(scenario_path)
+    _progress(progress, f"agent prompt: {_compact_agent_brief(scenario)}")
+
     if client is None:
         _progress(progress, f"creating OpenAI client for model {model}")
         client = _openai_client()
 
-    scenario = load_scenario(scenario_path)
     tools = _tool_specs(scenario)
     tool_handlers = _tool_handlers(db_path, scenario_path)
     input_items: list[Any] = [
@@ -392,6 +394,17 @@ def _agent_brief_text(scenario: dict[str, Any]) -> str:
         lines.extend(f"- {item}" for item in finish_criteria)
 
     return "\n".join(lines)
+
+
+def _compact_agent_brief(scenario: dict[str, Any]) -> str:
+    brief = scenario.get("agent_brief", {})
+    if not isinstance(brief, dict):
+        brief = {}
+    objective = brief.get("objective") or scenario.get("summary") or scenario.get("name") or scenario.get("id")
+    guidance = _string_list(brief.get("guidance"))
+    if guidance:
+        return f"{objective} Guidance: {guidance[0]}"
+    return str(objective or "Run the PM simulation scenario.")
 
 
 def _string_list(value: Any) -> list[str]:
