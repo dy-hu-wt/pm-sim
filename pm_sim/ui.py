@@ -477,7 +477,7 @@ def _log_entries(lines: list[str]) -> list[dict[str, str]]:
 
 def _action_title(action_type: str, payload: dict[str, Any]) -> str:
     if action_type == "send_chat":
-        return f"Chat to {_label(payload.get('person_id'))}"
+        return _label(payload.get("person_id"))
     if action_type == "send_email":
         subject = str(payload.get("subject") or "").strip()
         return subject or f"Email to {_label(payload.get('person_id'))}"
