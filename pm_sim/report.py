@@ -93,8 +93,8 @@ def _render_html(data: dict[str, Any]) -> str:
             "</head>",
             "<body>",
             '<div class="app-shell">',
-            _sidebar(),
             '<main class="content">',
+            _top_nav(),
             '<header class="hero">',
             '<div class="hero-copy">',
             '<p class="eyebrow">PM Sim Operator Report</p>',
@@ -104,7 +104,7 @@ def _render_html(data: dict[str, Any]) -> str:
             f'<div class="hero-score">{_h(score)}<span>score</span></div>',
             "</header>",
             _summary_cards(evaluation, final_outcome),
-            '<div class="dashboard-grid">',
+            '<div id="overview" class="dashboard-grid">',
             _section("Projects", _projects(observation.get("projects", []))),
             _section("Calendar Obligations", _obligations(observation.get("calendar_obligations", []))),
             "</div>",
@@ -152,28 +152,37 @@ body {
   color: var(--ink);
   font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
-.app-shell { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; }
-.sidebar {
+.app-shell { min-height: 100vh; }
+.top-nav {
   position: sticky;
   top: 0;
-  align-self: start;
-  height: 100vh;
-  padding: 24px 18px;
-  background: var(--nav);
-  color: #ffffff;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
 }
-.brand { margin-bottom: 28px; }
-.brand strong { display: block; font-size: 18px; }
-.brand span { color: var(--nav-muted); font-size: 12px; }
-.nav a {
-  display: block;
-  color: var(--nav-muted);
+.brand strong { display: block; font-size: 16px; }
+.brand span { color: var(--muted); font-size: 12px; }
+.nav-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.nav-links a {
+  color: var(--ink);
   text-decoration: none;
-  border-radius: 7px;
-  padding: 8px 10px;
-  margin: 3px 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 13px;
+  font-weight: 700;
+  background: #f8fafc;
 }
-.nav a:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+.nav-links a:hover { background: #e8f1fb; border-color: #bdd3ed; color: var(--blue); }
 .content { max-width: 1280px; width: 100%; padding: 28px; }
 .hero {
   display: flex;
@@ -217,16 +226,17 @@ p { margin: 0 0 8px; }
 }
 .week-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(210px, 1fr));
+  grid-template-columns: repeat(5, minmax(240px, 1fr));
   gap: 12px;
   padding: 14px;
+  overflow-x: auto;
 }
 .day-column {
-  min-height: 220px;
+  min-height: 180px;
   background: #f8fafc;
   border: 1px solid var(--line);
   border-radius: 9px;
-  overflow: hidden;
+  overflow: visible;
 }
 .day-header {
   padding: 10px 12px;
@@ -236,8 +246,8 @@ p { margin: 0 0 8px; }
 .day-header strong { display: block; }
 .day-header span { color: var(--muted); font-size: 12px; }
 .calendar-card {
-  margin: 9px;
-  padding: 10px;
+  margin: 8px;
+  padding: 9px;
   border: 1px solid var(--line);
   border-left: 4px solid var(--blue);
   border-radius: 8px;
@@ -246,9 +256,9 @@ p { margin: 0 0 8px; }
 .calendar-card.event { border-left-color: var(--purple); }
 .calendar-card.evidence { border-left-color: var(--good); }
 .calendar-card.message { border-left-color: var(--warn); }
-.calendar-time { color: var(--muted); font-size: 12px; font-weight: 700; }
-.calendar-title { font-weight: 800; margin-top: 3px; }
-.calendar-detail { color: var(--muted); margin-top: 4px; font-size: 12px; }
+.calendar-time { color: var(--muted); font-size: 11px; font-weight: 800; }
+.calendar-title { font-weight: 800; margin-top: 2px; }
+.calendar-detail { color: var(--muted); margin-top: 3px; font-size: 12px; }
 .debug-stack { padding: 14px; display: grid; gap: 10px; }
 details {
   border: 1px solid var(--line);
@@ -261,10 +271,6 @@ summary {
   padding: 10px 12px;
   font-weight: 800;
   background: #f8fafc;
-}
-.outcome-summary {
-  padding: 14px 16px 0;
-  color: var(--muted);
 }
 .stat-card, section {
   background: var(--panel);
@@ -289,7 +295,6 @@ section { padding: 0; margin: 14px 0; overflow: hidden; }
   border-bottom: 1px solid var(--line);
   background: #fbfcfe;
 }
-.section-kicker { color: var(--muted); font-size: 12px; }
 .section-body { padding: 0; }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; min-width: 680px; }
@@ -320,10 +325,9 @@ tbody tr:hover { background: #f9fbff; }
 .mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 12px; }
 .empty { color: var(--muted); font-style: italic; padding: 16px; }
 @media (max-width: 860px) {
-  .app-shell { grid-template-columns: 1fr; }
-  .sidebar { position: static; height: auto; }
-  .nav { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 4px; }
   .content { padding: 18px; }
+  .top-nav { display: block; }
+  .nav-links { margin-top: 10px; }
   .hero { display: block; }
   .hero-score { text-align: left; margin-top: 14px; }
   .week-grid { grid-template-columns: 1fr; }
@@ -331,11 +335,9 @@ tbody tr:hover { background: #f9fbff; }
 """.strip()
 
 
-def _sidebar() -> str:
+def _top_nav() -> str:
     links = [
-        ("projects", "Projects"),
-        ("calendar-obligations", "Calendar"),
-        ("known-blockers", "Blockers"),
+        ("overview", "Overview"),
         ("evaluation", "Evaluation"),
         ("week-timeline", "Week Timeline"),
         ("tasks", "Tasks"),
@@ -345,10 +347,10 @@ def _sidebar() -> str:
     ]
     nav = "".join(f'<a href="#{section_id}">{_h(label)}</a>' for section_id, label in links)
     return (
-        '<aside class="sidebar">'
-        '<div class="brand"><strong>PM Sim</strong><span>operator view</span></div>'
-        f'<nav class="nav">{nav}</nav>'
-        "</aside>"
+        '<nav class="top-nav">'
+        '<div class="brand"><strong>PM Sim</strong><span>operator report</span></div>'
+        f'<div class="nav-links">{nav}</div>'
+        "</nav>"
     )
 
 
@@ -358,11 +360,10 @@ def _summary_cards(evaluation: dict[str, Any], final_outcome: dict[str, Any]) ->
     return (
         '<div class="stat-grid">'
         + _card("Score", f"{evaluation.get('score')} / {evaluation.get('max_score')}", "good" if status == "passed" else "warn")
-        + _card("Evidence Rows", str(evaluation.get("evidence_count", 0)))
+        + _card("Evidence Found", str(evaluation.get("evidence_count", 0)))
         + _card("Friday Result", outcome_title)
         + _card("Status", status, "good" if status == "passed" else "warn")
         + "</div>"
-        + _outcome_summary(final_outcome)
     )
 
 
@@ -388,7 +389,6 @@ def _section(title: str, body: str) -> str:
         f'<section id="{section_id}">'
         '<div class="section-header">'
         f"<h2>{_h(title)}</h2>"
-        '<span class="section-kicker">live state</span>'
         "</div>"
         f'<div class="section-body">{body}</div>'
         "</section>"
@@ -447,7 +447,7 @@ def _evaluation(evaluation: dict[str, Any]) -> str:
     for component in evaluation.get("components", []):
         rows.append(
             [
-                component.get("key"),
+                _human_label(component.get("key")),
                 f"{component.get('earned')} / {component.get('points')}",
                 _badge(component.get("status"), _tone(component.get("status"))),
                 component.get("note"),
@@ -483,6 +483,10 @@ def _week_calendar(entries: list[dict[str, Any]]) -> str:
 def _calendar_card(entry: dict[str, Any]) -> str | None:
     kind = entry.get("kind")
     if kind not in {"action", "event_delivered"}:
+        return None
+    if kind == "action" and entry.get("action_type") in {"advance_time", "reset", "finalize_to_deadline"}:
+        return None
+    if kind == "event_delivered" and entry.get("event_type") == "coworker_reply":
         return None
 
     title = _calendar_title(entry)
@@ -535,22 +539,15 @@ def _calendar_detail(entry: dict[str, Any]) -> str:
     kind = entry.get("kind")
     if kind == "action":
         payload = entry.get("payload", {})
-        result = entry.get("result", {})
         action_type = entry.get("action_type")
         if action_type in {"send_chat", "send_email"}:
-            text = payload.get("body") or payload.get("subject") or ""
-            return _h(_short_text(text, 120))
+            return _h(payload.get("subject") or "Message sent")
         if action_type == "read_doc":
             return _h(_doc_name(payload.get("doc_id")))
         if action_type == "update_doc":
             return _h(_doc_name(payload.get("doc_id")))
         if action_type == "update_task":
             return _h(_task_name(payload.get("task_id")))
-        if action_type == "advance_time":
-            delivered = result.get("delivered_event_ids", [])
-            if delivered:
-                return _h(f"Delivered {len(delivered)} queued event(s)")
-            return _h(str(payload.get("target") or "wait"))
         return _h(_human_label(action_type))
     if kind == "event_delivered":
         return _h(_human_event_detail(entry))
@@ -618,7 +615,7 @@ def _debug_logs(data: dict[str, Any]) -> str:
     events_html = _events(data.get("events", []))
     return (
         '<div class="debug-stack">'
-        "<details open><summary>Timeline</summary>"
+        "<details><summary>Timeline</summary>"
         f"{timeline_html}"
         "</details>"
         "<details><summary>Action Log</summary>"
@@ -708,13 +705,6 @@ def _human_outcome(final_outcome: dict[str, Any]) -> str:
     return mapping.get(str(outcome), _human_label(outcome or "Pending"))
 
 
-def _outcome_summary(final_outcome: dict[str, Any]) -> str:
-    summary = final_outcome.get("summary")
-    if not summary:
-        return ""
-    return f'<div class="outcome-summary">{_h(summary)}</div>'
-
-
 def _human_project_state(metadata: dict[str, Any]) -> str:
     if metadata.get("final_outcome"):
         return _human_outcome({"outcome": metadata.get("final_outcome")})
@@ -745,15 +735,15 @@ def _human_event_detail(entry: dict[str, Any]) -> str:
     descriptions = {
         "coworker_reply": "A coworker response became visible.",
         "meeting_occurs": "The meeting ended and a transcript was created.",
-        "project_deadline": "A project deadline was reached and the outcome was settled.",
-        "mario_auto_comment_push": "Mario pushed for the flashier auto-commenting launch path.",
-        "peach_design_blocked_escalation": "Peach flagged that onboarding was still blocked by unclear launch scope.",
-        "daisy_confidence_check": "Daisy asked whether the Nimbus beta was still on track.",
-        "daisy_private_repo_security_question": "Daisy brought in a same-day customer security question.",
-        "nimbus_launch_mode_question": "Nimbus asked for clear launch-mode wording.",
-        "luigi_proactive_repo_risk": "Luigi resurfaced repo-sync risk before launch.",
-        "koopa_audit_export_request": "Koopa's audit-log export request became visible.",
-        "thursday_final_readiness_check": "Daisy asked for the final go/no-go before Friday.",
+        "project_deadline": "Deadline settled",
+        "mario_auto_comment_push": "Scope pressure",
+        "peach_design_blocked_escalation": "Onboarding risk",
+        "daisy_confidence_check": "Customer confidence check",
+        "daisy_private_repo_security_question": "Security question",
+        "nimbus_launch_mode_question": "Launch wording question",
+        "luigi_proactive_repo_risk": "Repo-sync reminder",
+        "koopa_audit_export_request": "New competing request",
+        "thursday_final_readiness_check": "Final go/no-go",
     }
     event_type = str(entry.get("event_type") or "")
     if event_type in descriptions:
