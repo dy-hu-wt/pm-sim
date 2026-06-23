@@ -612,6 +612,7 @@ function scenarioDays(scenario, items) {
 }
 
 function renderReplay(items, scenario) {
+  const latest = items.length - 1;
   const days = scenarioDays(scenario || {}, items);
   $("calendar-board").style.gridTemplateColumns = days.length
     ? `repeat(${days.length}, minmax(150px, 1fr))`
