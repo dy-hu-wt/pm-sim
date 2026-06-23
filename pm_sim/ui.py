@@ -164,11 +164,12 @@ class _Handler(BaseHTTPRequestHandler):
 def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> dict[str, Any]:
     scenario = load_scenario(scenario_path)
     llm_state = llm_session_state(db_path)
-    entries = timeline(db_path, limit=0)
+    all_entries = timeline(db_path, limit=0)
+    entries = all_entries
     if timeline_limit > 0:
         entries = entries[-timeline_limit:]
     display_timeline = []
-    for entry in entries:
+    for entry in all_entries:
         display = _display_entry(entry)
         if display:
             display_timeline.append(display)
@@ -189,7 +190,7 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
         "tasks": list_tasks(db_path),
         "timeline": entries,
         "display_timeline": display_timeline,
-        "log_lines": _log_lines(entries, llm_state),
+        "log_lines": _log_lines(all_entries, llm_state),
         "authored_schedule": _authored_schedule(scenario),
         "scripted_demo": _scripted_demo_state(db_path, scenario_path),
         "llm_session": llm_state,
@@ -313,7 +314,7 @@ def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
     kind = entry.get("kind")
     if kind not in {"action", "event_delivered", "message"}:
         return None
-    if kind == "action" and entry.get("action_type") in {"reset", "finalize_to_deadline"}:
+    if kind == "action" and entry.get("action_type") in {"reset", "finalize_to_deadline", "advance_time"}:
         return None
     if kind == "event_delivered" and entry.get("event_type") == "coworker_reply":
         return None
@@ -354,7 +355,7 @@ def _log_lines(entries: list[dict[str, Any]], llm_state: dict[str, Any]) -> list
         kind = entry.get("kind")
         if kind == "action":
             action_type = str(entry.get("action_type") or "")
-            if action_type in {"reset", "finalize_to_deadline"}:
+            if action_type in {"reset", "finalize_to_deadline", "advance_time"}:
                 continue
             payload = entry.get("payload") or {}
             detail = _action_detail(action_type, payload)
@@ -448,8 +449,11 @@ main { max-width:1280px; margin:0 auto; padding:24px; }
 .brand span { color:var(--muted); font-size:12px; }
 .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 button { border:1px solid var(--line); border-radius:8px; padding:8px 12px; background:#fff; color:var(--ink); font-weight:800; cursor:pointer; }
+button[disabled] { opacity:.55; cursor:wait; }
 button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
 .meter { color:var(--muted); font-weight:800; }
+.spinner { width:14px; height:14px; border:2px solid #c7d5e8; border-top-color:var(--blue); border-radius:999px; display:inline-block; animation:spin .8s linear infinite; }
+.spinner[hidden] { display:none; }
 .hero, section, .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); }
 .hero { display:flex; justify-content:space-between; gap:16px; align-items:flex-end; padding:22px; margin-bottom:14px; background:linear-gradient(135deg,#ffffff 0%,#edf5ff 100%); }
 .eyebrow { color:var(--blue); text-transform:uppercase; font-size:12px; font-weight:800; letter-spacing:.08em; margin:0 0 4px; }
@@ -493,6 +497,7 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
 .badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:800; background:#eef2f7; }
 .good { color:var(--good); } .warn { color:var(--warn); } .bad { color:var(--bad); }
 .empty { color:var(--muted); font-style:italic; padding:14px; }
+@keyframes spin { to { transform:rotate(360deg); } }
 @media (max-width:800px) { .top,.hero { display:block; } .controls { margin-top:10px; } .score { text-align:left; margin-top:12px; } }
 </style>
 </head>
@@ -501,6 +506,7 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
   <nav class="top">
     <div class="brand"><strong>PM Sim</strong><span>live operator UI</span></div>
     <div class="controls">
+      <span class="spinner" id="spinner" hidden></span>
       <span class="meter" id="meter">loading</span>
     </div>
   </nav>
@@ -586,6 +592,14 @@ async function api(path, options = {}) {
   return response.json();
 }
 
+function setLoading(active) {
+  stepping = active;
+  $("spinner").hidden = !active;
+  $("play").disabled = active;
+  $("step").disabled = active;
+  $("reset").disabled = active;
+}
+
 function card(labelText, value) {
   return `<div class="card"><div class="label">${esc(labelText)}</div><div class="value">${esc(value)}</div></div>`;
 }
@@ -650,10 +664,14 @@ function render(state) {
 
   renderReplay(state.display_timeline || [], scenario);
   const logs = state.log_lines || [];
-  $("playback").innerHTML = logs.length
+  const logEl = $("playback");
+  const shouldStick = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 24;
+  logEl.innerHTML = logs.length
     ? logs.map(line => `<div class="log-line">${esc(line)}</div>`).join("")
     : `<div class="empty">No log output yet.</div>`;
-  $("playback").lastElementChild?.scrollIntoView({ block: "nearest" });
+  if (shouldStick) {
+    logEl.scrollTop = logEl.scrollHeight;
+  }
 
   $("projects").innerHTML = (obs.projects || []).map(project => row(project.name, `${project.stakeholder_pressure || ""} Deadline: ${pretty(project.deadline)}`, project.status)).join("") || `<div class="empty">No projects.</div>`;
   $("blockers").innerHTML = (obs.known_blockers || []).map(blocker => row(blocker.title, blocker.description || "", blocker.status)).join("") || `<div class="empty">No visible blockers.</div>`;
@@ -676,14 +694,14 @@ async function refresh() {
 
 async function step() {
   if (stepping) return;
-  stepping = true;
+  setLoading(true);
   try {
     const state = await api("/api/advance-next", { method: "POST" });
     if (state.busy) return;
     render(state);
     if (state.done) pause();
   } finally {
-    stepping = false;
+    setLoading(false);
   }
 }
 
