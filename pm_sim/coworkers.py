@@ -205,11 +205,7 @@ def _meeting_rule_matches(
     if attendees_any and not attendees.intersection(attendees_any):
         return False
 
-    topic_match = {
-        "terms_any": rule.get("topic_terms_any", []),
-        "terms_all": rule.get("topic_terms_all", []),
-    }
-    if not match_text_and_facts(topic_match, normalized_topic):
+    if not match_text_and_facts(rule.get("topic_match", {}), normalized_topic):
         return False
 
     facts = context["facts"]

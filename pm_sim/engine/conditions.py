@@ -398,13 +398,10 @@ def _message_exists(conn: sqlite3.Connection, spec: dict[str, Any]) -> bool:
     query += " ORDER BY sent_at, id"
     rows = conn.execute(query, values).fetchall()
 
-    terms_any = {_normalize(term) for term in spec.get("terms_any", [])}
-    terms_all = {_normalize(term) for term in spec.get("terms_all", [])}
+    match = spec.get("match", {})
     for row in rows:
         text = _normalize(f"{row['subject'] or ''} {row['body'] or ''}")
-        if terms_any and not any(term in text for term in terms_any):
-            continue
-        if terms_all and not all(term in text for term in terms_all):
+        if not _match_text(match, text):
             continue
         return True
     return False
@@ -473,17 +470,47 @@ def _message_match_count(conn: sqlite3.Connection, spec: dict[str, Any]) -> int:
         query += " WHERE " + " AND ".join(clauses)
     rows = conn.execute(query, values).fetchall()
 
-    terms_any = {_normalize(term) for term in spec.get("terms_any", [])}
-    terms_all = {_normalize(term) for term in spec.get("terms_all", [])}
+    match = spec.get("match", {})
     count = 0
     for row in rows:
         text = _normalize(f"{row['subject'] or ''} {row['body'] or ''}")
-        if terms_any and not any(term in text for term in terms_any):
-            continue
-        if terms_all and not all(term in text for term in terms_all):
+        if not _match_text(match, text):
             continue
         count += 1
     return count
+
+
+def _match_text(match: dict[str, Any], text: str) -> bool:
+    if not match:
+        return True
+    intents = {
+        intent["id"]: intent
+        for intent in match.get("intents", [])
+        if isinstance(intent, dict) and isinstance(intent.get("id"), str)
+    }
+    matched = {
+        intent_id
+        for intent_id, intent in intents.items()
+        if _intent_matches(text, intent)
+    }
+    require_all = set(match.get("require_all", intents))
+    if require_all and not require_all.issubset(matched):
+        return False
+    require_any = set(match.get("require_any", []))
+    if require_any and not require_any.intersection(matched):
+        return False
+    forbid = set(match.get("forbid", []))
+    if forbid and forbid.intersection(matched):
+        return False
+    return True
+
+
+def _intent_matches(text: str, intent: dict[str, Any]) -> bool:
+    signals = [_normalize(signal) for signal in intent.get("signals", [])]
+    if signals:
+        return any(signal and signal in text for signal in signals)
+    description = _normalize(str(intent.get("description", "")))
+    return bool(description and description in text)
 
 
 def _normalize(value: str) -> str:

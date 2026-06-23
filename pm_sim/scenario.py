@@ -116,7 +116,7 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
                 "action_type": action_type,
                 "priority": int(rule.get("priority", 60)),
                 "recipient_id": recipient_id,
-                "semantic_match": _semantic_match_for_grading_action(action),
+                "match": _match_for_grading_action(action),
                 "when": rule.get("requires", []),
                 "effects": [
                     {
@@ -160,11 +160,11 @@ def copy_json_object(data: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(data))
 
 
-def _semantic_match_for_grading_action(action: dict[str, Any]) -> dict[str, Any]:
-    semantic_match = action.get("semantic_match")
-    if isinstance(semantic_match, dict):
-        return semantic_match
-    raise ScenarioError("grading rule action must include semantic_match.")
+def _match_for_grading_action(action: dict[str, Any]) -> dict[str, Any]:
+    match = action.get("match")
+    if isinstance(match, dict):
+        return {"mode": "semantic", **match}
+    raise ScenarioError("grading rule action must include match.")
 
 
 def _required_object(row: dict[str, Any], key: str, label: str) -> dict[str, Any]:
@@ -433,14 +433,7 @@ def _validate_actor_reply_behavior(
     match = rule.get("match", rule)
     if not isinstance(match, dict):
         raise ScenarioError(f"Actor behavior {rule_id} match must be an object.")
-    _validate_string_list(match.get("terms_any", []), f"Actor behavior {rule_id} terms_any")
-    _validate_string_list(match.get("terms_all", []), f"Actor behavior {rule_id} terms_all")
-    for group in match.get("term_groups_all", []):
-        _validate_string_list(group, f"Actor behavior {rule_id} term group")
-    for key in ("required_facts", "required_facts_any", "absent_facts"):
-        for fact_id in match.get(key, []):
-            if fact_id not in facts:
-                raise ScenarioError(f"Actor behavior {rule_id} references unknown {key} fact: {fact_id}")
+    _validate_match_spec(match, f"Actor behavior {rule_id}", facts=facts)
     _validate_conditions(
         rule.get("when", []),
         label=f"Actor behavior {rule_id}",
@@ -634,8 +627,12 @@ def _validate_meeting_rules(
                         f"Meeting rule {rule_id} references unknown {key} attendee: {attendee}"
                     )
 
-        for key in ("topic_terms_any", "topic_terms_all", "transcript_lines"):
-            _validate_string_list(rule.get(key, []), f"Meeting rule {rule_id} {key}")
+        _validate_string_list(rule.get("transcript_lines", []), f"Meeting rule {rule_id} transcript_lines")
+        topic_match = rule.get("topic_match")
+        if topic_match is not None:
+            if not isinstance(topic_match, dict):
+                raise ScenarioError(f"Meeting rule {rule_id} topic_match must be an object.")
+            _validate_match_spec(topic_match, f"Meeting rule {rule_id} topic_match", facts=facts)
 
         for key in ("required_facts", "required_facts_any", "absent_facts"):
             _validate_string_list(rule.get(key, []), f"Meeting rule {rule_id} {key}")
@@ -697,12 +694,10 @@ def _validate_action_rules(
         if doc_id is not None and doc_id not in docs:
             raise ScenarioError(f"Action rule {rule_id} references unknown doc_id: {doc_id}")
 
-        for key in ("terms_any", "terms_all"):
-            _validate_string_list(rule.get(key, []), f"Action rule {rule_id} {key}")
-        for group in rule.get("term_groups_all", []):
-            _validate_string_list(group, f"Action rule {rule_id} term group")
-        if "semantic_match" in rule:
-            _validate_semantic_match(rule["semantic_match"], f"Action rule {rule_id}")
+        match = rule.get("match")
+        if not isinstance(match, dict):
+            raise ScenarioError(f"Action rule {rule_id} match must be an object.")
+        _validate_match_spec(match, f"Action rule {rule_id}", facts=facts)
 
         _validate_conditions(
             rule.get("when", []),
@@ -726,27 +721,42 @@ def _validate_action_rules(
         )
 
 
-def _validate_semantic_match(spec: Any, label: str) -> None:
-    if not isinstance(spec, dict):
-        raise ScenarioError(f"{label} semantic_match must be an object.")
-    for key in ("required", "forbidden"):
-        items = spec.get(key, [])
-        if not isinstance(items, list):
-            raise ScenarioError(f"{label} semantic_match {key} must be a list.")
-        for index, item in enumerate(items, start=1):
-            item_label = f"{label} semantic_match {key} item {index}"
-            if isinstance(item, str):
-                if not item:
-                    raise ScenarioError(f"{item_label} must be non-empty.")
-                continue
-            if not isinstance(item, dict):
-                raise ScenarioError(f"{item_label} must be a string or object.")
-            if not isinstance(item.get("description"), str) or not item.get("description"):
-                raise ScenarioError(f"{item_label} must include description.")
-            for list_key in ("signals_any", "signals_all"):
-                _validate_string_list(item.get(list_key, []), f"{item_label} {list_key}")
-            for group in item.get("signal_groups_all", []):
-                _validate_string_list(group, f"{item_label} signal group")
+def _validate_match_spec(spec: dict[str, Any], label: str, *, facts: set[str]) -> None:
+    mode = spec.get("mode", "deterministic")
+    if mode not in {"deterministic", "semantic", "llm"}:
+        raise ScenarioError(f"{label} match.mode must be deterministic, semantic, or llm.")
+
+    for key in ("required_facts", "required_facts_any", "absent_facts"):
+        _validate_string_list(spec.get(key, []), f"{label} {key}")
+        for fact_id in spec.get(key, []):
+            if fact_id not in facts:
+                raise ScenarioError(f"{label} references unknown {key} fact: {fact_id}")
+
+    intents = spec.get("intents", [])
+    if intents is None:
+        intents = []
+    if not isinstance(intents, list):
+        raise ScenarioError(f"{label} match.intents must be a list.")
+    intent_ids = set()
+    for index, intent in enumerate(intents, start=1):
+        intent_label = f"{label} match intent {index}"
+        if not isinstance(intent, dict):
+            raise ScenarioError(f"{intent_label} must be an object.")
+        intent_id = intent.get("id")
+        if not isinstance(intent_id, str) or not intent_id:
+            raise ScenarioError(f"{intent_label} must include string id.")
+        if intent_id in intent_ids:
+            raise ScenarioError(f"{label} has duplicate match intent id: {intent_id}")
+        intent_ids.add(intent_id)
+        if not isinstance(intent.get("description"), str) or not intent.get("description"):
+            raise ScenarioError(f"{intent_label} must include description.")
+        _validate_string_list(intent.get("signals", []), f"{intent_label} signals")
+
+    for key in ("require_all", "require_any", "forbid", "forbidden"):
+        _validate_string_list(spec.get(key, []), f"{label} match.{key}")
+        for intent_id in spec.get(key, []):
+            if intent_id not in intent_ids:
+                raise ScenarioError(f"{label} match.{key} references unknown intent: {intent_id}")
 
 
 def _validate_scored_evidence_is_state_derived(data: dict[str, Any]) -> None:
@@ -888,8 +898,11 @@ def _validate_condition(
             actor_id = spec.get(key)
             if actor_id is not None and actor_id not in valid_actors:
                 raise ScenarioError(f"{label} references unknown message {key}: {actor_id}")
-        for key in ("terms_any", "terms_all"):
-            _validate_string_list(spec.get(key, []), f"{label} message_exists {key}")
+        match = spec.get("match")
+        if match is not None:
+            if not isinstance(match, dict):
+                raise ScenarioError(f"{label} message_exists match must be an object.")
+            _validate_match_spec(match, f"{label} message_exists", facts=facts)
 
 
 def _validate_effects(

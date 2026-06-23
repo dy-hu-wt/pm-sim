@@ -50,33 +50,36 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "semantic_match": {
-          "required": [
+        "match": {
+          "mode": "semantic",
+          "intents": [
             {
-              "id": "repo_sync_risk",
-              "description": "Repo sync or webhook ordering can make the agent review a stale or older commit.",
-              "signal_groups_all": [
-                [
-                  "repo sync",
-                  "repo-sync",
-                  "webhook",
-                  "stale",
-                  "older commit",
-                  "older diff"
-                ],
-                [
-                  "risk",
-                  "stale",
-                  "older commit",
-                  "older diff",
-                  "commit"
-                ]
+              "id": "repo_sync_risk_group_1",
+              "description": "Repo sync or webhook ordering can make the agent review a stale or older commit. signal group 1.",
+              "signals": [
+                "repo sync",
+                "repo-sync",
+                "webhook",
+                "stale",
+                "older commit",
+                "older diff"
+              ]
+            },
+            {
+              "id": "repo_sync_risk_group_2",
+              "description": "Repo sync or webhook ordering can make the agent review a stale or older commit. signal group 2.",
+              "signals": [
+                "risk",
+                "stale",
+                "older commit",
+                "older diff",
+                "commit"
               ]
             },
             {
               "id": "draft_mode",
               "description": "Friday launch mode is draft mode or queued draft suggestions.",
-              "signals_any": [
+              "signals": [
                 "draft mode",
                 "draft-mode",
                 "draft suggestions",
@@ -88,18 +91,21 @@
             {
               "id": "nimbus_beta",
               "description": "The message is about the Nimbus Friday beta or pilot.",
-              "signals_any": [
+              "signals": [
                 "nimbus",
                 "friday beta",
                 "nimbus beta",
                 "friday pilot",
-                "pilot"
+                "pilot",
+                "friday",
+                "friday draft mode",
+                "friday draft-mode"
               ]
             },
             {
               "id": "human_approval",
               "description": "A human or reviewer must approve before anything is posted.",
-              "signals_any": [
+              "signals": [
                 "human approval",
                 "approval before posting",
                 "approve before posting",
@@ -109,27 +115,47 @@
                 "human review",
                 "human-in-the-loop",
                 "human in the loop",
-                "before posting"
-              ],
-              "signal_groups_all": [
-                [
-                  "human",
-                  "reviewer"
-                ],
-                [
-                  "approve",
-                  "approval",
-                  "review"
-                ],
-                [
-                  "posted",
-                  "posting",
-                  "post",
-                  "comments",
-                  "suggestions"
-                ]
+                "before posting",
+                "before anything is posted",
+                "approve suggestions",
+                "approve before anything is posted"
+              ]
+            },
+            {
+              "id": "human_approval_group_1",
+              "description": "A human or reviewer must approve before anything is posted. signal group 1.",
+              "signals": [
+                "human",
+                "reviewer"
+              ]
+            },
+            {
+              "id": "human_approval_group_2",
+              "description": "A human or reviewer must approve before anything is posted. signal group 2.",
+              "signals": [
+                "approve",
+                "approval",
+                "review"
+              ]
+            },
+            {
+              "id": "human_approval_group_3",
+              "description": "A human or reviewer must approve before anything is posted. signal group 3.",
+              "signals": [
+                "posted",
+                "posting",
+                "post",
+                "comments",
+                "suggestions"
               ]
             }
+          ],
+          "require_all": [
+            "repo_sync_risk_group_1",
+            "repo_sync_risk_group_2",
+            "draft_mode",
+            "nimbus_beta",
+            "human_approval"
           ]
         }
       },
@@ -152,11 +178,23 @@
           "message_exists": {
             "sender_id": "daisy",
             "recipient_id": "agent",
-            "terms_any": [
-              "security",
-              "source code",
-              "private repo"
-            ]
+            "match": {
+              "mode": "deterministic",
+              "intents": [
+                {
+                  "id": "message_signal",
+                  "description": "Message contains one authored signal.",
+                  "signals": [
+                    "security",
+                    "source code",
+                    "private repo"
+                  ]
+                }
+              ],
+              "require_all": [
+                "message_signal"
+              ]
+            }
           }
         },
         {
@@ -170,71 +208,89 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "semantic_match": {
-          "required": [
+        "match": {
+          "mode": "semantic",
+          "intents": [
             {
               "id": "nimbus_beta",
               "description": "The message is about the Nimbus Friday beta or pilot.",
-              "signals_any": [
+              "signals": [
                 "nimbus",
                 "friday beta",
                 "nimbus beta",
                 "friday pilot",
-                "pilot"
+                "pilot",
+                "friday",
+                "friday draft mode",
+                "friday draft-mode"
               ]
             },
             {
               "id": "private_repo_security",
               "description": "The message addresses private repo source-code security handling.",
-              "signals_any": [
+              "signals": [
                 "private repo",
                 "private repos",
                 "source code",
                 "raw source",
                 "private-repo security",
-                "security wording"
+                "security wording",
+                "private repo security wording is covered",
+                "security wording is covered"
               ]
             },
             {
-              "id": "transient_source_processing",
-              "description": "Private repo source is processed transiently and raw source is not retained long term.",
-              "signal_groups_all": [
-                [
-                  "transient",
-                  "transiently",
-                  "not stored",
-                  "not retained",
-                  "no long-term",
-                  "not store"
-                ],
-                [
-                  "source",
-                  "source code",
-                  "raw source",
-                  "private repo",
-                  "private-repo"
-                ]
+              "id": "transient_source_processing_group_1",
+              "description": "Private repo source is processed transiently and raw source is not retained long term. signal group 1.",
+              "signals": [
+                "transient",
+                "transiently",
+                "not stored",
+                "not retained",
+                "no long-term",
+                "not store"
               ]
             },
             {
-              "id": "beta_audit_retention",
-              "description": "Generated suggestions or metadata are retained for the beta audit window.",
-              "signal_groups_all": [
-                [
-                  "metadata",
-                  "draft suggestions",
-                  "generated suggestions",
-                  "audit"
-                ],
-                [
-                  "30 days",
-                  "thirty days",
-                  "beta audit",
-                  "audit window",
-                  "retained"
-                ]
+              "id": "transient_source_processing_group_2",
+              "description": "Private repo source is processed transiently and raw source is not retained long term. signal group 2.",
+              "signals": [
+                "source",
+                "source code",
+                "raw source",
+                "private repo",
+                "private-repo"
+              ]
+            },
+            {
+              "id": "beta_audit_retention_group_1",
+              "description": "Generated suggestions or metadata are retained for the beta audit window. signal group 1.",
+              "signals": [
+                "metadata",
+                "draft suggestions",
+                "generated suggestions",
+                "audit"
+              ]
+            },
+            {
+              "id": "beta_audit_retention_group_2",
+              "description": "Generated suggestions or metadata are retained for the beta audit window. signal group 2.",
+              "signals": [
+                "30 days",
+                "thirty days",
+                "beta audit",
+                "audit window",
+                "retained"
               ]
             }
+          ],
+          "require_all": [
+            "transient_source_processing_group_1",
+            "transient_source_processing_group_2",
+            "beta_audit_retention_group_1",
+            "beta_audit_retention_group_2",
+            "nimbus_beta",
+            "private_repo_security"
           ]
         }
       },
@@ -273,45 +329,52 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "semantic_match": {
-          "required": [
+        "match": {
+          "mode": "semantic",
+          "intents": [
             {
-              "id": "koopa_audit",
-              "description": "The message addresses Koopa audit-log or security-review needs.",
-              "signal_groups_all": [
-                [
-                  "koopa"
-                ],
-                [
-                  "audit",
-                  "admin log",
-                  "admin logs",
-                  "audit log",
-                  "audit logs",
-                  "security review"
-                ]
+              "id": "koopa_audit_group_1",
+              "description": "The message addresses Koopa audit-log or security-review needs. signal group 1.",
+              "signals": [
+                "koopa"
               ]
             },
             {
-              "id": "one_time_csv",
-              "description": "Koopa can receive a one-time CSV export for the security review.",
-              "signal_groups_all": [
-                [
-                  "csv",
-                  "export"
-                ],
-                [
-                  "one-time",
-                  "one time",
-                  "for the review",
-                  "security review"
-                ]
+              "id": "koopa_audit_group_2",
+              "description": "The message addresses Koopa audit-log or security-review needs. signal group 2.",
+              "signals": [
+                "audit",
+                "admin log",
+                "admin logs",
+                "audit log",
+                "audit logs",
+                "security review"
+              ]
+            },
+            {
+              "id": "one_time_csv_group_1",
+              "description": "Koopa can receive a one-time CSV export for the security review. signal group 1.",
+              "signals": [
+                "csv",
+                "export",
+                "csv scope",
+                "audit csv"
+              ]
+            },
+            {
+              "id": "one_time_csv_group_2",
+              "description": "Koopa can receive a one-time CSV export for the security review. signal group 2.",
+              "signals": [
+                "one-time",
+                "one time",
+                "for the review",
+                "security review"
               ]
             },
             {
               "id": "self_serve_followup",
               "description": "Full self-serve export is deferred as follow-up after launch.",
-              "signals_any": [
+              "signals": [
                 "follow-up",
                 "follow up",
                 "self-serve",
@@ -321,6 +384,13 @@
                 "after nimbus launch"
               ]
             }
+          ],
+          "require_all": [
+            "koopa_audit_group_1",
+            "koopa_audit_group_2",
+            "one_time_csv_group_1",
+            "one_time_csv_group_2",
+            "self_serve_followup"
           ]
         }
       },
@@ -357,12 +427,24 @@
           "message_exists": {
             "sender_id": "daisy",
             "recipient_id": "agent",
-            "terms_any": [
-              "final nimbus agenda",
-              "go/no-go",
-              "go no-go",
-              "final readiness"
-            ]
+            "match": {
+              "mode": "deterministic",
+              "intents": [
+                {
+                  "id": "message_signal",
+                  "description": "Message contains one authored signal.",
+                  "signals": [
+                    "final nimbus agenda",
+                    "go/no-go",
+                    "go no-go",
+                    "final readiness"
+                  ]
+                }
+              ],
+              "require_all": [
+                "message_signal"
+              ]
+            }
           }
         },
         {
@@ -397,12 +479,13 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "semantic_match": {
-          "required": [
+        "match": {
+          "mode": "semantic",
+          "intents": [
             {
               "id": "final_readiness",
               "description": "The message gives a final readiness or go/no-go confirmation.",
-              "signals_any": [
+              "signals": [
                 "go/no-go",
                 "go no-go",
                 "go for friday",
@@ -416,7 +499,7 @@
             {
               "id": "draft_mode",
               "description": "Friday launch mode is draft mode or queued draft suggestions.",
-              "signals_any": [
+              "signals": [
                 "draft mode",
                 "draft-mode",
                 "draft suggestions",
@@ -428,7 +511,7 @@
             {
               "id": "human_approval",
               "description": "A human or reviewer must approve before anything is posted.",
-              "signals_any": [
+              "signals": [
                 "human approval",
                 "approval before posting",
                 "approve before posting",
@@ -438,83 +521,116 @@
                 "human review",
                 "human-in-the-loop",
                 "human in the loop",
-                "before posting"
-              ],
-              "signal_groups_all": [
-                [
-                  "human",
-                  "reviewer"
-                ],
-                [
-                  "approve",
-                  "approval",
-                  "review"
-                ],
-                [
-                  "posted",
-                  "posting",
-                  "post",
-                  "comments",
-                  "suggestions"
-                ]
+                "before posting",
+                "before anything is posted",
+                "approve suggestions",
+                "approve before anything is posted"
+              ]
+            },
+            {
+              "id": "human_approval_group_1",
+              "description": "A human or reviewer must approve before anything is posted. signal group 1.",
+              "signals": [
+                "human",
+                "reviewer"
+              ]
+            },
+            {
+              "id": "human_approval_group_2",
+              "description": "A human or reviewer must approve before anything is posted. signal group 2.",
+              "signals": [
+                "approve",
+                "approval",
+                "review"
+              ]
+            },
+            {
+              "id": "human_approval_group_3",
+              "description": "A human or reviewer must approve before anything is posted. signal group 3.",
+              "signals": [
+                "posted",
+                "posting",
+                "post",
+                "comments",
+                "suggestions"
               ]
             },
             {
               "id": "private_repo_security",
               "description": "The message addresses private repo source-code security handling.",
-              "signals_any": [
+              "signals": [
                 "private repo",
                 "private repos",
                 "source code",
                 "raw source",
                 "private-repo security",
-                "security wording"
+                "security wording",
+                "private repo security wording is covered",
+                "security wording is covered"
               ]
             },
             {
-              "id": "koopa_audit",
-              "description": "The message addresses Koopa audit-log or security-review needs.",
-              "signal_groups_all": [
-                [
-                  "koopa"
-                ],
-                [
-                  "audit",
-                  "admin log",
-                  "admin logs",
-                  "audit log",
-                  "audit logs",
-                  "security review"
-                ]
+              "id": "koopa_audit_group_1",
+              "description": "The message addresses Koopa audit-log or security-review needs. signal group 1.",
+              "signals": [
+                "koopa"
               ]
             },
             {
-              "id": "one_time_csv",
-              "description": "Koopa can receive a one-time CSV export for the security review.",
-              "signal_groups_all": [
-                [
-                  "csv",
-                  "export"
-                ],
-                [
-                  "one-time",
-                  "one time",
-                  "for the review",
-                  "security review"
-                ]
+              "id": "koopa_audit_group_2",
+              "description": "The message addresses Koopa audit-log or security-review needs. signal group 2.",
+              "signals": [
+                "audit",
+                "admin log",
+                "admin logs",
+                "audit log",
+                "audit logs",
+                "security review"
+              ]
+            },
+            {
+              "id": "one_time_csv_group_1",
+              "description": "Koopa can receive a one-time CSV export for the security review. signal group 1.",
+              "signals": [
+                "csv",
+                "export",
+                "csv scope",
+                "audit csv"
+              ]
+            },
+            {
+              "id": "one_time_csv_group_2",
+              "description": "Koopa can receive a one-time CSV export for the security review. signal group 2.",
+              "signals": [
+                "one-time",
+                "one time",
+                "for the review",
+                "security review"
               ]
             },
             {
               "id": "nimbus_beta",
               "description": "The message is about the Nimbus Friday beta or pilot.",
-              "signals_any": [
+              "signals": [
                 "nimbus",
                 "friday beta",
                 "nimbus beta",
                 "friday pilot",
-                "pilot"
+                "pilot",
+                "friday",
+                "friday draft mode",
+                "friday draft-mode"
               ]
             }
+          ],
+          "require_all": [
+            "final_readiness",
+            "draft_mode",
+            "human_approval",
+            "private_repo_security",
+            "koopa_audit_group_1",
+            "one_time_csv_group_1",
+            "nimbus_beta"
           ]
         }
       },
@@ -537,12 +653,24 @@
           "message_exists": {
             "sender_id": "daisy",
             "recipient_id": "agent",
-            "terms_any": [
-              "final nimbus agenda",
-              "go/no-go",
-              "go no-go",
-              "final readiness"
-            ]
+            "match": {
+              "mode": "deterministic",
+              "intents": [
+                {
+                  "id": "message_signal",
+                  "description": "Message contains one authored signal.",
+                  "signals": [
+                    "final nimbus agenda",
+                    "go/no-go",
+                    "go no-go",
+                    "final readiness"
+                  ]
+                }
+              ],
+              "require_all": [
+                "message_signal"
+              ]
+            }
           }
         },
         {
@@ -577,12 +705,13 @@
       "action": {
         "type": "send_chat",
         "recipient_id": "daisy",
-        "semantic_match": {
-          "required": [
+        "match": {
+          "mode": "semantic",
+          "intents": [
             {
               "id": "final_readiness",
               "description": "The message gives a final readiness or go/no-go confirmation.",
-              "signals_any": [
+              "signals": [
                 "go/no-go",
                 "go no-go",
                 "go for friday",
@@ -596,7 +725,7 @@
             {
               "id": "draft_mode",
               "description": "Friday launch mode is draft mode or queued draft suggestions.",
-              "signals_any": [
+              "signals": [
                 "draft mode",
                 "draft-mode",
                 "draft suggestions",
@@ -608,7 +737,7 @@
             {
               "id": "human_approval",
               "description": "A human or reviewer must approve before anything is posted.",
-              "signals_any": [
+              "signals": [
                 "human approval",
                 "approval before posting",
                 "approve before posting",
@@ -618,83 +747,116 @@
                 "human review",
                 "human-in-the-loop",
                 "human in the loop",
-                "before posting"
-              ],
-              "signal_groups_all": [
-                [
-                  "human",
-                  "reviewer"
-                ],
-                [
-                  "approve",
-                  "approval",
-                  "review"
-                ],
-                [
-                  "posted",
-                  "posting",
-                  "post",
-                  "comments",
-                  "suggestions"
-                ]
+                "before posting",
+                "before anything is posted",
+                "approve suggestions",
+                "approve before anything is posted"
+              ]
+            },
+            {
+              "id": "human_approval_group_1",
+              "description": "A human or reviewer must approve before anything is posted. signal group 1.",
+              "signals": [
+                "human",
+                "reviewer"
+              ]
+            },
+            {
+              "id": "human_approval_group_2",
+              "description": "A human or reviewer must approve before anything is posted. signal group 2.",
+              "signals": [
+                "approve",
+                "approval",
+                "review"
+              ]
+            },
+            {
+              "id": "human_approval_group_3",
+              "description": "A human or reviewer must approve before anything is posted. signal group 3.",
+              "signals": [
+                "posted",
+                "posting",
+                "post",
+                "comments",
+                "suggestions"
               ]
             },
             {
               "id": "private_repo_security",
               "description": "The message addresses private repo source-code security handling.",
-              "signals_any": [
+              "signals": [
                 "private repo",
                 "private repos",
                 "source code",
                 "raw source",
                 "private-repo security",
-                "security wording"
+                "security wording",
+                "private repo security wording is covered",
+                "security wording is covered"
               ]
             },
             {
-              "id": "koopa_audit",
-              "description": "The message addresses Koopa audit-log or security-review needs.",
-              "signal_groups_all": [
-                [
-                  "koopa"
-                ],
-                [
-                  "audit",
-                  "admin log",
-                  "admin logs",
-                  "audit log",
-                  "audit logs",
-                  "security review"
-                ]
+              "id": "koopa_audit_group_1",
+              "description": "The message addresses Koopa audit-log or security-review needs. signal group 1.",
+              "signals": [
+                "koopa"
               ]
             },
             {
-              "id": "one_time_csv",
-              "description": "Koopa can receive a one-time CSV export for the security review.",
-              "signal_groups_all": [
-                [
-                  "csv",
-                  "export"
-                ],
-                [
-                  "one-time",
-                  "one time",
-                  "for the review",
-                  "security review"
-                ]
+              "id": "koopa_audit_group_2",
+              "description": "The message addresses Koopa audit-log or security-review needs. signal group 2.",
+              "signals": [
+                "audit",
+                "admin log",
+                "admin logs",
+                "audit log",
+                "audit logs",
+                "security review"
+              ]
+            },
+            {
+              "id": "one_time_csv_group_1",
+              "description": "Koopa can receive a one-time CSV export for the security review. signal group 1.",
+              "signals": [
+                "csv",
+                "export",
+                "csv scope",
+                "audit csv"
+              ]
+            },
+            {
+              "id": "one_time_csv_group_2",
+              "description": "Koopa can receive a one-time CSV export for the security review. signal group 2.",
+              "signals": [
+                "one-time",
+                "one time",
+                "for the review",
+                "security review"
               ]
             },
             {
               "id": "nimbus_beta",
               "description": "The message is about the Nimbus Friday beta or pilot.",
-              "signals_any": [
+              "signals": [
                 "nimbus",
                 "friday beta",
                 "nimbus beta",
                 "friday pilot",
-                "pilot"
+                "pilot",
+                "friday",
+                "friday draft mode",
+                "friday draft-mode"
               ]
             }
+          ],
+          "require_all": [
+            "final_readiness",
+            "draft_mode",
+            "human_approval",
+            "private_repo_security",
+            "koopa_audit_group_1",
+            "one_time_csv_group_1",
+            "nimbus_beta"
           ]
         }
       },

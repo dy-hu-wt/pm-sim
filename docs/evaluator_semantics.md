@@ -37,7 +37,7 @@ It does not decide whether the PM deserves credit by itself. Causal gates run fi
 - required customer interruptions must already be visible
 - required coworker state must already exist
 
-The default matcher is deterministic and offline. `PM_SIM_SEMANTIC_MATCHER=llm` can use a cached, fail-closed lightweight model for phrasing equivalence, but the evaluator still scores database state.
+The default matcher is a cached, fail-closed lightweight LLM for phrasing equivalence. `PM_SIM_SEMANTIC_MATCHER=deterministic` is available for fully offline tests and scripted demonstrations, but the evaluator still scores database state.
 
 ## Anti-Cheat Matrix
 

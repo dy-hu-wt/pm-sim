@@ -82,7 +82,7 @@ def semantic_match(
     if cache_key in cache:
         return dict(cache[cache_key])
 
-    mode = os.environ.get("PM_SIM_SEMANTIC_MATCHER", "deterministic").lower()
+    mode = os.environ.get("PM_SIM_SEMANTIC_MATCHER", "llm").lower()
     if mode == "llm":
         result = _safe_llm_match(text, criteria)
     else:
@@ -179,27 +179,9 @@ def _criteria_items(items: Any) -> list[dict[str, Any]]:
 
 def _item_match(text: str, item: dict[str, Any]) -> dict[str, Any]:
     normalized_text = _normalize(text)
-    signals_any = [_normalize(value) for value in item.get("signals_any", [])]
-    signals_all = [_normalize(value) for value in item.get("signals_all", [])]
-    signal_groups = [
-        [_normalize(value) for value in group]
-        for group in item.get("signal_groups_all", [])
-        if isinstance(group, list)
-    ]
-    checks = []
-    if signals_any:
-        checks.append(any(signal and signal in normalized_text for signal in signals_any))
-    if signals_all:
-        checks.append(all(signal and signal in normalized_text for signal in signals_all))
-    if signal_groups:
-        checks.append(
-            all(
-                any(signal and signal in normalized_text for signal in group)
-                for group in signal_groups
-            )
-        )
-    if checks:
-        matched = any(checks)
+    signals = [_normalize(value) for value in item.get("signals", [])]
+    if signals:
+        matched = any(signal and signal in normalized_text for signal in signals)
     else:
         matched = _description_matches(text, str(item.get("description", "")))
     return {

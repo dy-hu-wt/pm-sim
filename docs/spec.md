@@ -80,8 +80,8 @@ They should have:
 - response delays
 - private knowledge
 - mutable coworker state
-- behavior rules
-- autonomous policies
+- actor behaviors
+- autonomous actor policies
 
 Coworker behavior should be autonomous enough to create PM-relevant pressure, but deterministic at the state-transition level. I do not want grading-critical facts to depend on an LLM improvising.
 
@@ -229,7 +229,7 @@ The first implementation should focus on the backend simulator:
 - SQLite state
 - action handlers
 - event queue
-- coworker behavior rules
+- actor behaviors
 - evaluator
 - CLI/operator commands
 
@@ -285,7 +285,7 @@ Scenario data should define most of the setup:
 - outcome rules
 - actor behaviors
 
-Python owns reusable interpreters and mutation semantics, while scenario-specific scoring, outcomes, actor behaviors, proactive events, action-derived effects, and meeting semantics should be data-authored. The current implementation uses a small reusable condition language for task gates, action rules, state-derived evidence rows, harmful-action rules, actor behaviors, background event rules, meeting rules, and outcome classification. Action rules use deterministic causal conditions plus local `semantic_match` criteria rather than a global keyword-claim registry.
+Python owns reusable interpreters and mutation semantics, while scenario-specific scoring, outcomes, actor behaviors, proactive events, action-derived effects, and meeting semantics should be data-authored. The current implementation uses a small reusable condition language for task gates, action rules, state-derived evidence rows, harmful-action rules, actor behaviors, background event rules, meeting rules, and outcome classification. Actor routing and action scoring both use the shared `match` object: deterministic mode routes stable coworker behavior, while semantic mode validates phrasing before state mutation.
 
 The defensible split is:
 

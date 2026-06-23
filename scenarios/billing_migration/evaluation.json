@@ -52,11 +52,13 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "semantic_match": {
-          "required": [
+        "match": {
+          "mode": "semantic",
+          "intents": [
             {
               "description": "Atlas billing migration update",
-              "signals_any": [
+              "id": "required_1",
+              "signals": [
                 "atlas",
                 "billing migration",
                 "friday"
@@ -64,7 +66,8 @@
             },
             {
               "description": "staged shadow mode, not full cutover",
-              "signals_any": [
+              "id": "required_2",
+              "signals": [
                 "staged shadow",
                 "shadow mode",
                 "not full cutover",
@@ -73,24 +76,32 @@
             },
             {
               "description": "invoice correctness/data risk rationale",
-              "signals_any": [
+              "id": "required_3",
+              "signals": [
                 "invoice correctness",
                 "checksum",
                 "backfill",
                 "incorrect invoice",
                 "data quality"
               ]
-            }
-          ],
-          "forbidden": [
+            },
             {
               "description": "promises full billing cutover this week",
-              "signals_any": [
+              "id": "forbidden_1",
+              "signals": [
                 "full cutover is approved",
                 "fully cut over",
                 "all invoices from the new ledger"
               ]
             }
+          ],
+          "require_all": [
+            "required_1",
+            "required_2",
+            "required_3"
+          ],
+          "forbid": [
+            "forbidden_1"
           ]
         }
       },
@@ -135,11 +146,13 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "semantic_match": {
-          "required": [
+        "match": {
+          "mode": "semantic",
+          "intents": [
             {
               "description": "Meridian invoice export answer",
-              "signals_any": [
+              "id": "required_1",
+              "signals": [
                 "meridian",
                 "invoice export",
                 "finance review"
@@ -147,7 +160,8 @@
             },
             {
               "description": "one-time export is feasible",
-              "signals_any": [
+              "id": "required_2",
+              "signals": [
                 "one-time export",
                 "one time export",
                 "one-time invoice export",
@@ -158,23 +172,31 @@
             },
             {
               "description": "self-serve export remains follow-up",
-              "signals_any": [
+              "id": "required_3",
+              "signals": [
                 "self-serve follow-up",
                 "self serve follow-up",
                 "self-serve export is follow-up",
                 "not self-serve this week"
               ]
-            }
-          ],
-          "forbidden": [
+            },
             {
               "description": "commits to self-serve export this week",
-              "signals_any": [
+              "id": "forbidden_1",
+              "signals": [
                 "self-serve export this week",
                 "full self-serve export for thursday",
                 "productized export by thursday"
               ]
             }
+          ],
+          "require_all": [
+            "required_1",
+            "required_2",
+            "required_3"
+          ],
+          "forbid": [
+            "forbidden_1"
           ]
         }
       },
@@ -218,11 +240,13 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "semantic_match": {
-          "required": [
+        "match": {
+          "mode": "semantic",
+          "intents": [
             {
               "description": "final go/no-go for Atlas Friday",
-              "signals_any": [
+              "id": "required_1",
+              "signals": [
                 "go for friday",
                 "final readiness",
                 "go/no-go",
@@ -231,7 +255,8 @@
             },
             {
               "description": "staged shadow mode with full cutover deferred",
-              "signals_any": [
+              "id": "required_2",
+              "signals": [
                 "staged shadow mode",
                 "shadow mode",
                 "full cutover deferred",
@@ -240,12 +265,18 @@
             },
             {
               "description": "Meridian remains scoped to one-time export",
-              "signals_any": [
+              "id": "required_3",
+              "signals": [
                 "meridian",
                 "one-time export",
                 "self-serve follow-up"
               ]
             }
+          ],
+          "require_all": [
+            "required_1",
+            "required_2",
+            "required_3"
           ]
         }
       },
@@ -588,12 +619,29 @@
               "message_exists": {
                 "channel": "email",
                 "sender_id": "agent",
-                "terms_all": [
-                  "full cutover"
-                ],
-                "terms_any": [
-                  "approved"
-                ]
+                "match": {
+                  "mode": "deterministic",
+                  "intents": [
+                    {
+                      "id": "message_signal",
+                      "description": "Message contains one authored signal.",
+                      "signals": [
+                        "approved"
+                      ]
+                    },
+                    {
+                      "id": "message_required_signal_1",
+                      "description": "Message contains required authored signal.",
+                      "signals": [
+                        "full cutover"
+                      ]
+                    }
+                  ],
+                  "require_all": [
+                    "message_signal",
+                    "message_required_signal_1"
+                  ]
+                }
               }
             },
             {

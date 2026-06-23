@@ -76,13 +76,23 @@
         "required_facts": [
           "fact_meridian_needs_invoice_export"
         ],
-        "terms_any": [
-          "meridian",
-          "export",
-          "invoice",
-          "csv",
-          "finance review"
-        ]
+        "intents": [
+          {
+            "id": "routing_signal_1",
+            "description": "Match one authored routing signal.",
+            "signals": [
+              "meridian",
+              "export",
+              "invoice",
+              "csv",
+              "finance review"
+            ]
+          }
+        ],
+        "require_all": [
+          "routing_signal_1"
+        ],
+        "mode": "deterministic"
       },
       "when": [],
       "reply": {
@@ -115,15 +125,25 @@
       "channel": "email",
       "priority": 100,
       "match": {
-        "terms_any": [
-          "backfill",
-          "checksum",
-          "billing",
-          "migration",
-          "cutover",
-          "invoice",
-          "risk"
-        ]
+        "intents": [
+          {
+            "id": "routing_signal_1",
+            "description": "Match one authored routing signal.",
+            "signals": [
+              "backfill",
+              "checksum",
+              "billing",
+              "migration",
+              "cutover",
+              "invoice",
+              "risk"
+            ]
+          }
+        ],
+        "require_all": [
+          "routing_signal_1"
+        ],
+        "mode": "deterministic"
       },
       "when": [
         {
@@ -182,13 +202,23 @@
         "required_facts": [
           "fact_meridian_needs_invoice_export"
         ],
-        "terms_any": [
-          "meridian",
-          "export",
-          "invoice",
-          "csv",
-          "finance review"
-        ]
+        "intents": [
+          {
+            "id": "routing_signal_1",
+            "description": "Match one authored routing signal.",
+            "signals": [
+              "meridian",
+              "export",
+              "invoice",
+              "csv",
+              "finance review"
+            ]
+          }
+        ],
+        "require_all": [
+          "routing_signal_1"
+        ],
+        "mode": "deterministic"
       },
       "when": [],
       "reply": {
@@ -220,15 +250,25 @@
       "channel": "chat",
       "priority": 110,
       "match": {
-        "terms_any": [
-          "backfill",
-          "checksum",
-          "billing",
-          "migration",
-          "cutover",
-          "invoice",
-          "risk"
-        ]
+        "intents": [
+          {
+            "id": "routing_signal_1",
+            "description": "Match one authored routing signal.",
+            "signals": [
+              "backfill",
+              "checksum",
+              "billing",
+              "migration",
+              "cutover",
+              "invoice",
+              "risk"
+            ]
+          }
+        ],
+        "require_all": [
+          "routing_signal_1"
+        ],
+        "mode": "deterministic"
       },
       "when": [
         {
@@ -251,15 +291,25 @@
       "channel": "chat",
       "priority": 100,
       "match": {
-        "terms_any": [
-          "backfill",
-          "checksum",
-          "billing",
-          "migration",
-          "cutover",
-          "invoice",
-          "risk"
-        ]
+        "intents": [
+          {
+            "id": "routing_signal_1",
+            "description": "Match one authored routing signal.",
+            "signals": [
+              "backfill",
+              "checksum",
+              "billing",
+              "migration",
+              "cutover",
+              "invoice",
+              "risk"
+            ]
+          }
+        ],
+        "require_all": [
+          "routing_signal_1"
+        ],
+        "mode": "deterministic"
       },
       "when": [
         {
@@ -313,7 +363,10 @@
       "person_id": "luigi",
       "channel": "chat",
       "priority": 0,
-      "match": {},
+      "match": {
+        "intents": [],
+        "mode": "deterministic"
+      },
       "when": [],
       "reply": {
         "body": "I am working on billing backfill parity. If you need the migration decision, ask me specifically about checksum or cutover risk."
@@ -327,25 +380,43 @@
       "channel": "email",
       "priority": 100,
       "match": {
-        "term_groups_all": [
-          [
-            "atlas",
-            "customer",
-            "friday"
-          ],
-          [
-            "checksum",
-            "backfill",
-            "invoice",
-            "incorrect",
-            "data"
-          ],
-          [
-            "shadow",
-            "staged",
-            "safe",
-            "not full cutover"
-          ]
+        "mode": "deterministic",
+        "intents": [
+          {
+            "id": "term_group_1",
+            "description": "Match one authored routing signal from this group.",
+            "signals": [
+              "atlas",
+              "customer",
+              "friday"
+            ]
+          },
+          {
+            "id": "term_group_2",
+            "description": "Match one authored routing signal from this group.",
+            "signals": [
+              "checksum",
+              "backfill",
+              "invoice",
+              "incorrect",
+              "data"
+            ]
+          },
+          {
+            "id": "term_group_3",
+            "description": "Match one authored routing signal from this group.",
+            "signals": [
+              "shadow",
+              "staged",
+              "safe",
+              "not full cutover"
+            ]
+          }
+        ],
+        "require_all": [
+          "term_group_1",
+          "term_group_2",
+          "term_group_3"
         ]
       },
       "when": [
@@ -392,25 +463,43 @@
       "channel": "chat",
       "priority": 100,
       "match": {
-        "term_groups_all": [
-          [
-            "atlas",
-            "customer",
-            "friday"
-          ],
-          [
-            "checksum",
-            "backfill",
-            "invoice",
-            "incorrect",
-            "data"
-          ],
-          [
-            "shadow",
-            "staged",
-            "safe",
-            "not full cutover"
-          ]
+        "mode": "deterministic",
+        "intents": [
+          {
+            "id": "term_group_1",
+            "description": "Match one authored routing signal from this group.",
+            "signals": [
+              "atlas",
+              "customer",
+              "friday"
+            ]
+          },
+          {
+            "id": "term_group_2",
+            "description": "Match one authored routing signal from this group.",
+            "signals": [
+              "checksum",
+              "backfill",
+              "invoice",
+              "incorrect",
+              "data"
+            ]
+          },
+          {
+            "id": "term_group_3",
+            "description": "Match one authored routing signal from this group.",
+            "signals": [
+              "shadow",
+              "staged",
+              "safe",
+              "not full cutover"
+            ]
+          }
+        ],
+        "require_all": [
+          "term_group_1",
+          "term_group_2",
+          "term_group_3"
         ]
       },
       "when": [
@@ -455,7 +544,10 @@
       "person_id": "daisy",
       "channel": "chat",
       "priority": 0,
-      "match": {},
+      "match": {
+        "intents": [],
+        "mode": "deterministic"
+      },
       "when": [],
       "reply": {
         "body": "Atlas needs a reliable customer-facing migration update. I need the approved mode, limitation, and rationale by email."
@@ -473,13 +565,23 @@
           "fact_meridian_needs_invoice_export",
           "fact_invoice_export_feasible"
         ],
-        "terms_any": [
-          "meridian",
-          "export",
-          "scope",
-          "self-serve",
-          "finance review"
-        ]
+        "intents": [
+          {
+            "id": "routing_signal_1",
+            "description": "Match one authored routing signal.",
+            "signals": [
+              "meridian",
+              "export",
+              "scope",
+              "self-serve",
+              "finance review"
+            ]
+          }
+        ],
+        "require_all": [
+          "routing_signal_1"
+        ],
+        "mode": "deterministic"
       },
       "when": [],
       "reply": {
@@ -522,13 +624,23 @@
           "fact_meridian_needs_invoice_export",
           "fact_invoice_export_feasible"
         ],
-        "terms_any": [
-          "meridian",
-          "export",
-          "scope",
-          "self-serve",
-          "finance review"
-        ]
+        "intents": [
+          {
+            "id": "routing_signal_1",
+            "description": "Match one authored routing signal.",
+            "signals": [
+              "meridian",
+              "export",
+              "scope",
+              "self-serve",
+              "finance review"
+            ]
+          }
+        ],
+        "require_all": [
+          "routing_signal_1"
+        ],
+        "mode": "deterministic"
       },
       "when": [],
       "reply": {
@@ -566,14 +678,24 @@
       "channel": "chat",
       "priority": 110,
       "match": {
-        "terms_any": [
-          "approval",
-          "approve",
-          "decision",
-          "staged",
-          "shadow",
-          "billing"
-        ]
+        "intents": [
+          {
+            "id": "routing_signal_1",
+            "description": "Match one authored routing signal.",
+            "signals": [
+              "approval",
+              "approve",
+              "decision",
+              "staged",
+              "shadow",
+              "billing"
+            ]
+          }
+        ],
+        "require_all": [
+          "routing_signal_1"
+        ],
+        "mode": "deterministic"
       },
       "when": [
         {
@@ -600,25 +722,43 @@
           "fact_backfill_checksum_mismatch",
           "fact_atlas_values_invoice_correctness"
         ],
-        "term_groups_all": [
-          [
-            "staged",
-            "shadow",
-            "defer",
-            "not full cutover"
-          ],
-          [
-            "atlas",
-            "billing",
-            "friday",
-            "migration"
-          ],
-          [
-            "checksum",
-            "backfill",
-            "invoice",
-            "risk"
-          ]
+        "mode": "deterministic",
+        "intents": [
+          {
+            "id": "term_group_1",
+            "description": "Match one authored routing signal from this group.",
+            "signals": [
+              "staged",
+              "shadow",
+              "defer",
+              "not full cutover"
+            ]
+          },
+          {
+            "id": "term_group_2",
+            "description": "Match one authored routing signal from this group.",
+            "signals": [
+              "atlas",
+              "billing",
+              "friday",
+              "migration"
+            ]
+          },
+          {
+            "id": "term_group_3",
+            "description": "Match one authored routing signal from this group.",
+            "signals": [
+              "checksum",
+              "backfill",
+              "invoice",
+              "risk"
+            ]
+          }
+        ],
+        "require_all": [
+          "term_group_1",
+          "term_group_2",
+          "term_group_3"
         ]
       },
       "when": [
@@ -673,25 +813,43 @@
           "fact_backfill_checksum_mismatch",
           "fact_atlas_values_invoice_correctness"
         ],
-        "term_groups_all": [
-          [
-            "staged",
-            "shadow",
-            "defer",
-            "not full cutover"
-          ],
-          [
-            "atlas",
-            "billing",
-            "friday",
-            "migration"
-          ],
-          [
-            "checksum",
-            "backfill",
-            "invoice",
-            "risk"
-          ]
+        "mode": "deterministic",
+        "intents": [
+          {
+            "id": "term_group_1",
+            "description": "Match one authored routing signal from this group.",
+            "signals": [
+              "staged",
+              "shadow",
+              "defer",
+              "not full cutover"
+            ]
+          },
+          {
+            "id": "term_group_2",
+            "description": "Match one authored routing signal from this group.",
+            "signals": [
+              "atlas",
+              "billing",
+              "friday",
+              "migration"
+            ]
+          },
+          {
+            "id": "term_group_3",
+            "description": "Match one authored routing signal from this group.",
+            "signals": [
+              "checksum",
+              "backfill",
+              "invoice",
+              "risk"
+            ]
+          }
+        ],
+        "require_all": [
+          "term_group_1",
+          "term_group_2",
+          "term_group_3"
         ]
       },
       "when": [
@@ -740,7 +898,10 @@
       "person_id": "toad",
       "channel": "chat",
       "priority": 0,
-      "match": {},
+      "match": {
+        "intents": [],
+        "mode": "deterministic"
+      },
       "when": [],
       "reply": {
         "body": "I need the technical backfill risk, Atlas customer impact, and recommended safe Friday mode before approving a migration de-scope."
@@ -756,7 +917,9 @@
       "match": {
         "required_facts": [
           "fact_backfill_checksum_mismatch"
-        ]
+        ],
+        "intents": [],
+        "mode": "deterministic"
       },
       "when": [],
       "reply": {
@@ -777,7 +940,10 @@
       "person_id": "mario",
       "channel": "chat",
       "priority": 0,
-      "match": {},
+      "match": {
+        "intents": [],
+        "mode": "deterministic"
+      },
       "when": [],
       "reply": {
         "body": "Please try to keep full cutover in scope if the data is safe. Atlas wants visible migration progress."
@@ -790,7 +956,10 @@
       "person_id": "daisy",
       "channel": "email",
       "priority": 0,
-      "match": {},
+      "match": {
+        "intents": [],
+        "mode": "deterministic"
+      },
       "when": [],
       "reply": {
         "subject": "Re: received",
@@ -804,7 +973,10 @@
       "person_id": "luigi",
       "channel": "email",
       "priority": 0,
-      "match": {},
+      "match": {
+        "intents": [],
+        "mode": "deterministic"
+      },
       "when": [],
       "reply": {
         "subject": "Re: received",
@@ -818,7 +990,10 @@
       "person_id": "toad",
       "channel": "email",
       "priority": 0,
-      "match": {},
+      "match": {
+        "intents": [],
+        "mode": "deterministic"
+      },
       "when": [],
       "reply": {
         "subject": "Re: received",
@@ -836,15 +1011,6 @@
       ],
       "absent_facts": [
         "fact_backfill_checksum_mismatch"
-      ],
-      "topic_terms_any": [
-        "billing",
-        "migration",
-        "backfill",
-        "checksum",
-        "cutover",
-        "risk",
-        "atlas"
       ],
       "transcript_lines": [
         "- Luigi: Backfill checksums still disagree for enterprise discount invoices, so full cutover can create incorrect invoice totals.",
@@ -882,7 +1048,28 @@
           "key": "backfill_risk_shared",
           "value": true
         }
-      ]
+      ],
+      "topic_match": {
+        "mode": "deterministic",
+        "intents": [
+          {
+            "id": "meeting_topic",
+            "description": "Meeting title contains one authored topic signal.",
+            "signals": [
+              "billing",
+              "migration",
+              "backfill",
+              "checksum",
+              "cutover",
+              "risk",
+              "atlas"
+            ]
+          }
+        ],
+        "require_all": [
+          "meeting_topic"
+        ]
+      }
     },
     {
       "id": "meeting_daisy_customer_context",
@@ -895,15 +1082,6 @@
       ],
       "absent_facts": [
         "fact_atlas_values_invoice_correctness"
-      ],
-      "topic_terms_any": [
-        "billing",
-        "migration",
-        "atlas",
-        "invoice",
-        "customer",
-        "shadow",
-        "cutover"
       ],
       "transcript_lines": [
         "- Daisy: Atlas will accept staged shadow mode if the framing is invoice correctness and reliability.",
@@ -931,7 +1109,28 @@
           "key": "customer_preference_shared",
           "value": true
         }
-      ]
+      ],
+      "topic_match": {
+        "mode": "deterministic",
+        "intents": [
+          {
+            "id": "meeting_topic",
+            "description": "Meeting title contains one authored topic signal.",
+            "signals": [
+              "billing",
+              "migration",
+              "atlas",
+              "invoice",
+              "customer",
+              "shadow",
+              "cutover"
+            ]
+          }
+        ],
+        "require_all": [
+          "meeting_topic"
+        ]
+      }
     },
     {
       "id": "meeting_toad_approves_staged_mode",
@@ -945,14 +1144,6 @@
       ],
       "absent_facts": [
         "fact_staged_migration_approved"
-      ],
-      "topic_terms_any": [
-        "billing",
-        "migration",
-        "staged",
-        "shadow",
-        "cutover",
-        "atlas"
       ],
       "transcript_lines": [
         "- Toad approved staged shadow mode for Friday and explicitly kept full cutover as follow-up after checksum parity is proven."
@@ -983,7 +1174,27 @@
           "key": "stage_approved",
           "value": true
         }
-      ]
+      ],
+      "topic_match": {
+        "mode": "deterministic",
+        "intents": [
+          {
+            "id": "meeting_topic",
+            "description": "Meeting title contains one authored topic signal.",
+            "signals": [
+              "billing",
+              "migration",
+              "staged",
+              "shadow",
+              "cutover",
+              "atlas"
+            ]
+          }
+        ],
+        "require_all": [
+          "meeting_topic"
+        ]
+      }
     },
     {
       "id": "meeting_luigi_confirms_meridian_export",
@@ -996,13 +1207,6 @@
       ],
       "absent_facts": [
         "fact_invoice_export_feasible"
-      ],
-      "topic_terms_any": [
-        "meridian",
-        "export",
-        "invoice",
-        "csv",
-        "finance review"
       ],
       "transcript_lines": [
         "- Luigi: A one-time invoice export is feasible for Meridian's finance review.",
@@ -1025,7 +1229,26 @@
           "key": "export_feasibility_shared",
           "value": true
         }
-      ]
+      ],
+      "topic_match": {
+        "mode": "deterministic",
+        "intents": [
+          {
+            "id": "meeting_topic",
+            "description": "Meeting title contains one authored topic signal.",
+            "signals": [
+              "meridian",
+              "export",
+              "invoice",
+              "csv",
+              "finance review"
+            ]
+          }
+        ],
+        "require_all": [
+          "meeting_topic"
+        ]
+      }
     },
     {
       "id": "meeting_toad_scopes_meridian_export",
@@ -1039,13 +1262,6 @@
       ],
       "absent_facts": [
         "fact_invoice_export_scope_confirmed"
-      ],
-      "topic_terms_any": [
-        "meridian",
-        "export",
-        "scope",
-        "self-serve",
-        "finance review"
       ],
       "transcript_lines": [
         "- Toad scoped Meridian to a one-time invoice export for Thursday and rejected a self-serve commitment this week."
@@ -1073,7 +1289,26 @@
           "key": "export_scope_aligned",
           "value": true
         }
-      ]
+      ],
+      "topic_match": {
+        "mode": "deterministic",
+        "intents": [
+          {
+            "id": "meeting_topic",
+            "description": "Meeting title contains one authored topic signal.",
+            "signals": [
+              "meridian",
+              "export",
+              "scope",
+              "self-serve",
+              "finance review"
+            ]
+          }
+        ],
+        "require_all": [
+          "meeting_topic"
+        ]
+      }
     }
   ],
   "action_rules": [
@@ -1082,36 +1317,6 @@
       "action_type": "update_doc",
       "doc_id": "doc_migration_decision_record",
       "priority": 100,
-      "semantic_match": {
-        "required": [
-          {
-            "description": "records staged shadow mode",
-            "signals_any": [
-              "staged shadow mode",
-              "shadow mode",
-              "not full cutover",
-              "full cutover deferred"
-            ]
-          },
-          {
-            "description": "explains backfill checksum risk",
-            "signals_any": [
-              "checksum",
-              "backfill",
-              "invoice correctness",
-              "incorrect invoice"
-            ]
-          },
-          {
-            "description": "states Toad approval",
-            "signals_any": [
-              "toad approved",
-              "approved by toad",
-              "approval"
-            ]
-          }
-        ]
-      },
       "when": [
         {
           "coworker_state": {
@@ -1128,7 +1333,46 @@
           "key": "decision_record_written",
           "value": true
         }
-      ]
+      ],
+      "match": {
+        "mode": "semantic",
+        "intents": [
+          {
+            "description": "records staged shadow mode",
+            "id": "required_1",
+            "signals": [
+              "staged shadow mode",
+              "shadow mode",
+              "not full cutover",
+              "full cutover deferred"
+            ]
+          },
+          {
+            "description": "explains backfill checksum risk",
+            "id": "required_2",
+            "signals": [
+              "checksum",
+              "backfill",
+              "invoice correctness",
+              "incorrect invoice"
+            ]
+          },
+          {
+            "description": "states Toad approval",
+            "id": "required_3",
+            "signals": [
+              "toad approved",
+              "approved by toad",
+              "approval"
+            ]
+          }
+        ],
+        "require_all": [
+          "required_1",
+          "required_2",
+          "required_3"
+        ]
+      }
     }
   ]
 }

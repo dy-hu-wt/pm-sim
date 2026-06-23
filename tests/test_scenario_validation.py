@@ -136,11 +136,15 @@ class ScenarioValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ScenarioError, "actor workload person_id"):
             load_scenario(self._write_scenario(scenario))
 
-    def test_invalid_action_semantic_match_raises_scenario_error(self) -> None:
+    def test_invalid_action_match_intent_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.base)
-        scenario["action_rules"][0]["semantic_match"] = {"required": [{"id": "missing_description"}]}
+        scenario["action_rules"][0]["match"] = {
+            "mode": "semantic",
+            "intents": [{"id": "missing_description"}],
+            "require_all": ["missing_description"],
+        }
 
-        with self.assertRaises(ScenarioError):
+        with self.assertRaisesRegex(ScenarioError, "must include description"):
             load_scenario(self._write_scenario(scenario))
 
     def test_direct_scored_evidence_effect_raises_scenario_error(self) -> None:

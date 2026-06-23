@@ -24,10 +24,6 @@ def priority_sorted(rules: list[dict[str, Any]], *, default: int = 0) -> list[di
     return sorted(rules, key=lambda rule: int(rule.get("priority", default)), reverse=True)
 
 
-def mentions_any(value: str, terms: set[str] | frozenset[str]) -> bool:
-    return any(term in value for term in terms)
-
-
 def match_rule(
     rule: dict[str, Any],
     *,
@@ -45,8 +41,17 @@ def match_rule(
         if expected is not None and str(context.get(key, "")).lower() != str(expected).lower():
             return RuleMatch(False)
 
-    match_spec = rule.get("match", rule)
-    if not match_text_and_facts(match_spec, normalized_text, state=state):
+    match_spec = rule.get("match")
+    if not isinstance(match_spec, dict):
+        return RuleMatch(False)
+    semantic_match_spec = _match_semantic_criteria(match_spec)
+
+    if not match_text_and_facts(
+        match_spec,
+        normalized_text,
+        state=state,
+        include_intents=semantic_match_spec is None,
+    ):
         return RuleMatch(False)
 
     conditions = rule.get("when", [])
@@ -55,11 +60,10 @@ def match_rule(
     if conn is None and state is not None and not state_conditions_match(conditions, state):
         return RuleMatch(False)
 
-    semantic_criteria = rule.get("semantic_match")
-    if semantic_criteria:
+    if semantic_match_spec:
         if semantic_matcher is None:
             return RuleMatch(False)
-        semantic_result = semantic_matcher(semantic_criteria, rule)
+        semantic_result = semantic_matcher(semantic_match_spec, rule)
         if not semantic_result.get("matches"):
             return RuleMatch(False, semantic_result)
         return RuleMatch(True, semantic_result)
@@ -72,19 +76,10 @@ def match_text_and_facts(
     normalized_text: str,
     *,
     state: dict[str, Any] | None = None,
+    include_intents: bool = True,
 ) -> bool:
-    terms_any = {normalize_text(term) for term in match.get("terms_any", [])}
-    if terms_any and not mentions_any(normalized_text, terms_any):
+    if include_intents and not _match_intents(match, normalized_text):
         return False
-
-    terms_all = {normalize_text(term) for term in match.get("terms_all", [])}
-    if terms_all and not all(term in normalized_text for term in terms_all):
-        return False
-
-    for group in match.get("term_groups_all", []):
-        terms = {normalize_text(term) for term in group}
-        if not terms or not mentions_any(normalized_text, terms):
-            return False
 
     discovered = set((state or {}).get("discovered_facts", ()))
     required_facts = set(match.get("required_facts", []))
@@ -100,6 +95,95 @@ def match_text_and_facts(
         return False
 
     return True
+
+
+def _match_semantic_criteria(match: dict[str, Any]) -> dict[str, Any] | None:
+    mode = str(match.get("mode", "deterministic")).lower()
+    if mode not in {"semantic", "llm"}:
+        return None
+    criteria = _criteria_from_intents(match)
+    return criteria if criteria["required"] or criteria["forbidden"] else None
+
+
+def _criteria_from_intents(match: dict[str, Any]) -> dict[str, Any]:
+    intents = _intent_map(match)
+    required_ids = _required_intent_ids(match, intents)
+    forbidden_ids = _forbidden_intent_ids(match)
+    return {
+        "required": [
+            _semantic_item_from_intent(intents[intent_id])
+            for intent_id in required_ids
+            if intent_id in intents
+        ],
+        "forbidden": [
+            _semantic_item_from_intent(intents[intent_id])
+            for intent_id in forbidden_ids
+            if intent_id in intents
+        ],
+    }
+
+
+def _semantic_item_from_intent(intent: dict[str, Any]) -> dict[str, Any]:
+    return dict(intent)
+
+
+def _match_intents(match: dict[str, Any], normalized_text: str) -> bool:
+    intents = _intent_map(match)
+    if not intents:
+        return True
+
+    matched = {
+        intent_id
+        for intent_id, intent in intents.items()
+        if _intent_matches(normalized_text, intent)
+    }
+    required_ids = _required_intent_ids(match, intents)
+    if required_ids and not set(required_ids).issubset(matched):
+        return False
+
+    require_any = [str(intent_id) for intent_id in match.get("require_any", [])]
+    if require_any and not set(require_any).intersection(matched):
+        return False
+
+    forbidden_ids = _forbidden_intent_ids(match)
+    if forbidden_ids and set(forbidden_ids).intersection(matched):
+        return False
+
+    return True
+
+
+def _intent_map(match: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    intents = match.get("intents", [])
+    if not isinstance(intents, list):
+        return {}
+    mapped = {}
+    for index, intent in enumerate(intents, start=1):
+        if not isinstance(intent, dict):
+            continue
+        intent_id = str(intent.get("id") or f"intent_{index}")
+        mapped[intent_id] = intent
+    return mapped
+
+
+def _required_intent_ids(match: dict[str, Any], intents: dict[str, dict[str, Any]]) -> list[str]:
+    if "require_all" in match:
+        return [str(intent_id) for intent_id in match.get("require_all", [])]
+    return list(intents)
+
+
+def _forbidden_intent_ids(match: dict[str, Any]) -> list[str]:
+    return [
+        str(intent_id)
+        for intent_id in match.get("forbid", match.get("forbidden", []))
+    ]
+
+
+def _intent_matches(normalized_text: str, intent: dict[str, Any]) -> bool:
+    signals = [normalize_text(value) for value in intent.get("signals", [])]
+    if signals:
+        return any(signal and signal in normalized_text for signal in signals)
+    description = normalize_text(str(intent.get("description", "")))
+    return bool(description and description in normalized_text)
 
 
 def state_conditions_match(conditions: list[dict[str, Any]], state: dict[str, Any]) -> bool:

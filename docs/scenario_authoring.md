@@ -149,11 +149,21 @@ Use `grading_rules` for scored communication. A grading rule says: only after pr
   "action": {
     "type": "send_email",
     "recipient_id": "daisy",
-    "semantic_match": {
-      "required": [
-        {"description": "staged shadow mode", "signals_any": ["staged shadow", "shadow mode"]},
-        {"description": "invoice correctness rationale", "signals_any": ["invoice correctness", "checksum"]}
-      ]
+    "match": {
+      "mode": "semantic",
+      "intents": [
+        {
+          "id": "staged_shadow",
+          "description": "The message says the migration will use staged shadow mode.",
+          "signals": ["staged shadow", "shadow mode"]
+        },
+        {
+          "id": "invoice_correctness",
+          "description": "The message explains the invoice correctness or checksum rationale.",
+          "signals": ["invoice correctness", "checksum"]
+        }
+      ],
+      "require_all": ["staged_shadow", "invoice_correctness"]
     }
   },
   "state": {
