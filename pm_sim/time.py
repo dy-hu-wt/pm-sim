@@ -33,8 +33,7 @@ def advance_time(
         if new_time < current_time:
             raise ValueError("Cannot move simulated time backwards.")
 
-        due_events = _due_events(conn, new_time)
-        delivered = [_deliver_event(conn, event, new_time) for event in due_events]
+        delivered, applied_policies = _deliver_due_activity(conn, current_time, new_time)
 
         set_state_value(conn, "current_time", new_time)
         log_action(
@@ -44,7 +43,10 @@ def advance_time(
             action_type=action_type,
             created_at=new_time,
             payload={"target": target, "from": current_time, "to": new_time},
-            result={"delivered_event_ids": [event["id"] for event in delivered]},
+            result={
+                "delivered_event_ids": [event["id"] for event in delivered],
+                "applied_coworker_policy_ids": [policy["id"] for policy in applied_policies],
+            },
         )
         conn.commit()
 
@@ -53,6 +55,7 @@ def advance_time(
             "from": current_time,
             "to": new_time,
             "delivered_events": delivered,
+            "applied_coworker_policies": applied_policies,
         }
     finally:
         conn.close()
@@ -65,8 +68,7 @@ def consume_action_time(
     minutes: int,
 ) -> dict[str, Any]:
     new_time = _format_time(_parse_time(current_time) + timedelta(minutes=minutes))
-    due_events = _due_events(conn, new_time)
-    delivered = [_deliver_event(conn, event, new_time) for event in due_events]
+    delivered, applied_policies = _deliver_due_activity(conn, current_time, new_time)
     set_state_value(conn, "current_time", new_time)
     return {
         "minutes": minutes,
@@ -74,12 +76,14 @@ def consume_action_time(
         "to": new_time,
         "delivered_events": delivered,
         "delivered_event_ids": [event["id"] for event in delivered],
+        "applied_coworker_policies": applied_policies,
+        "applied_coworker_policy_ids": [policy["id"] for policy in applied_policies],
     }
 
 
 def _resolve_target_time(conn: sqlite3.Connection, current_time: str, target: str) -> str:
     if target == "until_next_event":
-        row = conn.execute(
+        event_row = conn.execute(
             """
             SELECT scheduled_at
             FROM events
@@ -89,9 +93,15 @@ def _resolve_target_time(conn: sqlite3.Connection, current_time: str, target: st
             """,
             (current_time,),
         ).fetchone()
-        if row is None:
+        next_times = []
+        if event_row is not None:
+            next_times.append(event_row["scheduled_at"])
+        policy_time = _next_coworker_policy_time(conn, current_time)
+        if policy_time is not None:
+            next_times.append(policy_time)
+        if not next_times:
             return current_time
-        return row["scheduled_at"]
+        return min(next_times)
 
     if target.startswith("to:"):
         return target.removeprefix("to:").strip()
@@ -123,6 +133,103 @@ def _due_events(conn: sqlite3.Connection, new_time: str) -> list[dict[str, Any]]
             (new_time,),
         ).fetchall()
     )
+
+
+def _deliver_due_activity(
+    conn: sqlite3.Connection,
+    current_time: str,
+    new_time: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    delivered_events: list[dict[str, Any]] = []
+    applied_policies: list[dict[str, Any]] = []
+    while True:
+        next_event = _next_due_event(conn, new_time)
+        next_policy = _next_due_coworker_policy(conn, current_time, new_time)
+        if next_event is None and next_policy is None:
+            break
+        if next_event is not None and (
+            next_policy is None or next_event["scheduled_at"] <= next_policy["trigger_at"]
+        ):
+            delivered_events.append(_deliver_event(conn, next_event, new_time))
+            continue
+        if next_policy is not None:
+            applied_policies.append(_apply_coworker_policy(conn, next_policy))
+    return delivered_events, applied_policies
+
+
+def _next_due_event(conn: sqlite3.Connection, new_time: str) -> dict[str, Any] | None:
+    rows = _due_events(conn, new_time)
+    return rows[0] if rows else None
+
+
+def _next_coworker_policy_time(conn: sqlite3.Connection, current_time: str) -> str | None:
+    times = [
+        policy["trigger_at"]
+        for policy in _coworker_policy_candidates(conn)
+        if policy["trigger_at"] > current_time and not _coworker_policy_fired(conn, policy["id"])
+    ]
+    return min(times) if times else None
+
+
+def _next_due_coworker_policy(
+    conn: sqlite3.Connection,
+    current_time: str,
+    new_time: str,
+) -> dict[str, Any] | None:
+    for policy in _coworker_policy_candidates(conn):
+        if policy["trigger_at"] <= current_time or policy["trigger_at"] > new_time:
+            continue
+        if _coworker_policy_fired(conn, policy["id"]):
+            continue
+        if not all_conditions_match(conn, policy.get("when", [])):
+            continue
+        return policy
+    return None
+
+
+def _coworker_policy_candidates(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    policies = loads(get_state_value(conn, "coworker_policies_json") or "[]", [])
+    candidates = []
+    for policy in policies if isinstance(policies, list) else []:
+        trigger = policy.get("trigger", {})
+        trigger_at = trigger.get("at") or trigger.get("at_or_after")
+        if not isinstance(trigger_at, str) or not trigger_at:
+            continue
+        candidates.append({**policy, "trigger_at": trigger_at})
+    return sorted(
+        candidates,
+        key=lambda policy: (
+            policy["trigger_at"],
+            int(policy.get("priority", 100)),
+            policy["id"],
+        ),
+    )
+
+
+def _apply_coworker_policy(conn: sqlite3.Connection, policy: dict[str, Any]) -> dict[str, Any]:
+    policy_id = policy["id"]
+    source = f"coworker_policy:{policy_id}"
+    applied_effects = apply_effects(
+        conn,
+        [dict(effect) for effect in policy.get("effects", [])],
+        now=policy["trigger_at"],
+        source=source,
+    )
+    set_state_value(conn, _coworker_policy_fired_key(policy_id), policy["trigger_at"])
+    return {
+        "id": policy_id,
+        "person_id": policy.get("person_id"),
+        "trigger_at": policy["trigger_at"],
+        "applied_effects": applied_effects,
+    }
+
+
+def _coworker_policy_fired(conn: sqlite3.Connection, policy_id: str) -> bool:
+    return get_state_value(conn, _coworker_policy_fired_key(policy_id)) is not None
+
+
+def _coworker_policy_fired_key(policy_id: str) -> str:
+    return f"coworker_policy_fired:{policy_id}"
 
 
 def _deliver_event(

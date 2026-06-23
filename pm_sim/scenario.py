@@ -321,6 +321,17 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
             response_delays,
         )
 
+    _validate_coworker_policies(
+        data.get("coworker_policies", []),
+        people,
+        docs,
+        facts,
+        projects,
+        blockers,
+        tasks,
+        valid_actors,
+    )
+
     event_types = {
         event.get("event_type")
         for event in data.get("events", [])
@@ -474,6 +485,65 @@ def _validate_event_rules(
         _validate_effects(
             effects,
             label=f"Event rule {rule_id}",
+            docs=docs,
+            facts=facts,
+            projects=projects,
+            blockers=blockers,
+            tasks=tasks,
+            valid_actors=valid_actors,
+        )
+
+
+def _validate_coworker_policies(
+    policies: list[dict[str, Any]],
+    people: set[str],
+    docs: set[str],
+    facts: set[str],
+    projects: set[str],
+    blockers: set[str],
+    tasks: set[str],
+    valid_actors: set[str],
+) -> None:
+    if not isinstance(policies, list):
+        raise ScenarioError("coworker_policies must be a list.")
+    seen = set()
+    for policy in policies:
+        policy_id = policy.get("id")
+        if not isinstance(policy_id, str) or not policy_id:
+            raise ScenarioError("Coworker policy must have a string id.")
+        if policy_id in seen:
+            raise ScenarioError(f"Coworker policies have duplicate id: {policy_id}")
+        seen.add(policy_id)
+
+        person_id = policy.get("person_id")
+        if person_id not in people:
+            raise ScenarioError(
+                f"Coworker policy {policy_id} references unknown person_id: {person_id}"
+            )
+
+        trigger = policy.get("trigger")
+        if not isinstance(trigger, dict):
+            raise ScenarioError(f"Coworker policy {policy_id} trigger must be an object.")
+        trigger_at = trigger.get("at") or trigger.get("at_or_after")
+        if not isinstance(trigger_at, str) or not trigger_at:
+            raise ScenarioError(
+                f"Coworker policy {policy_id} trigger must include at or at_or_after."
+            )
+        _parse_datetime(trigger_at, f"Coworker policy {policy_id} trigger")
+
+        _validate_conditions(
+            policy.get("when", []),
+            label=f"Coworker policy {policy_id}",
+            facts=facts,
+            valid_actors=valid_actors,
+        )
+
+        effects = policy.get("effects", [])
+        if not isinstance(effects, list) or not effects:
+            raise ScenarioError(f"Coworker policy {policy_id} effects must be a non-empty list.")
+        _validate_effects(
+            effects,
+            label=f"Coworker policy {policy_id}",
             docs=docs,
             facts=facts,
             projects=projects,
@@ -649,6 +719,7 @@ def _validate_scored_evidence_is_state_derived(data: dict[str, Any]) -> None:
     for section in (
         "event_rules",
         "coworker_rules",
+        "coworker_policies",
         "meeting_rules",
         "action_rules",
         "task_gate_rules",

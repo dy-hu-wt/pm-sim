@@ -124,10 +124,9 @@ def _agent_result_summary(name: str, result: Any) -> str:
         return f"current time {_pretty_time(result.get('current_time'))}"
     if name == "advance_time":
         delivered = result.get("delivered_events", [])
-        if delivered:
-            event_types = ", ".join(event.get("event_type", "event") for event in delivered)
-            return f"{_pretty_time(result.get('to'))}; events: {event_types}"
-        return f"{_pretty_time(result.get('to'))}; events: none"
+        policies = result.get("applied_coworker_policies", [])
+        activity = _activity_summary(delivered, policies)
+        return f"{_pretty_time(result.get('to'))}; {activity}"
     if name == "send_chat":
         replies = result.get("scheduled_reply_ids", [])
         return f"scheduled {len(replies)} reply event(s){_agent_time_cost_summary(result)}"
@@ -155,11 +154,20 @@ def _agent_time_cost_summary(result: dict[str, Any]) -> str:
     if not isinstance(time_cost, dict):
         return ""
     delivered = time_cost.get("delivered_events") or []
-    delivered_summary = ""
-    if delivered:
-        event_types = ", ".join(event.get("event_type", "event") for event in delivered)
-        delivered_summary = f"; events: {event_types}"
+    policies = time_cost.get("applied_coworker_policies") or []
+    delivered_summary = f"; {_activity_summary(delivered, policies)}" if delivered or policies else ""
     return f" (+{time_cost.get('minutes')}m){delivered_summary}"
+
+
+def _activity_summary(events: list[dict[str, Any]], policies: list[dict[str, Any]]) -> str:
+    parts = []
+    if events:
+        event_types = ", ".join(event.get("event_type", "event") for event in events)
+        parts.append(f"events: {event_types}")
+    if policies:
+        policy_ids = ", ".join(policy.get("id", "coworker_policy") for policy in policies)
+        parts.append(f"coworker policies: {policy_ids}")
+    return "; ".join(parts) if parts else "events: none"
 
 
 def _highlight_agent_progress(message: str, *, mode: str) -> str:
@@ -473,6 +481,11 @@ def _format_time_cost_lines(value: dict[str, Any]) -> list[str]:
         lines.append("  Delivered during action:")
         for event in delivered:
             lines.append(f"    {event['event_type']} ({event['id']})")
+    policies = time_cost.get("applied_coworker_policies") or []
+    if policies:
+        lines.append("  Applied coworker policies during action:")
+        for policy in policies:
+            lines.append(f"    {policy['id']} ({policy.get('person_id')})")
     return lines
 
 
@@ -504,6 +517,18 @@ def _format_advance_time(value: dict[str, Any]) -> str:
         for event in delivered:
             lines.append(f"  {event['event_type']} ({event['id']})")
             effects = event.get("result", {}).get("applied_effects", [])
+            if effects:
+                lines.append("    Effects:")
+                for effect in effects:
+                    lines.append(f"      - {_format_effect(effect)}")
+    else:
+        lines.append("  None")
+    policies = value.get("applied_coworker_policies", [])
+    lines.extend(["", "Applied Coworker Policies"])
+    if policies:
+        for policy in policies:
+            lines.append(f"  {policy['id']} ({policy.get('person_id')})")
+            effects = policy.get("applied_effects", [])
             if effects:
                 lines.append("    Effects:")
                 for effect in effects:

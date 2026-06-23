@@ -986,6 +986,56 @@
       ]
     }
   ],
+  "coworker_policies": [
+    {
+      "id": "peach_autonomous_onboarding_risk_nudge",
+      "person_id": "peach",
+      "priority": 40,
+      "trigger": {
+        "at": "2026-06-24T15:00:00"
+      },
+      "when": [
+        {
+          "not": {
+            "coworker_state": {
+              "person_id": "peach",
+              "key": "scope_unblocked",
+              "equals": true
+            }
+          }
+        },
+        {
+          "not": {
+            "coworker_state": {
+              "person_id": "peach",
+              "key": "autonomous_onboarding_risk_sent",
+              "equals": true
+            }
+          }
+        }
+      ],
+      "effects": [
+        {
+          "type": "create_message",
+          "channel": "chat",
+          "sender_id": "peach",
+          "recipient_id": "agent",
+          "body": "I am still missing the Friday launch-mode decision. If this is not draft-mode with human approval soon, onboarding will be thin for the Nimbus beta."
+        },
+        {
+          "type": "update_coworker_state",
+          "person_id": "peach",
+          "key": "autonomous_onboarding_risk_sent",
+          "value": true
+        },
+        {
+          "type": "update_project",
+          "project_id": "project_pr_review_agent",
+          "stakeholder_pressure_delta": 1
+        }
+      ]
+    }
+  ],
   "coworker_rules": [
     {
       "id": "luigi_email_acknowledgement",

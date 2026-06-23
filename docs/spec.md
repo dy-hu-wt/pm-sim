@@ -73,19 +73,23 @@ They should have:
 - role
 - goals
 - constraints
+- current focus
+- needs from the PM
+- known constraints
 - availability
 - response delays
 - private knowledge
 - mutable coworker state
 - behavior rules
+- autonomous policies
 
-For the first version, coworker behavior should be deterministic at the state-transition level. I do not want grading-critical facts to depend on an LLM improvising.
+Coworker behavior should be autonomous enough to create PM-relevant pressure, but deterministic at the state-transition level. I do not want grading-critical facts to depend on an LLM improvising.
 
 An LLM could later help turn a known fact into more natural wording, but it should not decide the fact.
 
 Coworker response delays count only inside the person's authored availability windows. Agent action costs stay fixed, but a late-day chat to a coworker can schedule the reply in the next available work window.
 
-Coworker state is explicit actor memory, stored separately from global project state. It records durable commitments such as Luigi having surfaced the risk, Mario accepting draft mode, Peach becoming unblocked, Daisy receiving customer/security updates, and Toad recording approval. Facts, blockers, and project metadata still drive grading; coworker state makes NPC memory inspectable and reusable for future rules.
+Coworker state is explicit actor memory, stored separately from global project state. It records durable commitments such as Luigi having surfaced the risk, Mario accepting draft mode, Peach becoming unblocked, Daisy receiving customer/security updates, and Toad recording approval. Facts, blockers, and project metadata still drive grading; coworker state makes NPC memory inspectable and reusable for future rules and autonomous policies.
 
 Example:
 
@@ -173,7 +177,7 @@ Asynchronous examples:
 - a blocker gets worse if ignored
 - a stakeholder escalates after missed communication
 
-When time advances, the engine processes all due events in deterministic order. Events can mutate state and schedule more events.
+When time advances, the engine processes all due events and due autonomous coworker policies in deterministic order. Events and policies can mutate state and schedule more events.
 
 The system should record:
 
@@ -278,8 +282,9 @@ Scenario data should define most of the setup:
 - background event rules
 - meeting rules
 - outcome rules
+- autonomous coworker policies
 
-Python owns reusable interpreters and mutation semantics, while scenario-specific scoring, outcomes, proactive events, action-derived effects, and meeting semantics should be data-authored. The current implementation uses a small reusable condition language for task gates, action rules, state-derived evidence rows, harmful-action rules, background event rules, meeting rules, and outcome classification. Action rules use deterministic causal conditions plus local `semantic_match` criteria rather than a global keyword-claim registry.
+Python owns reusable interpreters and mutation semantics, while scenario-specific scoring, outcomes, autonomous coworker policies, proactive events, action-derived effects, and meeting semantics should be data-authored. The current implementation uses a small reusable condition language for task gates, action rules, state-derived evidence rows, harmful-action rules, autonomous coworker policies, background event rules, meeting rules, and outcome classification. Action rules use deterministic causal conditions plus local `semantic_match` criteria rather than a global keyword-claim registry.
 
 The defensible split is:
 
@@ -287,13 +292,13 @@ The defensible split is:
 Reusable engine:
   storage, tool actions, event delivery, timelines, effect application,
   condition evaluation, coworker rule matching, action logs, task gates,
-  state-derived evidence, coworker state, harm checks, background event rules,
-  outcome rules, and evaluator scoring
+  state-derived evidence, coworker state, autonomous policy delivery,
+  harm checks, background event rules, outcome rules, and evaluator scoring
 
 Scenario-specific v1 data:
   people, coworker state, facts, docs, tasks, blockers, events, coworker rules,
-  task gates, state evidence rules, harm rules, background event rules, and
-  outcome rules
+  coworker policies, task gates, state evidence rules, harm rules, background
+  event rules, and outcome rules
 
 Remaining boundary:
   two scenarios now use the same engine surface. The next scaling step is

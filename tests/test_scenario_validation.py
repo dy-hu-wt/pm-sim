@@ -103,6 +103,13 @@ class ScenarioValidationTests(unittest.TestCase):
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
+    def test_invalid_coworker_policy_person_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        scenario["coworker_policies"][0]["person_id"] = "unknown_person"
+
+        with self.assertRaises(ScenarioError):
+            load_scenario(self._write_scenario(scenario))
+
     def test_invalid_action_semantic_match_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.base)
         scenario["action_rules"][0]["semantic_match"] = {"required": [{"id": "missing_description"}]}

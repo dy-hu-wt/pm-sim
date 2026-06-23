@@ -137,6 +137,27 @@ class CoreSimulationTests(unittest.TestCase):
         }
         self.assertTrue(coworker_state[("luigi", "risk_surfaced")])
 
+    def test_autonomous_coworker_policy_applies_once_when_time_crosses_trigger(self) -> None:
+        result = advance_time(self.db_path, "to:2026-06-24T15:00:00")
+        state = observe(self.db_path)
+
+        applied_policy_ids = {
+            policy["id"] for policy in result["applied_coworker_policies"]
+        }
+        coworker_state = {
+            (row["person_id"], row["key"]): loads(row["value_json"])
+            for row in state["coworker_state"]
+        }
+        recent_bodies = [message["body"] for message in state["recent_messages"]]
+
+        self.assertIn("peach_autonomous_onboarding_risk_nudge", applied_policy_ids)
+        self.assertTrue(coworker_state[("peach", "autonomous_onboarding_risk_sent")])
+        self.assertTrue(any("onboarding will be thin" in body for body in recent_bodies))
+
+        followup = advance_time(self.db_path, "1h")
+
+        self.assertEqual(followup["applied_coworker_policies"], [])
+
     def test_agent_path_moves_launch_conflict_to_resolved_draft_mode(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
         advance_time(self.db_path, "until_next_event")
