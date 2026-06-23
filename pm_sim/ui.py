@@ -703,7 +703,7 @@ button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
 h1 { margin:0 0 6px; font-size:30px; letter-spacing:0; }
 h2 { margin:0; font-size:17px; }
 p { margin:0 0 8px; }
-.brief-card { border:1px solid var(--line); border-radius:10px; background:rgba(255,255,255,.78); padding:12px; display:grid; gap:8px; }
+.brief-card { border:1px solid var(--line); border-radius:10px; background:rgba(255,255,255,.78); padding:12px; display:grid; gap:8px; max-height:260px; overflow:auto; }
 .brief-title { color:var(--blue); font-size:12px; font-weight:850; text-transform:uppercase; letter-spacing:.06em; }
 .brief-objective { font-size:14px; font-weight:800; color:var(--ink); }
 .brief-list { display:grid; gap:5px; margin:0; padding:0; list-style:none; color:var(--muted); font-size:12px; }
@@ -1130,8 +1130,8 @@ function renderBrief(brief) {
     $("agent-brief").innerHTML = `<div class="brief-title">Agent prompt</div><div class="brief-objective">No scenario brief configured.</div>`;
     return;
   }
-  const guidance = (brief.guidance || []).slice(0, 3);
-  const finish = (brief.finish_criteria || []).slice(0, 2);
+  const guidance = brief.guidance || [];
+  const finish = brief.finish_criteria || [];
   const rows = [
     ...guidance.map(item => `Guidance: ${item}`),
     ...finish.map(item => `Finish: ${item}`),
