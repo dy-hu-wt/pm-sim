@@ -588,17 +588,25 @@ docs:
   kind: brief
   visibility_scope: public
   visible_at: '2026-06-22T09:00:00'
-  body: 'PR Review Agent goal: help engineering teams review pull requests faster. Friday pilot: Nimbus
-    Labs. Full beta mode posts review comments automatically on PRs. Draft-mode beta prepares suggestions
-    for human approval before posting. Draft mode is less flashy, but safer if repo sync is not reliable.'
+  body: 'PR Review Agent goal: help engineering teams review pull requests faster. Friday pilot:
+    Nimbus Labs. Full beta mode posts review comments automatically on PRs. Draft-mode beta prepares
+    suggestions for human approval before posting. Draft mode is less flashy, but safer if repo sync
+    is not reliable.
+
+    Open question from last week: Mario still prefers the stronger auto-commenting story if engineering
+    can defend it. Do not assume the safer scope is approved; confirm launch risk and get an explicit
+    decision before customer wording goes out.'
 - id: monday_standup
   title: Monday Standup Notes
   kind: meeting_notes
   visibility_scope: public
   visible_at: '2026-06-22T09:00:00'
-  body: Mario wants auto-commenting if possible. Peach needs launch-mode confirmation before final onboarding.
-    Daisy needs written customer-ready language by email before she updates Nimbus. Luigi said he is still
-    hardening repo sync ordering.
+  body: 'Mario wants auto-commenting if possible. Peach needs launch-mode confirmation before final
+    onboarding. Daisy needs written customer-ready language by email before she updates Nimbus. Luigi
+    said he is still hardening repo sync ordering.
+
+    Notes are from a fast standup and may be incomplete. Follow up with the owner before treating any
+    risk or customer commitment as final.'
 - id: beta_rollout_template
   title: Nimbus Beta Rollout Template
   kind: customer_note_template
@@ -607,14 +615,19 @@ docs:
   body: 'Rollout note must answer three questions: whether the agent posts comments automatically, what
     human approval means in draft mode, and what known limitation remains after Friday. Daisy needs the
     final customer-ready handoff by email, not chat, so she can forward and archive the approved wording.
-    Avoid promising auto-commenting until repo sync is proven reliable.'
+
+    Template caveat: this was copied from a previous beta that did not touch private repositories.
+    Verify any security or retention language with the source-of-truth owner before reusing it.'
 - id: launch_decision_record
   title: Friday Launch Decision Record
   kind: decision_record
   visibility_scope: public
   visible_at: '2026-06-22T09:00:00'
-  body: Decision pending. Record the approved Friday launch mode, approval owner, customer-visible behavior,
-    and any follow-up scope before Daisy updates Nimbus.
+  body: 'Decision pending. Record the approved Friday launch mode, approval owner, customer-visible
+    behavior, and any follow-up scope before Daisy updates Nimbus.
+
+    The decision record should be written after the tradeoff is grounded, not as a guess. Include
+    enough rationale that a teammate can tell why the Friday scope changed.'
 - id: repo_sync_notes
   title: Repo Sync Notes
   kind: engineering_notes
