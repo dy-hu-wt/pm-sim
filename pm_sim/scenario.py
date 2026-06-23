@@ -217,6 +217,7 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         tasks,
         valid_actors,
     )
+    action_claims = _validate_action_claims(data.get("action_claims", []))
     _validate_action_rules(
         data.get("action_rules", []),
         people,
@@ -226,6 +227,7 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         blockers,
         tasks,
         valid_actors,
+        action_claims,
     )
     _validate_scripted_policy(data.get("scripted_policy", []), people, docs, tasks)
 
@@ -413,6 +415,7 @@ def _validate_action_rules(
     blockers: set[str],
     tasks: set[str],
     valid_actors: set[str],
+    action_claims: set[str],
 ) -> None:
     seen = set()
     for rule in rules:
@@ -441,6 +444,13 @@ def _validate_action_rules(
             _validate_string_list(rule.get(key, []), f"Action rule {rule_id} {key}")
         for group in rule.get("term_groups_all", []):
             _validate_string_list(group, f"Action rule {rule_id} term group")
+        for key in ("claims_any", "claims_all"):
+            _validate_string_list(rule.get(key, []), f"Action rule {rule_id} {key}")
+            unknown_claims = sorted(set(rule.get(key, [])) - action_claims)
+            if unknown_claims:
+                raise ScenarioError(
+                    f"Action rule {rule_id} references unknown {key}: {', '.join(unknown_claims)}"
+                )
 
         _validate_conditions(
             rule.get("when", []),
@@ -462,6 +472,27 @@ def _validate_action_rules(
             tasks=tasks,
             valid_actors=valid_actors,
         )
+
+
+def _validate_action_claims(claims: list[dict[str, Any]]) -> set[str]:
+    if not isinstance(claims, list):
+        raise ScenarioError("action_claims must be a list.")
+
+    seen = set()
+    for claim in claims:
+        claim_id = claim.get("id") if isinstance(claim, dict) else None
+        if not isinstance(claim_id, str) or not claim_id:
+            raise ScenarioError("Action claim must have a string id.")
+        if claim_id in seen:
+            raise ScenarioError(f"Action claims have duplicate id: {claim_id}")
+        seen.add(claim_id)
+
+        for key in ("terms_any", "terms_all"):
+            _validate_string_list(claim.get(key, []), f"Action claim {claim_id} {key}")
+        for group in claim.get("term_groups_all", []):
+            _validate_string_list(group, f"Action claim {claim_id} term group")
+
+    return seen
 
 
 def _validate_scripted_policy(

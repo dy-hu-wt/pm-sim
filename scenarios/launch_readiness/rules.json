@@ -1,4 +1,202 @@
 {
+  "action_claims": [
+    {
+      "id": "repo_sync_risk",
+      "term_groups_all": [
+        [
+          "repo sync",
+          "repo-sync",
+          "webhook",
+          "stale",
+          "stale-code",
+          "stale commit",
+          "older commit"
+        ],
+        [
+          "risk",
+          "blocker",
+          "stale",
+          "commit",
+          "webhook",
+          "older diff",
+          "older commit"
+        ]
+      ]
+    },
+    {
+      "id": "draft_mode",
+      "terms_any": [
+        "draft mode",
+        "draft-mode",
+        "draft suggestions",
+        "queue draft",
+        "queues draft"
+      ]
+    },
+    {
+      "id": "human_approval",
+      "terms_any": [
+        "human approval",
+        "approval before posting",
+        "approve before posting",
+        "review before posting",
+        "human approves",
+        "human must review",
+        "human review",
+        "human-in-the-loop",
+        "human in the loop",
+        "before posting"
+      ]
+    },
+    {
+      "id": "nimbus_beta",
+      "terms_any": [
+        "nimbus",
+        "friday",
+        "beta",
+        "pilot"
+      ]
+    },
+    {
+      "id": "auto_commenting_deferred",
+      "terms_any": [
+        "auto-commenting out",
+        "auto commenting out",
+        "auto-commenting is out",
+        "auto commenting is out",
+        "auto-commenting follow-up",
+        "auto commenting follow-up",
+        "auto-commenting remains follow-up",
+        "auto commenting remains follow-up",
+        "auto-commenting not in friday",
+        "auto commenting not in friday",
+        "no auto-commenting",
+        "no auto commenting",
+        "not post comments automatically",
+        "not automatically post",
+        "will not automatically post",
+        "must not post comments automatically",
+        "automatic pr commenting is not part",
+        "automatic posting"
+      ]
+    },
+    {
+      "id": "toad_approval",
+      "term_groups_all": [
+        [
+          "toad"
+        ],
+        [
+          "approved",
+          "approval",
+          "sign-off",
+          "signed off"
+        ]
+      ]
+    },
+    {
+      "id": "private_repo_security",
+      "terms_any": [
+        "security",
+        "private repo",
+        "private repos",
+        "source code",
+        "raw source"
+      ]
+    },
+    {
+      "id": "transient_source_processing",
+      "term_groups_all": [
+        [
+          "transient",
+          "transiently",
+          "not stored",
+          "not retained",
+          "no long-term",
+          "not store"
+        ],
+        [
+          "source",
+          "source code",
+          "raw source",
+          "private repo",
+          "private-repo"
+        ]
+      ]
+    },
+    {
+      "id": "beta_audit_retention",
+      "term_groups_all": [
+        [
+          "metadata",
+          "draft suggestions",
+          "generated suggestions",
+          "audit"
+        ],
+        [
+          "30 days",
+          "thirty days",
+          "beta audit",
+          "audit window",
+          "retained"
+        ]
+      ]
+    },
+    {
+      "id": "koopa_audit",
+      "term_groups_all": [
+        [
+          "koopa"
+        ],
+        [
+          "audit",
+          "admin log",
+          "admin logs",
+          "audit log",
+          "audit logs",
+          "security review"
+        ]
+      ]
+    },
+    {
+      "id": "one_time_csv",
+      "term_groups_all": [
+        [
+          "csv",
+          "export"
+        ],
+        [
+          "one-time",
+          "one time",
+          "for the review",
+          "security review"
+        ]
+      ]
+    },
+    {
+      "id": "self_serve_followup",
+      "terms_any": [
+        "follow-up",
+        "follow up",
+        "self-serve",
+        "self serve",
+        "later",
+        "after launch"
+      ]
+    },
+    {
+      "id": "final_readiness",
+      "terms_any": [
+        "go/no-go",
+        "go no-go",
+        "go for friday",
+        "final readiness",
+        "readiness",
+        "ready",
+        "on track"
+      ]
+    }
+  ],
   "event_rules": [
     {
       "id": "mario_auto_comment_push",
@@ -1310,34 +1508,10 @@
       "action_type": "send_email",
       "priority": 100,
       "recipient_id": "daisy",
-      "term_groups_all": [
-        [
-          "risk",
-          "blocker",
-          "blocked",
-          "repo",
-          "sync",
-          "stale",
-          "commit",
-          "webhook"
-        ],
-        [
-          "fallback",
-          "draft",
-          "draft-mode",
-          "reliable",
-          "de-scope",
-          "descope",
-          "human approval"
-        ],
-        [
-          "nimbus",
-          "friday",
-          "beta",
-          "pilot",
-          "customer",
-          "confidence"
-        ]
+      "claims_all": [
+        "repo_sync_risk",
+        "draft_mode",
+        "nimbus_beta"
       ],
       "effects": [
         {
@@ -1370,40 +1544,11 @@
       "action_type": "send_email",
       "priority": 90,
       "recipient_id": "daisy",
-      "term_groups_all": [
-        [
-          "risk",
-          "blocker",
-          "blocked",
-          "repo",
-          "sync",
-          "stale",
-          "commit",
-          "webhook"
-        ],
-        [
-          "fallback",
-          "draft",
-          "draft-mode",
-          "reliable",
-          "de-scope",
-          "descope",
-          "human approval"
-        ],
-        [
-          "nimbus",
-          "friday",
-          "beta",
-          "pilot",
-          "customer",
-          "confidence"
-        ],
-        [
-          "human approval",
-          "approve",
-          "approval",
-          "review before posting"
-        ]
+      "claims_all": [
+        "repo_sync_risk",
+        "draft_mode",
+        "nimbus_beta",
+        "human_approval"
       ],
       "effects": [
         {
@@ -1418,42 +1563,11 @@
       "action_type": "send_email",
       "priority": 80,
       "recipient_id": "daisy",
-      "term_groups_all": [
-        [
-          "nimbus",
-          "friday",
-          "beta",
-          "pilot",
-          "customer",
-          "confidence"
-        ],
-        [
-          "security",
-          "private repo",
-          "private repos",
-          "source code",
-          "raw source",
-          "stores source",
-          "stored",
-          "retained",
-          "retention"
-        ],
-        [
-          "transient",
-          "transiently",
-          "not stored",
-          "not retained",
-          "no long-term",
-          "raw source is not"
-        ],
-        [
-          "metadata",
-          "draft suggestions",
-          "generated suggestions",
-          "audit",
-          "30 days",
-          "beta audit"
-        ]
+      "claims_all": [
+        "nimbus_beta",
+        "private_repo_security",
+        "transient_source_processing",
+        "beta_audit_retention"
       ],
       "when": [
         {
@@ -1487,31 +1601,10 @@
       "action_type": "send_email",
       "priority": 70,
       "recipient_id": "daisy",
-      "term_groups_all": [
-        [
-          "koopa",
-          "audit",
-          "admin logs",
-          "audit logs",
-          "security review"
-        ],
-        [
-          "csv",
-          "export"
-        ],
-        [
-          "one-time",
-          "one time",
-          "for the review",
-          "security review"
-        ],
-        [
-          "follow-up",
-          "follow up",
-          "self-serve",
-          "self serve",
-          "later"
-        ]
+      "claims_all": [
+        "koopa_audit",
+        "one_time_csv",
+        "self_serve_followup"
       ],
       "when": [
         {
@@ -1562,38 +1655,14 @@
       "action_type": "send_email",
       "priority": 65,
       "recipient_id": "daisy",
-      "term_groups_all": [
-        [
-          "go/no-go",
-          "go no-go",
-          "go for friday",
-          "final readiness",
-          "readiness",
-          "ready",
-          "on track"
-        ],
-        [
-          "draft mode",
-          "draft-mode",
-          "human approval"
-        ],
-        [
-          "security",
-          "private repo",
-          "source code",
-          "retention"
-        ],
-        [
-          "koopa",
-          "audit",
-          "csv",
-          "one-time"
-        ],
-        [
-          "nimbus",
-          "friday",
-          "beta"
-        ]
+      "claims_all": [
+        "final_readiness",
+        "draft_mode",
+        "human_approval",
+        "private_repo_security",
+        "koopa_audit",
+        "one_time_csv",
+        "nimbus_beta"
       ],
       "when": [
         {
@@ -1640,38 +1709,14 @@
       "action_type": "send_chat",
       "priority": 65,
       "recipient_id": "daisy",
-      "term_groups_all": [
-        [
-          "go/no-go",
-          "go no-go",
-          "go for friday",
-          "final readiness",
-          "readiness",
-          "ready",
-          "on track"
-        ],
-        [
-          "draft mode",
-          "draft-mode",
-          "human approval"
-        ],
-        [
-          "security",
-          "private repo",
-          "source code",
-          "retention"
-        ],
-        [
-          "koopa",
-          "audit",
-          "csv",
-          "one-time"
-        ],
-        [
-          "nimbus",
-          "friday",
-          "beta"
-        ]
+      "claims_all": [
+        "final_readiness",
+        "draft_mode",
+        "human_approval",
+        "private_repo_security",
+        "koopa_audit",
+        "one_time_csv",
+        "nimbus_beta"
       ],
       "when": [
         {
@@ -1718,60 +1763,12 @@
       "action_type": "update_doc",
       "priority": 100,
       "doc_id": "doc_launch_decision_record",
-      "term_groups_all": [
-        [
-          "draft",
-          "draft-mode",
-          "draft mode"
-        ],
-        [
-          "human approval",
-          "approval before posting",
-          "review before posting",
-          "human approves",
-          "human must review",
-          "human must review and approve",
-          "human reviews and approves",
-          "human review"
-        ],
-        [
-          "auto-commenting out",
-          "auto-commenting is out",
-          "auto-commenting follow-up",
-          "auto-commenting as follow-up",
-          "auto-commenting remains follow-up",
-          "auto-commenting not in friday",
-          "auto-commenting out of friday scope",
-          "auto-commenting is out of friday scope",
-          "auto-commenting is out of scope",
-          "auto-commenting out of scope",
-          "no auto-commenting",
-          "do not ship auto-commenting",
-          "must not post comments automatically",
-          "not post comments automatically",
-          "will not post comments automatically",
-          "not post automatically",
-          "comments automatically",
-          "automatic pr commenting is not part",
-          "automatic pr commenting is not part of the friday beta",
-          "will not automatically post pr comments",
-          "not automatically post pr comments",
-          "will not automatically post",
-          "automatic posting"
-        ],
-        [
-          "repo sync",
-          "stale",
-          "stale-code",
-          "stale code",
-          "commit",
-          "webhook"
-        ],
-        [
-          "toad",
-          "approved",
-          "approval"
-        ]
+      "claims_all": [
+        "draft_mode",
+        "human_approval",
+        "auto_commenting_deferred",
+        "repo_sync_risk",
+        "toad_approval"
       ],
       "when": [
         {

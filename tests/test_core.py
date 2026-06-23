@@ -102,6 +102,13 @@ class ScenarioValidationTests(unittest.TestCase):
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
+    def test_unknown_action_claim_reference_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        scenario["action_rules"][0]["claims_all"] = ["missing_claim"]
+
+        with self.assertRaises(ScenarioError):
+            load_scenario(self._write_scenario(scenario))
+
     def test_manifest_scenario_includes_files(self) -> None:
         scenario = copy.deepcopy(self.base)
         manifest = {
@@ -1779,6 +1786,33 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertEqual(result["applied_effects"][0]["type"], "add_evaluation_evidence")
         self.assertEqual(evidence["evidence_key"], "stakeholder_alignment")
         self.assertIn("Nimbus repo-sync risk and draft-mode", evidence["note"])
+
+    def test_customer_message_ready_uses_scenario_authored_claims(self) -> None:
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus pilot plan",
+            (
+                "For the Friday Nimbus beta, use draft mode: the agent queues draft "
+                "suggestions and a reviewer approves before posting. The reason is "
+                "repo sync webhook ordering can leave the agent reviewing an older commit."
+            ),
+        )
+        conn = connect(self.db_path)
+        try:
+            evidence = conn.execute(
+                """
+                SELECT evidence_key
+                FROM evaluation_evidence
+                WHERE evidence_key = 'customer_message_ready'
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(any(effect.get("key") == "customer_message_ready" for effect in result["applied_effects"]))
+        self.assertIsNotNone(evidence)
 
     def test_security_answer_email_before_daisy_question_does_not_score(self) -> None:
         result = send_email(

@@ -123,15 +123,11 @@ def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
             """,
             (body, current_time, doc_id),
         )
-        doc_effects = _effects_for_action(
+        action_context = _claims_for_action(
             conn,
-            "update_doc",
-            {
-                "doc_id": doc_id,
-                "body": body,
-                "text": body,
-            },
+            {"doc_id": doc_id, "body": body, "text": body},
         )
+        doc_effects = _effects_for_action(conn, "update_doc", action_context)
         applied_effects = apply_effects(
             conn,
             doc_effects,
@@ -149,7 +145,7 @@ def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
             actor=AGENT_ID,
             action_type="update_doc",
             created_at=current_time,
-            payload={"doc_id": doc_id, "body": body},
+            payload={"doc_id": doc_id, "body": body, "claims": action_context["claims"]},
             result={
                 "doc_id": doc_id,
                 "revision_id": revision_id,
@@ -197,16 +193,16 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
         scheduled_reply_ids = [
             _schedule_coworker_reply(conn, reply, current_time) for reply in replies
         ]
-        chat_effects = _effects_for_action(
+        action_context = _claims_for_action(
             conn,
-            "send_chat",
             {
                 "recipient_id": person_id,
                 "person_id": person_id,
                 "body": body,
                 "text": body,
-            },
+            }
         )
+        chat_effects = _effects_for_action(conn, "send_chat", action_context)
         applied_effects = apply_effects(
             conn,
             chat_effects,
@@ -225,7 +221,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
             actor=AGENT_ID,
             action_type="send_chat",
             created_at=current_time,
-            payload={"person_id": person_id, "body": body},
+            payload={"person_id": person_id, "body": body, "claims": action_context["claims"]},
             result={
                 "message_id": message_id,
                 "scheduled_reply_ids": scheduled_reply_ids,
@@ -276,17 +272,17 @@ def send_email(
             """,
             (message_id, AGENT_ID, person_id, subject, body, current_time),
         )
-        email_effects = _effects_for_action(
+        action_context = _claims_for_action(
             conn,
-            "send_email",
             {
                 "recipient_id": person_id,
                 "person_id": person_id,
                 "subject": subject,
                 "body": body,
                 "text": f"{subject} {body}",
-            },
+            }
         )
+        email_effects = _effects_for_action(conn, "send_email", action_context)
         applied_effects = apply_effects(
             conn,
             email_effects,
@@ -304,7 +300,12 @@ def send_email(
             actor=AGENT_ID,
             action_type="send_email",
             created_at=current_time,
-            payload={"person_id": person_id, "subject": subject, "body": body},
+            payload={
+                "person_id": person_id,
+                "subject": subject,
+                "body": body,
+                "claims": action_context["claims"],
+            },
             result={
                 "message_id": message_id,
                 "applied_effects": applied_effects,
@@ -563,12 +564,58 @@ def _action_rule_matches(
         if not terms or not _mentions_any(normalized, terms):
             return False
 
+    claims = set(context.get("claims", []))
+    claims_all = {str(claim) for claim in rule.get("claims_all", [])}
+    if claims_all and not claims_all.issubset(claims):
+        return False
+
+    claims_any = {str(claim) for claim in rule.get("claims_any", [])}
+    if claims_any and not claims_any.intersection(claims):
+        return False
+
     return all_conditions_match(conn, rule.get("when", []))
+
+
+def _claims_for_action(conn: sqlite3.Connection, context: dict[str, Any]) -> dict[str, Any]:
+    normalized = _normalize(str(context.get("text", "")))
+    claims = sorted(_claims_for_text(normalized, _action_claim_rules(conn)))
+    return {**context, "claims": claims}
+
+
+def _claims_for_text(normalized: str, claim_rules: list[dict[str, Any]]) -> set[str]:
+    claims = set()
+    for rule in claim_rules:
+        claim_id = rule.get("id")
+        if not isinstance(claim_id, str) or not claim_id:
+            continue
+
+        terms_any = {_normalize(term) for term in rule.get("terms_any", [])}
+        if terms_any and not _mentions_any(normalized, terms_any):
+            continue
+
+        terms_all = {_normalize(term) for term in rule.get("terms_all", [])}
+        if terms_all and not all(term in normalized for term in terms_all):
+            continue
+
+        matched = True
+        for group in rule.get("term_groups_all", []):
+            terms = {_normalize(term) for term in group}
+            if not terms or not _mentions_any(normalized, terms):
+                matched = False
+                break
+        if matched:
+            claims.add(claim_id)
+    return claims
 
 
 def _action_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     rules = loads(get_state_value(conn, "action_rules_json") or "[]", [])
     return sorted(rules, key=lambda rule: int(rule.get("priority", 0)), reverse=True)
+
+
+def _action_claim_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    rules = loads(get_state_value(conn, "action_claims_json") or "[]", [])
+    return rules if isinstance(rules, list) else []
 
 
 def _schedule_meeting_occurs(
