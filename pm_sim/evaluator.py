@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .conditions import all_conditions_match, condition_matches, condition_time
+from .conditions import all_conditions_match, condition_time, failed_condition_descriptions
 from .db import connect, rows_to_dicts
 from .jsonutil import loads
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
@@ -179,7 +179,7 @@ def _failed_gates_for_missing_evidence(
         state_rule = state_rules.get(evidence_key)
         if state_rule:
             checks.extend(
-                _failed_condition_descriptions(
+                failed_condition_descriptions(
                     conn,
                     state_rule.get("when", []),
                     prefix="state",
@@ -188,7 +188,7 @@ def _failed_gates_for_missing_evidence(
 
         grading_rule = grading_rules.get(evidence_key)
         if grading_rule:
-            failed_requires = _failed_condition_descriptions(
+            failed_requires = failed_condition_descriptions(
                 conn,
                 grading_rule.get("requires", []),
                 prefix="action prerequisite",
@@ -204,158 +204,6 @@ def _failed_gates_for_missing_evidence(
         if checks:
             gates.append({"evidence_key": evidence_key, "failed": checks})
     return gates
-
-
-def _failed_condition_descriptions(
-    conn,
-    conditions: list[dict[str, Any]],
-    *,
-    prefix: str,
-) -> list[str]:
-    failed = []
-    for condition in conditions:
-        if condition_matches(conn, condition):
-            continue
-        failed.append(f"{prefix}: {_condition_description(conn, condition)}")
-    return failed
-
-
-def _condition_description(conn, condition: dict[str, Any]) -> str:
-    if "all" in condition:
-        failed = _failed_condition_descriptions(conn, condition.get("all", []), prefix="all")
-        return "all of: " + ("; ".join(failed) if failed else "unknown nested gate")
-    if "any" in condition:
-        failed = _failed_condition_descriptions(conn, condition.get("any", []), prefix="any")
-        return "any of: " + ("; ".join(failed) if failed else "unknown nested gate")
-    if "not" in condition:
-        return "not " + _condition_description(conn, condition["not"])
-    if "fact_discovered" in condition:
-        fact_id = condition["fact_discovered"]
-        visible_at = _single_value(
-            conn,
-            "SELECT visible_at FROM facts WHERE id = ?",
-            (fact_id,),
-        )
-        return f"fact {fact_id} discovered (current visible_at={visible_at!r})"
-    if "evidence_exists" in condition:
-        key = condition["evidence_exists"]
-        created_at = _single_value(
-            conn,
-            """
-            SELECT created_at
-            FROM evaluation_evidence
-            WHERE evidence_key = ?
-            ORDER BY created_at, id
-            LIMIT 1
-            """,
-            (key,),
-        )
-        return f"evidence {key} exists (current created_at={created_at!r})"
-    if "coworker_state" in condition:
-        spec = condition["coworker_state"]
-        person_id = spec["person_id"]
-        key = spec["key"]
-        value = _single_value(
-            conn,
-            """
-            SELECT value_json
-            FROM coworker_state
-            WHERE person_id = ? AND key = ?
-            """,
-            (person_id, key),
-        )
-        expected = spec.get("equals", "truthy" if spec.get("truthy") else "configured condition")
-        return f"{person_id}.{key} == {expected!r} (current={value})"
-    if "project_decision" in condition:
-        spec = condition["project_decision"]
-        project_id = spec.get("project_id")
-        metadata = loads(
-            _single_value(
-                conn,
-                "SELECT metadata_json FROM projects WHERE id = ?",
-                (project_id,),
-            )
-            or "{}",
-            {},
-        )
-        return (
-            f"project {project_id} decision == {spec.get('equals')!r} "
-            f"(current={metadata.get('decision')!r})"
-        )
-    if "message_exists" in condition:
-        spec = condition["message_exists"]
-        count = _message_match_count(conn, spec)
-        return f"message exists matching {spec} (current count={count})"
-    if "blocker_status" in condition:
-        spec = condition["blocker_status"]
-        status = _single_value(
-            conn,
-            "SELECT status FROM blockers WHERE id = ?",
-            (spec.get("id"),),
-        )
-        return f"blocker {spec.get('id')} status matches {spec} (current={status!r})"
-    if "task_status" in condition:
-        spec = condition["task_status"]
-        status = _single_value(
-            conn,
-            "SELECT status FROM tasks WHERE id = ?",
-            (spec.get("id"),),
-        )
-        return f"task {spec.get('id')} status matches {spec} (current={status!r})"
-    if "current_time_at_or_after" in condition:
-        return (
-            f"current time >= {condition['current_time_at_or_after']} "
-            f"(current={_single_value(conn, 'SELECT value FROM sim_state WHERE key = ?', ('current_time',))})"
-        )
-    if "current_time_before" in condition:
-        return (
-            f"current time < {condition['current_time_before']} "
-            f"(current={_single_value(conn, 'SELECT value FROM sim_state WHERE key = ?', ('current_time',))})"
-        )
-    return f"unsupported diagnostic for {condition}"
-
-
-def _single_value(conn, query: str, params: tuple[Any, ...]) -> Any:
-    row = conn.execute(query, params).fetchone()
-    if row is None:
-        return None
-    return row[0]
-
-
-def _message_match_count(conn, spec: dict[str, Any]) -> int:
-    clauses = []
-    values = []
-    for key in ("channel", "sender_id", "recipient_id"):
-        if key in spec:
-            clauses.append(f"{key} = ?")
-            values.append(spec[key])
-    if "before" in spec:
-        clauses.append("sent_at < ?")
-        values.append(spec["before"])
-    if "at_or_after" in spec:
-        clauses.append("sent_at >= ?")
-        values.append(spec["at_or_after"])
-
-    query = "SELECT subject, body FROM messages"
-    if clauses:
-        query += " WHERE " + " AND ".join(clauses)
-    rows = conn.execute(query, values).fetchall()
-
-    terms_any = {_normalize(term) for term in spec.get("terms_any", [])}
-    terms_all = {_normalize(term) for term in spec.get("terms_all", [])}
-    count = 0
-    for row in rows:
-        text = _normalize(f"{row['subject'] or ''} {row['body'] or ''}")
-        if terms_any and not any(term in text for term in terms_any):
-            continue
-        if terms_all and not all(term in text for term in terms_all):
-            continue
-        count += 1
-    return count
-
-
-def _normalize(value: str) -> str:
-    return " ".join(value.lower().split())
 
 
 def _coordination_penalty(conn, target: dict[str, Any]) -> float:

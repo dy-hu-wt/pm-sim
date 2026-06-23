@@ -1,4 +1,26 @@
 {
+  "agent_brief": {
+    "objective": "Run the launch-readiness week for the PR Review Agent beta.",
+    "guidance": [
+      "Use email, not chat, for customer-ready wording that Daisy needs to forward or archive.",
+      "Daisy needs customer-ready Nimbus wording early enough for her Thursday account update.",
+      "Koopa needs scoped wording before Thursday's security review.",
+      "Thursday final-readiness requests need an answer before the final agenda.",
+      "When writing the launch decision record, include the approved launch mode, Toad's approval, human approval before posting, auto-commenting out of Friday scope or left as follow-up, and the repo-sync stale-commit rationale.",
+      "When a customer-facing security or compliance question appears, ask the source-of-truth owner, wait for the reply, read the referenced doc, then answer the customer owner directly.",
+      "Do not schedule a meeting for a security wording question unless the needed document or owner answer is unavailable."
+    ],
+    "finish_criteria": [
+      "launch mode is approved",
+      "customer messaging is ready",
+      "blocked work is unblocked",
+      "visible async customer questions have been answered from evidence",
+      "no visible calendar obligations remain"
+    ],
+    "tool_hints": {
+      "update_doc": "For doc_launch_decision_record, write the complete decision: Toad approval, draft mode, human approval before posting, auto-commenting out of Friday scope or follow-up, and repo-sync stale-commit rationale."
+    }
+  },
   "grading_rules": [
     {
       "id": "customer_message_ready",

@@ -85,6 +85,13 @@ class CoreSimulationTests(unittest.TestCase):
             conn.close()
         self.assertTrue(any(behavior["kind"] == "reply" for behavior in actor_behaviors))
         self.assertTrue(any(behavior["kind"] == "policy" for behavior in actor_behaviors))
+        actor_goals = state["actor_goals"]
+        actor_workload = {row["person_id"]: row for row in state["actor_workload"]}
+        self.assertTrue(any(goal["person_id"] == "luigi" for goal in actor_goals))
+        self.assertEqual(
+            actor_workload["luigi"]["current_focus"],
+            "repo sync hardening and private-repo security details",
+        )
         obligations = {row["title"] for row in state["calendar_obligations"]}
         self.assertIn("Daisy final Nimbus go/no-go", obligations)
         self.assertIn("Admin Audit Log Export deadline", obligations)
@@ -148,12 +155,12 @@ class CoreSimulationTests(unittest.TestCase):
         }
         self.assertTrue(coworker_state[("luigi", "risk_surfaced")])
 
-    def test_autonomous_coworker_policy_applies_once_when_time_crosses_trigger(self) -> None:
+    def test_autonomous_actor_behavior_applies_once_when_time_crosses_trigger(self) -> None:
         result = advance_time(self.db_path, "to:2026-06-24T15:00:00")
         state = observe(self.db_path)
 
         applied_policy_ids = {
-            policy["id"] for policy in result["applied_coworker_policies"]
+            policy["id"] for policy in result["applied_actor_behaviors"]
         }
         coworker_state = {
             (row["person_id"], row["key"]): loads(row["value_json"])
@@ -167,14 +174,14 @@ class CoreSimulationTests(unittest.TestCase):
 
         followup = advance_time(self.db_path, "1h")
 
-        self.assertEqual(followup["applied_coworker_policies"], [])
+        self.assertEqual(followup["applied_actor_behaviors"], [])
 
     def test_autonomous_daisy_policy_fires_only_without_customer_wording(self) -> None:
         result = advance_time(self.db_path, "to:2026-06-25T09:30:00")
         state = observe(self.db_path)
 
         applied_policy_ids = {
-            policy["id"] for policy in result["applied_coworker_policies"]
+            policy["id"] for policy in result["applied_actor_behaviors"]
         }
         coworker_state = {
             (row["person_id"], row["key"]): loads(row["value_json"])
@@ -185,6 +192,9 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertIn("daisy_autonomous_customer_wording_nudge", applied_policy_ids)
         self.assertTrue(coworker_state[("daisy", "autonomous_customer_update_sent")])
         self.assertTrue(any("conservative placeholder" in body for body in recent_bodies))
+        workloads = {row["person_id"]: row for row in state["actor_workload"]}
+        self.assertEqual(workloads["daisy"]["load_level"], "high")
+        self.assertIn("recover Nimbus wording", workloads["daisy"]["current_focus"])
 
     def test_autonomous_daisy_policy_skips_when_customer_wording_ready(self) -> None:
         conn = connect(self.db_path)
@@ -209,9 +219,19 @@ class CoreSimulationTests(unittest.TestCase):
         result = advance_time(self.db_path, "to:2026-06-25T09:30:00")
 
         applied_policy_ids = {
-            policy["id"] for policy in result["applied_coworker_policies"]
+            policy["id"] for policy in result["applied_actor_behaviors"]
         }
         self.assertNotIn("daisy_autonomous_customer_wording_nudge", applied_policy_ids)
+
+    def test_interruption_creates_actor_commitment(self) -> None:
+        advance_time(self.db_path, "to:2026-06-24T10:00:00")
+        state = observe(self.db_path)
+
+        commitments = {row["id"]: row for row in state["actor_commitments"]}
+
+        self.assertIn("commitment_daisy_koopa_scoped_answer", commitments)
+        self.assertEqual(commitments["commitment_daisy_koopa_scoped_answer"]["person_id"], "daisy")
+        self.assertEqual(commitments["commitment_daisy_koopa_scoped_answer"]["status"], "open")
 
     def test_agent_path_moves_launch_conflict_to_resolved_draft_mode(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")

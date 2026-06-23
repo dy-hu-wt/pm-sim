@@ -1,4 +1,26 @@
 {
+  "agent_brief": {
+    "objective": "Run the billing migration readiness week for Atlas Retail.",
+    "guidance": [
+      "Use email, not chat, for customer-ready wording that Daisy needs to forward or archive.",
+      "Daisy needs customer-ready Atlas migration wording before Thursday afternoon.",
+      "Meridian needs scoped invoice-export wording before Thursday's finance review.",
+      "Thursday final-readiness requests need an answer before the final deadline.",
+      "When writing the migration decision record, include Toad's approval, staged shadow mode, full cutover deferred, checksum/backfill risk rationale, customer impact, and follow-up parity work.",
+      "Do not promise full billing cutover unless visible state proves checksum parity.",
+      "Keep Meridian export work scoped so it does not derail Atlas migration readiness."
+    ],
+    "finish_criteria": [
+      "migration mode is approved",
+      "customer messaging is ready",
+      "blocked work is unblocked",
+      "visible interruption requests have been answered from evidence",
+      "no visible calendar obligations remain"
+    ],
+    "tool_hints": {
+      "update_doc": "For doc_migration_decision_record, write the complete decision: Toad approval, staged shadow mode, full cutover deferred, checksum/backfill risk rationale, customer impact, and follow-up parity work."
+    }
+  },
   "grading_rules": [
     {
       "id": "atlas_customer_update",

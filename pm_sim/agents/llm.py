@@ -21,6 +21,7 @@ from ..evaluator import evaluate
 from ..formatters import format_agent_tool_progress, format_semantic_progress
 from ..jsonutil import dumps, loads
 from ..paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH, REPO_ROOT
+from ..scenario import load_scenario
 from ..state import get_state_value, observe, reset, set_state_value
 from ..time import advance_time
 from .finalize import finalize_to_deadline
@@ -52,6 +53,7 @@ def start_llm_session(
     if reset_first:
         steps.append(_step("reset", reset(db_path, scenario_path)))
 
+    scenario = load_scenario(scenario_path)
     state = {
         "model": model,
         "turns": 0,
@@ -63,7 +65,7 @@ def start_llm_session(
         "input_items": [
             {
                 "role": "user",
-                "content": _initial_prompt(observe(db_path)),
+                "content": _initial_prompt(scenario, observe(db_path)),
             }
         ],
     }
@@ -130,13 +132,14 @@ def step_llm_session(
     if client is None:
         client = _openai_client()
 
+    scenario = load_scenario(scenario_path)
     input_items = list(state.get("input_items", []))
     _progress(progress, f"{_sim_time_label(db_path)} turn {turn}/{max_turns}: waiting for model")
     response = client.responses.create(
         model=model,
-        instructions=_instructions(),
+        instructions=_instructions(scenario),
         input=input_items,
-        tools=_tool_specs(),
+        tools=_tool_specs(scenario),
         tool_choice="auto",
     )
     output = list(getattr(response, "output", []) or [])
@@ -221,12 +224,13 @@ def run_llm_agent(
         _progress(progress, f"creating OpenAI client for model {model}")
         client = _openai_client()
 
-    tools = _tool_specs()
+    scenario = load_scenario(scenario_path)
+    tools = _tool_specs(scenario)
     tool_handlers = _tool_handlers(db_path, scenario_path)
     input_items: list[Any] = [
         {
             "role": "user",
-            "content": _initial_prompt(observe(db_path)),
+            "content": _initial_prompt(scenario, observe(db_path)),
         }
     ]
 
@@ -237,7 +241,7 @@ def run_llm_agent(
         _progress(progress, f"{_sim_time_label(db_path)} turn {turn}/{max_turns}: waiting for model")
         response = client.responses.create(
             model=model,
-            instructions=_instructions(),
+            instructions=_instructions(scenario),
             input=input_items,
             tools=tools,
             tool_choice="auto",
@@ -330,8 +334,9 @@ def _load_dotenv(path: Path | None = None) -> None:
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
-def _instructions() -> str:
-    return (
+def _instructions(scenario: dict[str, Any] | None = None) -> str:
+    scenario = scenario or load_scenario(DEFAULT_SCENARIO_PATH)
+    generic = (
         "You are the project-manager agent operating inside pm-sim. Use only the workplace tools "
         "provided to you: observation, docs, tasks, chat, email, calendar meetings, and explicit time "
         "advancement. Do not assume hidden facts, inspect scenario files, infer evaluator evidence keys, "
@@ -345,39 +350,53 @@ def _instructions() -> str:
         "or task. Message the smallest useful set of people. Prefer one concise email or one focused "
         "meeting over repeated individual pings when several people need the same context. Only message "
         "someone when you need private information, a concrete decision, or a specific unblock. Do not "
-        "use chat for customer-ready wording that Daisy needs to forward or archive; send those final "
-        "Nimbus, security, Koopa, and go/no-go handoffs by email after the facts are grounded. Do not "
-        "treat visible business timing as optional: Daisy needs customer-ready Nimbus wording early "
-        "enough for her Thursday account update, Koopa needs scoped wording before Thursday's security "
-        "review, and Thursday final-readiness requests need an answer before the final agenda. "
+        "treat visible business timing as optional. "
         "Do not update a task just to show activity. When alignment or a decision becomes clear, preserve it "
         "in a durable artifact such as a visible decision record or launch note. Do not update docs "
         "with guesses or vague summaries; written artifacts should reflect decisions, risks, blockers, "
-        "or customer commitments that are already supported by visible state. When writing the launch "
-        "decision record, include the approved launch mode, Toad's approval, human approval before "
-        "posting, auto-commenting out of Friday scope or left as follow-up, and the repo-sync stale-commit "
-        "rationale. If a critical decision-record update applies no effect, revise the doc with the "
-        "missing grounded details before finishing. When a customer-facing "
-        "security or compliance question appears, handle it as a same-day interruption: ask the owner "
-        "for the source of truth, wait for the reply, read the referenced doc, then answer the customer "
-        "owner directly. Do not schedule a meeting for a security wording question unless the needed "
-        "document or owner answer is unavailable. A Thursday final-readiness check may arrive after the "
-        "main launch decision and security answer. Do not call finish before handling any visible final "
-        "go/no-go or readiness request; answer it with one concise note covering launch mode, security "
-        "wording, and competing project scope. "
-        "Your objective is to improve the Friday launch outcome through realistic PM behavior: discover "
+        "or customer commitments that are already supported by visible state. If a critical document "
+        "update applies no effect, revise the doc with the missing grounded details before finishing. "
+        "Your objective is to improve the project outcome through realistic PM behavior: discover "
         "blockers, resolve conflicts, prioritize tradeoffs, communicate clearly, and keep work moving. "
         "You do not need to simulate every empty hour, but you must respect visible calendar obligations. "
         "Before calling finish, observe the calendar obligations and advance through any remaining visible "
-        "commitments or deadlines. Call finish only when the launch mode is approved, customer messaging "
-        "is ready, blocked work is unblocked, visible async customer questions have been answered from "
-        "evidence, and no visible calendar obligations remain."
+        "commitments or deadlines."
     )
+    return f"{generic}\n\n{_agent_brief_text(scenario)}"
 
 
-def _initial_prompt(observation: dict[str, Any]) -> str:
+def _agent_brief_text(scenario: dict[str, Any]) -> str:
+    brief = scenario.get("agent_brief", {})
+    if not isinstance(brief, dict):
+        brief = {}
+
+    lines = [
+        "Scenario brief:",
+        f"Objective: {brief.get('objective') or scenario.get('summary') or scenario.get('name') or scenario.get('id')}",
+    ]
+    guidance = _string_list(brief.get("guidance"))
+    if guidance:
+        lines.append("Guidance:")
+        lines.extend(f"- {item}" for item in guidance)
+
+    finish_criteria = _string_list(brief.get("finish_criteria"))
+    if finish_criteria:
+        lines.append("Call finish only when:")
+        lines.extend(f"- {item}" for item in finish_criteria)
+
+    return "\n".join(lines)
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item.strip()]
+
+
+def _initial_prompt(scenario: dict[str, Any], observation: dict[str, Any]) -> str:
+    objective = (scenario.get("agent_brief") or {}).get("objective") or scenario.get("summary")
     return (
-        "Run the launch-readiness week for the PR Review Agent beta. "
+        f"{objective or 'Run the PM simulation scenario.'} "
         "Start from this observation and choose tool calls step by step:\n"
         f"{json.dumps(observation, default=str)}"
     )
@@ -413,7 +432,14 @@ def _tool_handlers(db_path: Path | str, scenario_path: Path | str) -> dict[str, 
     }
 
 
-def _tool_specs() -> list[dict[str, Any]]:
+def _tool_specs(scenario: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    scenario = scenario or load_scenario(DEFAULT_SCENARIO_PATH)
+    tool_hints = scenario.get("agent_brief", {}).get("tool_hints", {})
+    update_doc_hint = (
+        tool_hints.get("update_doc")
+        if isinstance(tool_hints, dict) and isinstance(tool_hints.get("update_doc"), str)
+        else "Use this for durable decisions, plans, customer updates, risk registers, or launch notes."
+    )
     return [
         _tool("observe", "Inspect visible current simulation state.", {}),
         _tool("list_tasks", "List project tasks.", {}),
@@ -425,11 +451,7 @@ def _tool_specs() -> list[dict[str, Any]]:
         ),
         _tool(
             "update_doc",
-            (
-                "Replace the body of a visible existing document. For doc_launch_decision_record, "
-                "write the complete decision: Toad approval, draft mode, human approval before posting, "
-                "auto-commenting out of Friday scope or follow-up, and repo-sync stale-commit rationale."
-            ),
+            f"Replace the body of a visible existing document. {update_doc_hint}",
             {"doc_id": {"type": "string"}, "body": {"type": "string"}},
             ["doc_id", "body"],
         ),

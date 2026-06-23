@@ -65,9 +65,10 @@
       ]
     }
   ],
-  "coworker_rules": [
+  "actor_behaviors": [
     {
       "id": "luigi_email_invoice_export_feasibility",
+      "kind": "reply",
       "person_id": "luigi",
       "channel": "email",
       "priority": 120,
@@ -83,6 +84,7 @@
           "finance review"
         ]
       },
+      "when": [],
       "reply": {
         "subject": "Re: Meridian invoice export feasibility",
         "body": "For Meridian, a one-time invoice export is feasible for the finance review. A self-serve export feature is larger work and should stay follow-up after Atlas."
@@ -108,18 +110,10 @@
     },
     {
       "id": "luigi_email_reveals_backfill_risk",
+      "kind": "reply",
       "person_id": "luigi",
       "channel": "email",
       "priority": 100,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "luigi",
-            "key": "backfill_risk_shared",
-            "equals": false
-          }
-        }
-      ],
       "match": {
         "terms_any": [
           "backfill",
@@ -131,6 +125,15 @@
           "risk"
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "luigi",
+            "key": "backfill_risk_shared",
+            "equals": false
+          }
+        }
+      ],
       "reply": {
         "subject": "Re: billing migration risk",
         "body": "The blocker is backfill parity. Checksums disagree for enterprise discount invoices, so full cutover could create incorrect invoice totals. I recommend read-only shadow mode this week while I keep fixing parity."
@@ -171,6 +174,7 @@
     },
     {
       "id": "luigi_invoice_export_feasibility",
+      "kind": "reply",
       "person_id": "luigi",
       "channel": "chat",
       "priority": 120,
@@ -186,6 +190,7 @@
           "finance review"
         ]
       },
+      "when": [],
       "reply": {
         "body": "For Meridian, a one-time invoice export is feasible for the finance review. A self-serve export feature is larger work and should stay follow-up after Atlas."
       },
@@ -210,9 +215,21 @@
     },
     {
       "id": "luigi_repeats_backfill_risk",
+      "kind": "reply",
       "person_id": "luigi",
       "channel": "chat",
       "priority": 110,
+      "match": {
+        "terms_any": [
+          "backfill",
+          "checksum",
+          "billing",
+          "migration",
+          "cutover",
+          "invoice",
+          "risk"
+        ]
+      },
       "when": [
         {
           "coworker_state": {
@@ -222,6 +239,17 @@
           }
         }
       ],
+      "reply": {
+        "body": "Same billing risk: backfill checksums still disagree for enterprise discount invoices, so full cutover is unsafe. Shadow mode is the safe Friday path."
+      },
+      "effects": []
+    },
+    {
+      "id": "luigi_reveals_backfill_risk",
+      "kind": "reply",
+      "person_id": "luigi",
+      "channel": "chat",
+      "priority": 100,
       "match": {
         "terms_any": [
           "backfill",
@@ -233,16 +261,6 @@
           "risk"
         ]
       },
-      "reply": {
-        "body": "Same billing risk: backfill checksums still disagree for enterprise discount invoices, so full cutover is unsafe. Shadow mode is the safe Friday path."
-      },
-      "effects": []
-    },
-    {
-      "id": "luigi_reveals_backfill_risk",
-      "person_id": "luigi",
-      "channel": "chat",
-      "priority": 100,
       "when": [
         {
           "coworker_state": {
@@ -252,17 +270,6 @@
           }
         }
       ],
-      "match": {
-        "terms_any": [
-          "backfill",
-          "checksum",
-          "billing",
-          "migration",
-          "cutover",
-          "invoice",
-          "risk"
-        ]
-      },
       "reply": {
         "body": "The blocker is backfill parity. Checksums disagree for enterprise discount invoices, so full cutover could create incorrect invoice totals. I recommend read-only shadow mode this week while I keep fixing parity."
       },
@@ -302,10 +309,12 @@
     },
     {
       "id": "luigi_default_status",
+      "kind": "reply",
       "person_id": "luigi",
       "channel": "chat",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "body": "I am working on billing backfill parity. If you need the migration decision, ask me specifically about checksum or cutover risk."
       },
@@ -313,18 +322,10 @@
     },
     {
       "id": "daisy_email_aligns_on_invoice_correctness",
+      "kind": "reply",
       "person_id": "daisy",
       "channel": "email",
       "priority": 100,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "daisy",
-            "key": "customer_preference_shared",
-            "equals": false
-          }
-        }
-      ],
       "match": {
         "term_groups_all": [
           [
@@ -347,6 +348,15 @@
           ]
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "customer_preference_shared",
+            "equals": false
+          }
+        }
+      ],
       "reply": {
         "subject": "Re: Atlas migration wording",
         "body": "Atlas will accept staged shadow mode if we frame it around invoice correctness. Please send me email-ready wording before Thursday afternoon."
@@ -377,18 +387,10 @@
     },
     {
       "id": "daisy_aligns_on_invoice_correctness",
+      "kind": "reply",
       "person_id": "daisy",
       "channel": "chat",
       "priority": 100,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "daisy",
-            "key": "customer_preference_shared",
-            "equals": false
-          }
-        }
-      ],
       "match": {
         "term_groups_all": [
           [
@@ -411,6 +413,15 @@
           ]
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "customer_preference_shared",
+            "equals": false
+          }
+        }
+      ],
       "reply": {
         "body": "Atlas will accept staged shadow mode if we frame it around invoice correctness. Please send me email-ready wording before Thursday afternoon."
       },
@@ -440,10 +451,12 @@
     },
     {
       "id": "daisy_default_customer_request",
+      "kind": "reply",
       "person_id": "daisy",
       "channel": "chat",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "body": "Atlas needs a reliable customer-facing migration update. I need the approved mode, limitation, and rationale by email."
       },
@@ -451,6 +464,7 @@
     },
     {
       "id": "toad_email_aligns_meridian_scope",
+      "kind": "reply",
       "person_id": "toad",
       "channel": "email",
       "priority": 120,
@@ -467,6 +481,7 @@
           "finance review"
         ]
       },
+      "when": [],
       "reply": {
         "subject": "Re: Meridian export scope",
         "body": "Scope Meridian to the one-time invoice export for Thursday. Do not promise self-serve export this week; keep that follow-up so Atlas migration remains protected."
@@ -498,6 +513,7 @@
     },
     {
       "id": "toad_aligns_meridian_scope",
+      "kind": "reply",
       "person_id": "toad",
       "channel": "chat",
       "priority": 120,
@@ -514,6 +530,7 @@
           "finance review"
         ]
       },
+      "when": [],
       "reply": {
         "body": "Scope Meridian to the one-time invoice export for Thursday. Do not promise self-serve export this week; keep that follow-up so Atlas migration remains protected."
       },
@@ -544,18 +561,10 @@
     },
     {
       "id": "toad_already_approved_staged_mode",
+      "kind": "reply",
       "person_id": "toad",
       "channel": "chat",
       "priority": 110,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "toad",
-            "key": "stage_approved",
-            "equals": true
-          }
-        }
-      ],
       "match": {
         "terms_any": [
           "approval",
@@ -566,6 +575,15 @@
           "billing"
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "toad",
+            "key": "stage_approved",
+            "equals": true
+          }
+        }
+      ],
       "reply": {
         "body": "The staged shadow-mode approval is already recorded. Use the decision record as source of truth and keep full cutover as follow-up after checksum parity."
       },
@@ -573,18 +591,10 @@
     },
     {
       "id": "toad_email_approves_staged_shadow_mode",
+      "kind": "reply",
       "person_id": "toad",
       "channel": "email",
       "priority": 100,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "toad",
-            "key": "stage_approved",
-            "equals": false
-          }
-        }
-      ],
       "match": {
         "required_facts": [
           "fact_backfill_checksum_mismatch",
@@ -611,6 +621,15 @@
           ]
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "toad",
+            "key": "stage_approved",
+            "equals": false
+          }
+        }
+      ],
       "reply": {
         "subject": "Re: Atlas migration decision",
         "body": "Approved: Friday should be staged shadow mode, not full cutover. Record the decision, explain the checksum risk, and keep full cutover as follow-up after parity is proven."
@@ -645,18 +664,10 @@
     },
     {
       "id": "toad_approves_staged_shadow_mode",
+      "kind": "reply",
       "person_id": "toad",
       "channel": "chat",
       "priority": 100,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "toad",
-            "key": "stage_approved",
-            "equals": false
-          }
-        }
-      ],
       "match": {
         "required_facts": [
           "fact_backfill_checksum_mismatch",
@@ -683,6 +694,15 @@
           ]
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "toad",
+            "key": "stage_approved",
+            "equals": false
+          }
+        }
+      ],
       "reply": {
         "body": "Approved: Friday should be staged shadow mode, not full cutover. Record the decision, explain the checksum risk, and keep full cutover as follow-up after parity is proven."
       },
@@ -716,10 +736,12 @@
     },
     {
       "id": "toad_default_needs_inputs",
+      "kind": "reply",
       "person_id": "toad",
       "channel": "chat",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "body": "I need the technical backfill risk, Atlas customer impact, and recommended safe Friday mode before approving a migration de-scope."
       },
@@ -727,6 +749,7 @@
     },
     {
       "id": "mario_accepts_staged_mode_if_risk_known",
+      "kind": "reply",
       "person_id": "mario",
       "channel": "chat",
       "priority": 100,
@@ -735,6 +758,7 @@
           "fact_backfill_checksum_mismatch"
         ]
       },
+      "when": [],
       "reply": {
         "body": "I prefer a bigger story, but incorrect invoices would be worse. If Atlas accepts the staged explanation, keep full cutover as follow-up."
       },
@@ -749,10 +773,12 @@
     },
     {
       "id": "mario_default_full_cutover_pressure",
+      "kind": "reply",
       "person_id": "mario",
       "channel": "chat",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "body": "Please try to keep full cutover in scope if the data is safe. Atlas wants visible migration progress."
       },
@@ -760,10 +786,12 @@
     },
     {
       "id": "daisy_email_acknowledgement",
+      "kind": "reply",
       "person_id": "daisy",
       "channel": "email",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "subject": "Re: received",
         "body": "Received. I will use the emailed wording as the customer-facing source of truth."
@@ -772,10 +800,12 @@
     },
     {
       "id": "luigi_email_acknowledgement",
+      "kind": "reply",
       "person_id": "luigi",
       "channel": "email",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "subject": "Re: received",
         "body": "Received. For technical risk, chat is faster; I will answer with source-of-truth details when ready."
@@ -784,10 +814,12 @@
     },
     {
       "id": "toad_email_acknowledgement",
+      "kind": "reply",
       "person_id": "toad",
       "channel": "email",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "subject": "Re: received",
         "body": "Received. Make sure the recommended scope is tied to concrete risk and customer impact."

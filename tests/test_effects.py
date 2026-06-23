@@ -165,6 +165,67 @@ class EffectApplicationTests(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_actor_runtime_effects_update_schema_tables(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            applied = apply_effects(
+                conn,
+                [
+                    {
+                        "type": "update_actor_workload",
+                        "person_id": "daisy",
+                        "current_focus": "customer launch wording",
+                        "load_level": "high",
+                        "capacity_minutes_remaining": 90,
+                    },
+                    {
+                        "type": "add_actor_commitment",
+                        "id": "commitment_test_customer_note",
+                        "person_id": "daisy",
+                        "project_id": "project_pr_review_agent",
+                        "commitment_type": "customer_update",
+                        "description": "Send customer-ready launch wording.",
+                        "due_at": "2026-06-25T12:00:00",
+                    },
+                    {
+                        "type": "update_actor_commitment",
+                        "id": "commitment_test_customer_note",
+                        "status": "done",
+                    },
+                ],
+                now="2026-06-22T11:00:00",
+                source="test",
+            )
+            conn.commit()
+
+            workload = conn.execute(
+                """
+                SELECT current_focus, capacity_minutes_remaining, load_level
+                FROM actor_workload
+                WHERE person_id = 'daisy'
+                """
+            ).fetchone()
+            commitment = conn.execute(
+                """
+                SELECT status, commitment_type
+                FROM actor_commitments
+                WHERE id = 'commitment_test_customer_note'
+                """
+            ).fetchone()
+
+            self.assertEqual([row["type"] for row in applied], [
+                "update_actor_workload",
+                "add_actor_commitment",
+                "update_actor_commitment",
+            ])
+            self.assertEqual(workload["current_focus"], "customer launch wording")
+            self.assertEqual(workload["capacity_minutes_remaining"], 90)
+            self.assertEqual(workload["load_level"], "high")
+            self.assertEqual(commitment["status"], "done")
+            self.assertEqual(commitment["commitment_type"], "customer_update")
+        finally:
+            conn.close()
+
     def test_llm_semantic_match_failure_fails_closed(self) -> None:
         original = semantic_match_module._llm_match
         semantic_match_module._llm_match = lambda text, criteria: (_ for _ in ()).throw(

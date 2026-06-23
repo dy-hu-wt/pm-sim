@@ -21,7 +21,14 @@ from pm_sim.actions import (
     update_doc,
     update_task,
 )
-from pm_sim.agents.llm import _instructions, llm_session_state, start_llm_session, step_llm_session, run_llm_agent
+from pm_sim.agents.llm import (
+    _instructions,
+    _tool_specs,
+    llm_session_state,
+    run_llm_agent,
+    start_llm_session,
+    step_llm_session,
+)
 from pm_sim.agents.scripted import run_scripted_agent
 from pm_sim.cli import main as cli_main
 from pm_sim.conditions import condition_matches
@@ -420,6 +427,18 @@ class LlmAgentTests(unittest.TestCase):
         self.assertIn("Koopa needs scoped wording before Thursday's security review", instructions)
         self.assertIn("Thursday final-readiness requests need an answer", instructions)
         self.assertIn("Call finish only when", instructions)
+
+    def test_llm_instructions_use_scenario_brief(self) -> None:
+        billing = load_scenario(Path("scenarios/billing_migration"))
+        instructions = _instructions(billing)
+        tool_specs = _tool_specs(billing)
+        update_doc_spec = next(tool for tool in tool_specs if tool["name"] == "update_doc")
+
+        self.assertIn("Atlas migration wording", instructions)
+        self.assertIn("Meridian needs scoped invoice-export wording", instructions)
+        self.assertNotIn("Nimbus", instructions)
+        self.assertIn("doc_migration_decision_record", update_doc_spec["description"])
+        self.assertNotIn("doc_launch_decision_record", update_doc_spec["description"])
 
 
 if __name__ == "__main__":

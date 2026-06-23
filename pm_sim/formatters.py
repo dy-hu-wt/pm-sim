@@ -124,7 +124,7 @@ def _agent_result_summary(name: str, result: Any) -> str:
         return f"current time {_pretty_time(result.get('current_time'))}"
     if name == "advance_time":
         delivered = result.get("delivered_events", [])
-        policies = result.get("applied_coworker_policies", [])
+        policies = result.get("applied_actor_behaviors", [])
         activity = _activity_summary(delivered, policies)
         return f"{_pretty_time(result.get('to'))}; {activity}"
     if name == "send_chat":
@@ -154,7 +154,7 @@ def _agent_time_cost_summary(result: dict[str, Any]) -> str:
     if not isinstance(time_cost, dict):
         return ""
     delivered = time_cost.get("delivered_events") or []
-    policies = time_cost.get("applied_coworker_policies") or []
+    policies = time_cost.get("applied_actor_behaviors") or []
     delivered_summary = f"; {_activity_summary(delivered, policies)}" if delivered or policies else ""
     return f" (+{time_cost.get('minutes')}m){delivered_summary}"
 
@@ -165,8 +165,8 @@ def _activity_summary(events: list[dict[str, Any]], policies: list[dict[str, Any
         event_types = ", ".join(event.get("event_type", "event") for event in events)
         parts.append(f"events: {event_types}")
     if policies:
-        policy_ids = ", ".join(policy.get("id", "coworker_policy") for policy in policies)
-        parts.append(f"coworker policies: {policy_ids}")
+        policy_ids = ", ".join(policy.get("id", "actor_behavior") for policy in policies)
+        parts.append(f"actor behaviors: {policy_ids}")
     return "; ".join(parts) if parts else "events: none"
 
 
@@ -314,6 +314,34 @@ def _format_observe(value: dict[str, Any]) -> str:
         for row in coworker_state:
             lines.append(
                 f"  {row['person_id']}.{row['key']} = {_format_json_value(row.get('value_json'))}"
+            )
+    else:
+        lines.append("  None")
+
+    lines.append("")
+    lines.append("Actor Workload")
+    workloads = value.get("actor_workload", [])
+    if workloads:
+        for row in workloads:
+            lines.append(
+                f"  {row['person_id']}: {row.get('load_level', 'normal')} load"
+                f" · {row.get('capacity_minutes_remaining', 0)}m capacity"
+            )
+            if row.get("current_focus"):
+                lines.append(f"       Focus: {_short(row['current_focus'], 120)}")
+    else:
+        lines.append("  None")
+
+    lines.append("")
+    lines.append("Actor Commitments")
+    commitments = value.get("actor_commitments", [])
+    open_commitments = [row for row in commitments if row.get("status") != "done"]
+    if open_commitments:
+        for row in open_commitments[:8]:
+            due = f" due {_pretty_time(row.get('due_at'))}" if row.get("due_at") else ""
+            lines.append(
+                f"  {row['person_id']} [{row.get('status')}]{due}: "
+                f"{_short(row.get('description', ''), 120)}"
             )
     else:
         lines.append("  None")
@@ -481,9 +509,9 @@ def _format_time_cost_lines(value: dict[str, Any]) -> list[str]:
         lines.append("  Delivered during action:")
         for event in delivered:
             lines.append(f"    {event['event_type']} ({event['id']})")
-    policies = time_cost.get("applied_coworker_policies") or []
+    policies = time_cost.get("applied_actor_behaviors") or []
     if policies:
-        lines.append("  Applied coworker policies during action:")
+        lines.append("  Applied actor behaviors during action:")
         for policy in policies:
             lines.append(f"    {policy['id']} ({policy.get('person_id')})")
     return lines
@@ -523,8 +551,8 @@ def _format_advance_time(value: dict[str, Any]) -> str:
                     lines.append(f"      - {_format_effect(effect)}")
     else:
         lines.append("  None")
-    policies = value.get("applied_coworker_policies", [])
-    lines.extend(["", "Applied Coworker Policies"])
+    policies = value.get("applied_actor_behaviors", [])
+    lines.extend(["", "Applied Actor Behaviors"])
     if policies:
         for policy in policies:
             lines.append(f"  {policy['id']} ({policy.get('person_id')})")
@@ -833,6 +861,15 @@ def _format_effect(effect: dict[str, Any]) -> str:
     if effect_type == "update_coworker_state":
         keys = ", ".join(effect.get("keys", []))
         return f"updated coworker state {effect.get('person_id')}: {keys}"
+    if effect_type == "update_actor_workload":
+        fields = ", ".join(effect.get("updated", []))
+        return f"updated actor workload {effect.get('person_id')}: {fields}"
+    if effect_type == "add_actor_commitment":
+        return f"added actor commitment {effect.get('id')}"
+    if effect_type == "update_actor_commitment":
+        return f"updated actor commitment {effect.get('id')}"
+    if effect_type == "update_actor_goal":
+        return f"updated actor goal {effect.get('id')}"
     if effect_type == "add_evaluation_evidence":
         deduped = " (already recorded)" if effect.get("deduped") else ""
         return f"added evidence {effect.get('key')}{deduped}"

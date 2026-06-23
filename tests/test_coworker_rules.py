@@ -39,10 +39,10 @@ from pm_sim.time import advance_time
 from pm_sim.timeline import timeline
 from pm_sim.ui import _html, _run_next_ui_step, _scripted_demo_state, _state_payload
 
-class CoworkerRuleTests(unittest.TestCase):
+class ActorBehaviorTests(unittest.TestCase):
     def setUp(self) -> None:
         scenario = load_scenario(DEFAULT_SCENARIO_PATH)
-        self.rules = scenario.get("coworker_rules", [])
+        self.actor_behaviors = scenario.get("actor_behaviors", [])
         self.response_delays = {
             person["id"]: person["response_delay_minutes"]
             for person in scenario.get("people", [])
@@ -51,7 +51,7 @@ class CoworkerRuleTests(unittest.TestCase):
     def _state(self, facts: list[str] | None = None) -> dict[str, Any]:
         return {
             "discovered_facts": facts or [],
-            "coworker_rules": self.rules,
+            "actor_behaviors": self.actor_behaviors,
             "response_delays": self.response_delays,
         }
 
@@ -110,8 +110,8 @@ class CoworkerRuleTests(unittest.TestCase):
         self.assertIn("ask me specifically", replies[0].body)
 
     def test_rule_without_delay_uses_scenario_person_delay(self) -> None:
-        rules = copy.deepcopy(self.rules)
-        rule = next(rule for rule in rules if rule["id"] == "luigi_private_repo_security_doc")
+        behaviors = copy.deepcopy(self.actor_behaviors)
+        rule = next(rule for rule in behaviors if rule["id"] == "luigi_private_repo_security_doc")
         del rule["reply"]["delay_minutes"]
 
         replies = replies_for_chat(
@@ -119,7 +119,7 @@ class CoworkerRuleTests(unittest.TestCase):
             "Any private repo security docs?",
             {
                 "discovered_facts": [],
-                "coworker_rules": rules,
+                "actor_behaviors": behaviors,
                 "response_delays": {"luigi": 120},
             },
         )

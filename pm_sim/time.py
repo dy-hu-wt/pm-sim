@@ -12,6 +12,7 @@ from .db import connect, rows_to_dicts
 from .effects import apply_effects
 from .jsonutil import dumps, loads
 from .paths import DEFAULT_DB_PATH
+from .runtime_config import meeting_rules, outcome_rules, policy_behaviors
 from .state import get_current_time, get_state_value, log_action, set_state_value
 
 
@@ -45,7 +46,7 @@ def advance_time(
             payload={"target": target, "from": current_time, "to": new_time},
             result={
                 "delivered_event_ids": [event["id"] for event in delivered],
-                "applied_coworker_policy_ids": [policy["id"] for policy in applied_policies],
+                "applied_actor_behavior_ids": [policy["id"] for policy in applied_policies],
             },
         )
         conn.commit()
@@ -55,7 +56,7 @@ def advance_time(
             "from": current_time,
             "to": new_time,
             "delivered_events": delivered,
-            "applied_coworker_policies": applied_policies,
+            "applied_actor_behaviors": applied_policies,
         }
     finally:
         conn.close()
@@ -76,8 +77,8 @@ def consume_action_time(
         "to": new_time,
         "delivered_events": delivered,
         "delivered_event_ids": [event["id"] for event in delivered],
-        "applied_coworker_policies": applied_policies,
-        "applied_coworker_policy_ids": [policy["id"] for policy in applied_policies],
+        "applied_actor_behaviors": applied_policies,
+        "applied_actor_behavior_ids": [policy["id"] for policy in applied_policies],
     }
 
 
@@ -96,7 +97,7 @@ def _resolve_target_time(conn: sqlite3.Connection, current_time: str, target: st
         next_times = []
         if event_row is not None:
             next_times.append(event_row["scheduled_at"])
-        policy_time = _next_coworker_policy_time(conn, current_time)
+        policy_time = _next_actor_behavior_time(conn, current_time)
         if policy_time is not None:
             next_times.append(policy_time)
         if not next_times:
@@ -144,7 +145,7 @@ def _deliver_due_activity(
     applied_policies: list[dict[str, Any]] = []
     while True:
         next_event = _next_due_event(conn, new_time)
-        next_policy = _next_due_coworker_policy(conn, current_time, new_time)
+        next_policy = _next_due_actor_behavior(conn, current_time, new_time)
         if next_event is None and next_policy is None:
             break
         if next_event is not None and (
@@ -153,7 +154,7 @@ def _deliver_due_activity(
             delivered_events.append(_deliver_event(conn, next_event, new_time))
             continue
         if next_policy is not None:
-            applied_policies.append(_apply_coworker_policy(conn, next_policy))
+            applied_policies.append(_apply_actor_behavior(conn, next_policy))
     return delivered_events, applied_policies
 
 
@@ -162,24 +163,24 @@ def _next_due_event(conn: sqlite3.Connection, new_time: str) -> dict[str, Any] |
     return rows[0] if rows else None
 
 
-def _next_coworker_policy_time(conn: sqlite3.Connection, current_time: str) -> str | None:
+def _next_actor_behavior_time(conn: sqlite3.Connection, current_time: str) -> str | None:
     times = [
         policy["trigger_at"]
-        for policy in _coworker_policy_candidates(conn)
-        if policy["trigger_at"] > current_time and not _coworker_policy_fired(conn, policy["id"])
+        for policy in _actor_policy_candidates(conn)
+        if policy["trigger_at"] > current_time and not _actor_behavior_fired(conn, policy["id"])
     ]
     return min(times) if times else None
 
 
-def _next_due_coworker_policy(
+def _next_due_actor_behavior(
     conn: sqlite3.Connection,
     current_time: str,
     new_time: str,
 ) -> dict[str, Any] | None:
-    for policy in _coworker_policy_candidates(conn):
+    for policy in _actor_policy_candidates(conn):
         if policy["trigger_at"] <= current_time or policy["trigger_at"] > new_time:
             continue
-        if _coworker_policy_fired(conn, policy["id"]):
+        if _actor_behavior_fired(conn, policy["id"]):
             continue
         if not all_conditions_match(conn, policy.get("when", [])):
             continue
@@ -187,7 +188,7 @@ def _next_due_coworker_policy(
     return None
 
 
-def _coworker_policy_candidates(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+def _actor_policy_candidates(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     policies = _policy_behaviors(conn)
     candidates = []
     for policy in policies if isinstance(policies, list) else []:
@@ -207,27 +208,19 @@ def _coworker_policy_candidates(conn: sqlite3.Connection) -> list[dict[str, Any]
 
 
 def _policy_behaviors(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    actor_behaviors = loads(get_state_value(conn, "actor_behaviors_json") or "[]", [])
-    if isinstance(actor_behaviors, list) and actor_behaviors:
-        return [
-            behavior
-            for behavior in actor_behaviors
-            if isinstance(behavior, dict) and behavior.get("kind") == "policy"
-        ]
-    policies = loads(get_state_value(conn, "coworker_policies_json") or "[]", [])
-    return policies if isinstance(policies, list) else []
+    return policy_behaviors(conn)
 
 
-def _apply_coworker_policy(conn: sqlite3.Connection, policy: dict[str, Any]) -> dict[str, Any]:
+def _apply_actor_behavior(conn: sqlite3.Connection, policy: dict[str, Any]) -> dict[str, Any]:
     policy_id = policy["id"]
-    source = f"coworker_policy:{policy_id}"
+    source = f"actor_behavior:{policy_id}"
     applied_effects = apply_effects(
         conn,
         [dict(effect) for effect in policy.get("effects", [])],
         now=policy["trigger_at"],
         source=source,
     )
-    set_state_value(conn, _coworker_policy_fired_key(policy_id), policy["trigger_at"])
+    set_state_value(conn, _actor_behavior_fired_key(policy_id), policy["trigger_at"])
     return {
         "id": policy_id,
         "person_id": policy.get("person_id"),
@@ -236,12 +229,12 @@ def _apply_coworker_policy(conn: sqlite3.Connection, policy: dict[str, Any]) -> 
     }
 
 
-def _coworker_policy_fired(conn: sqlite3.Connection, policy_id: str) -> bool:
-    return get_state_value(conn, _coworker_policy_fired_key(policy_id)) is not None
+def _actor_behavior_fired(conn: sqlite3.Connection, policy_id: str) -> bool:
+    return get_state_value(conn, _actor_behavior_fired_key(policy_id)) is not None
 
 
-def _coworker_policy_fired_key(policy_id: str) -> str:
-    return f"coworker_policy_fired:{policy_id}"
+def _actor_behavior_fired_key(policy_id: str) -> str:
+    return f"actor_behavior_fired:{policy_id}"
 
 
 def _deliver_event(
@@ -342,8 +335,7 @@ def _effects_for_project_deadline(
 
 
 def _classify_project_outcome(conn: sqlite3.Connection, project_id: str) -> dict[str, str]:
-    rules = loads(get_state_value(conn, "outcome_rules_json") or "[]", [])
-    for rule in rules:
+    for rule in outcome_rules(conn):
         if not all_conditions_match(conn, rule.get("when", []), project_id=project_id):
             continue
         result = rule.get("result", {})
@@ -371,7 +363,7 @@ def _meeting_state(conn: sqlite3.Connection) -> dict[str, Any]:
     return {
         "discovered_facts": sorted(_discovered_fact_ids(conn)),
         "evidence_keys": sorted(_evidence_keys(conn)),
-        "meeting_rules": loads(get_state_value(conn, "meeting_rules_json") or "[]", []),
+        "meeting_rules": meeting_rules(conn),
     }
 
 

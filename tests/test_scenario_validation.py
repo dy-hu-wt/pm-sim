@@ -103,9 +103,9 @@ class ScenarioValidationTests(unittest.TestCase):
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
-    def test_invalid_coworker_policy_person_raises_scenario_error(self) -> None:
+    def test_invalid_actor_policy_person_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.base)
-        scenario["coworker_policies"][0]["person_id"] = "unknown_person"
+        next(behavior for behavior in scenario["actor_behaviors"] if behavior["kind"] == "policy")["person_id"] = "unknown_person"
 
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
@@ -121,6 +121,19 @@ class ScenarioValidationTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(ScenarioError, "unsupported kind"):
+            load_scenario(self._write_scenario(scenario))
+
+    def test_invalid_actor_workload_effect_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.base)
+        scenario["actor_behaviors"][0]["effects"].append(
+            {
+                "type": "update_actor_workload",
+                "person_id": "unknown_person",
+                "load_level": "high",
+            }
+        )
+
+        with self.assertRaisesRegex(ScenarioError, "actor workload person_id"):
             load_scenario(self._write_scenario(scenario))
 
     def test_invalid_action_semantic_match_raises_scenario_error(self) -> None:
@@ -176,7 +189,7 @@ class ScenarioValidationTests(unittest.TestCase):
 
         self.assertEqual(loaded["id"], "launch_readiness")
         self.assertEqual(len(loaded["people"]), 5)
-        self.assertTrue(loaded["coworker_rules"])
+        self.assertTrue(loaded["actor_behaviors"])
         self.assertTrue(loaded["event_rules"])
 
         loaded_from_dir = load_scenario(root)

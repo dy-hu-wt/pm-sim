@@ -35,6 +35,9 @@ Use `pm-sim reset --scenario scenarios/<scenario_id>` to validate and load it.
 
 - `people`: coworkers, roles, goals, constraints, availability, private knowledge, and behavior notes.
 - `coworker_state`: mutable actor memory such as `risk_shared`, `approval_recorded`, or `customer_update_received`.
+- `actor_goals`, `actor_workload`, and `actor_commitments`: optional first-class runtime actor
+  state for deterministic NPC complexity. If omitted, goals and workload are seeded from
+  `people[].goals` and `people[].behavior.current_focus`.
 - `projects`: active workstreams with status, risk, stakeholder pressure, deadline, and metadata.
 - `facts`: discoverable information, often hidden until chat, email, docs, or events reveal it.
 - `tasks` and `dependencies`: visible PM work, owners, due dates, blockers, and priorities.
@@ -47,22 +50,18 @@ Visibility is standardized with nullable `visible_at`: if it is `null`, the item
 
 ## Interactions
 
-`interactions.json` defines how coworkers and background dynamics change the world. At runtime,
-reply behavior and proactive coworker behavior are normalized into one `actor_behaviors` list:
+`interactions.json` defines how coworkers and background dynamics change the world. Reply behavior
+and proactive coworker behavior live in one `actor_behaviors` list:
 
 - `actor_behaviors`: the reusable actor model. `kind: "reply"` entries respond to chat/email;
   `kind: "policy"` entries fire from time plus state. Both use the shared condition and effect
   languages.
-- `coworker_rules`: compatibility authoring shorthand for `actor_behaviors` reply entries.
-- `coworker_policies`: compatibility authoring shorthand for `actor_behaviors` policy entries.
 - `event_rules`: effects applied when scheduled non-actor events are delivered.
 - `meeting_rules`: transcript lines and effects applied when a meeting resolves.
 - `action_rules`: effects applied when an agent action matches causal conditions and optional
   semantic criteria.
 
-Prefer `actor_behaviors` for new scenarios. The older `coworker_rules` and `coworker_policies`
-keys are still accepted and compiled into `actor_behaviors`, so existing scenarios remain readable
-while the engine has one actor path.
+`actor_behaviors` is the single scenario surface for coworker replies and proactive actor behavior.
 
 ```json
 {
@@ -98,6 +97,8 @@ while the engine has one actor path.
 
 `evaluation.json` defines grading and reviewer/demo behavior:
 
+- `agent_brief`: scenario-specific operating guidance for LLM-driven runs, including objective,
+  timing guidance, finish criteria, and optional tool hints.
 - `grading_rules`: reusable templates that compile into action rules plus state-derived evidence.
 - `state_evidence_rules`: how evaluator evidence is derived from coworker/world state.
 - `task_gate_rules`: prevents task completion before required state exists.
@@ -107,11 +108,16 @@ while the engine has one actor path.
 - `baseline`: no-op reference path.
 - `scripted_policy`: deterministic demo path using normal tools.
 
+Keep engine behavior out of `agent_brief`. It should orient the agent to the scenario's visible
+PM objective and durable-work expectations; it should not reveal hidden facts or evaluator keys.
+
 Effects are reusable state mutations:
 
 ```json
 {"type": "discover_fact", "fact_id": "fact_backfill_checksum_mismatch"}
 {"type": "update_coworker_state", "person_id": "toad", "key": "stage_approved", "value": true}
+{"type": "update_actor_workload", "person_id": "daisy", "load_level": "high"}
+{"type": "add_actor_commitment", "person_id": "daisy", "description": "Send customer update."}
 {"type": "update_project", "project_id": "project_billing_migration", "decision": "staged_shadow_mode"}
 {"type": "create_message", "channel": "email", "sender_id": "daisy", "recipient_id": "agent", "body": "..."}
 ```

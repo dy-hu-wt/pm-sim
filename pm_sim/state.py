@@ -80,6 +80,41 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
                     """
                 ).fetchall()
             ),
+            "actor_goals": rows_to_dicts(
+                conn.execute(
+                    """
+                    SELECT ag.id, ag.person_id, p.name, ag.project_id, ag.description,
+                           ag.priority, ag.status, ag.metadata_json
+                    FROM actor_goals ag
+                    JOIN people p ON p.id = ag.person_id
+                    ORDER BY ag.person_id, ag.priority DESC, ag.id
+                    """
+                ).fetchall()
+            ),
+            "actor_workload": rows_to_dicts(
+                conn.execute(
+                    """
+                    SELECT aw.person_id, p.name, aw.current_focus,
+                           aw.capacity_minutes_remaining, aw.load_level,
+                           aw.updated_at, aw.metadata_json
+                    FROM actor_workload aw
+                    JOIN people p ON p.id = aw.person_id
+                    ORDER BY aw.person_id
+                    """
+                ).fetchall()
+            ),
+            "actor_commitments": rows_to_dicts(
+                conn.execute(
+                    """
+                    SELECT ac.id, ac.person_id, p.name, ac.project_id,
+                           ac.commitment_type, ac.description, ac.due_at,
+                           ac.status, ac.created_at, ac.updated_at, ac.metadata_json
+                    FROM actor_commitments ac
+                    JOIN people p ON p.id = ac.person_id
+                    ORDER BY ac.status, ac.due_at, ac.id
+                    """
+                ).fetchall()
+            ),
             "tasks": rows_to_dicts(
                 conn.execute(
                     """
@@ -240,8 +275,6 @@ def _load_scenario(conn: sqlite3.Connection, scenario: dict[str, Any]) -> None:
     set_state_value(conn, "scenario_id", scenario["id"])
     set_state_value(conn, "current_time", scenario["start_time"])
     set_state_value(conn, "actor_behaviors_json", dumps(scenario.get("actor_behaviors", [])))
-    set_state_value(conn, "coworker_rules_json", dumps(scenario.get("coworker_rules", [])))
-    set_state_value(conn, "coworker_policies_json", dumps(scenario.get("coworker_policies", [])))
     set_state_value(conn, "event_rules_json", dumps(scenario.get("event_rules", [])))
     set_state_value(conn, "meeting_rules_json", dumps(scenario.get("meeting_rules", [])))
     set_state_value(conn, "action_rules_json", dumps(scenario.get("action_rules", [])))
@@ -254,6 +287,7 @@ def _load_scenario(conn: sqlite3.Connection, scenario: dict[str, Any]) -> None:
     _insert_coworker_state(conn, scenario.get("coworker_state", []), scenario["start_time"])
     _insert_facts(conn, scenario.get("facts", []))
     _insert_projects(conn, scenario.get("projects", []))
+    _insert_actor_runtime_state(conn, scenario, scenario["start_time"])
     _insert_tasks(conn, scenario.get("tasks", []))
     _insert_dependencies(conn, scenario.get("dependencies", []))
     _insert_blockers(conn, scenario.get("blockers", []))
@@ -311,6 +345,93 @@ def _insert_coworker_state(
                 row["key"],
                 dumps(row.get("value")),
                 row.get("updated_at", start_time),
+            ),
+        )
+
+
+def _insert_actor_runtime_state(
+    conn: sqlite3.Connection,
+    scenario: dict[str, Any],
+    start_time: str,
+) -> None:
+    people = scenario.get("people", [])
+    explicit_goals = list(scenario.get("actor_goals", []))
+    explicit_workload = {
+        row["person_id"]: row
+        for row in scenario.get("actor_workload", [])
+        if isinstance(row, dict) and isinstance(row.get("person_id"), str)
+    }
+
+    for person in people:
+        person_id = person["id"]
+        if not any(goal.get("person_id") == person_id for goal in explicit_goals):
+            for index, description in enumerate(person.get("goals", []), start=1):
+                explicit_goals.append(
+                    {
+                        "id": f"actor_goal_{person_id}_{index}",
+                        "person_id": person_id,
+                        "description": description,
+                        "priority": max(10, 100 - (index * 10)),
+                        "status": "active",
+                    }
+                )
+
+        workload = explicit_workload.get(person_id, {})
+        behavior = person.get("behavior", {}) if isinstance(person.get("behavior"), dict) else {}
+        conn.execute(
+            """
+            INSERT INTO actor_workload
+              (person_id, current_focus, capacity_minutes_remaining, load_level,
+               updated_at, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                person_id,
+                workload.get("current_focus", behavior.get("current_focus", "")),
+                int(workload.get("capacity_minutes_remaining", 0)),
+                workload.get("load_level", "normal"),
+                workload.get("updated_at", start_time),
+                dumps(workload.get("metadata", {})),
+            ),
+        )
+
+    for goal in explicit_goals:
+        conn.execute(
+            """
+            INSERT INTO actor_goals
+              (id, person_id, project_id, description, priority, status, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                goal["id"],
+                goal["person_id"],
+                goal.get("project_id"),
+                goal["description"],
+                int(goal.get("priority", 50)),
+                goal.get("status", "active"),
+                dumps(goal.get("metadata", {})),
+            ),
+        )
+
+    for commitment in scenario.get("actor_commitments", []):
+        conn.execute(
+            """
+            INSERT INTO actor_commitments
+              (id, person_id, project_id, commitment_type, description, due_at,
+               status, created_at, updated_at, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                commitment["id"],
+                commitment["person_id"],
+                commitment.get("project_id"),
+                commitment.get("commitment_type", "commitment"),
+                commitment["description"],
+                commitment.get("due_at"),
+                commitment.get("status", "open"),
+                commitment.get("created_at", start_time),
+                commitment.get("updated_at", commitment.get("created_at", start_time)),
+                dumps(commitment.get("metadata", {})),
             ),
         )
 

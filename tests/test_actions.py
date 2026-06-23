@@ -273,10 +273,10 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertIn("Raw source code is not stored long term", revealed["doc"]["body"])
         self.assertTrue(loads(state["value_json"]))
 
-    def test_private_repo_security_reply_is_scenario_rule_driven(self) -> None:
+    def test_private_repo_security_reply_is_actor_behavior_driven(self) -> None:
         scenario = load_scenario(DEFAULT_SCENARIO_PATH)
-        scenario["coworker_rules"] = []
-        scenario_path = Path(self.tmpdir.name) / "no_coworker_rules.json"
+        scenario["actor_behaviors"] = []
+        scenario_path = Path(self.tmpdir.name) / "no_actor_behaviors.json"
         scenario_path.write_text(json.dumps(scenario))
         reset(self.db_path, scenario_path)
 

@@ -34,6 +34,14 @@ def apply_effects(
             result = _apply_update_project(conn, effect)
         elif effect_type == "update_coworker_state":
             result = _apply_update_coworker_state(conn, effect, now=now)
+        elif effect_type == "update_actor_workload":
+            result = _apply_update_actor_workload(conn, effect, now=now)
+        elif effect_type == "add_actor_commitment":
+            result = _apply_add_actor_commitment(conn, effect, now=now, source=source, index=index)
+        elif effect_type == "update_actor_commitment":
+            result = _apply_update_actor_commitment(conn, effect, now=now)
+        elif effect_type == "update_actor_goal":
+            result = _apply_update_actor_goal(conn, effect)
         elif effect_type == "update_metric":
             result = _apply_update_metric(conn, effect)
         elif effect_type == "add_evaluation_evidence":
@@ -298,6 +306,144 @@ def _apply_update_coworker_state(
         changed.append(key)
 
     return {"person_id": person_id, "keys": sorted(changed)}
+
+
+def _apply_update_actor_workload(
+    conn: sqlite3.Connection,
+    effect: dict[str, Any],
+    *,
+    now: str,
+) -> dict[str, Any]:
+    person_id = _required(effect, "person_id")
+    if conn.execute("SELECT 1 FROM people WHERE id = ?", (person_id,)).fetchone() is None:
+        raise ValueError(f"Cannot update workload for unknown actor: {person_id}")
+
+    row = conn.execute(
+        "SELECT metadata_json FROM actor_workload WHERE person_id = ?",
+        (person_id,),
+    ).fetchone()
+    metadata = loads(row["metadata_json"], {}) if row is not None else {}
+    if isinstance(effect.get("metadata"), dict):
+        metadata = _deep_merge(metadata if isinstance(metadata, dict) else {}, effect["metadata"])
+
+    updates = {
+        key: effect[key]
+        for key in ("current_focus", "capacity_minutes_remaining", "load_level")
+        if key in effect
+    }
+    current_focus = updates.get("current_focus", "")
+    capacity = int(updates.get("capacity_minutes_remaining", 0))
+    load_level = updates.get("load_level", "normal")
+    if row is not None:
+        existing = conn.execute(
+            """
+            SELECT current_focus, capacity_minutes_remaining, load_level
+            FROM actor_workload
+            WHERE person_id = ?
+            """,
+            (person_id,),
+        ).fetchone()
+        current_focus = updates.get("current_focus", existing["current_focus"])
+        capacity = int(updates.get("capacity_minutes_remaining", existing["capacity_minutes_remaining"]))
+        load_level = updates.get("load_level", existing["load_level"])
+
+    conn.execute(
+        """
+        INSERT INTO actor_workload
+          (person_id, current_focus, capacity_minutes_remaining, load_level,
+           updated_at, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(person_id) DO UPDATE SET
+          current_focus = excluded.current_focus,
+          capacity_minutes_remaining = excluded.capacity_minutes_remaining,
+          load_level = excluded.load_level,
+          updated_at = excluded.updated_at,
+          metadata_json = excluded.metadata_json
+        """,
+        (person_id, current_focus, capacity, load_level, now, dumps(metadata)),
+    )
+    return {"person_id": person_id, "updated": sorted(updates)}
+
+
+def _apply_add_actor_commitment(
+    conn: sqlite3.Connection,
+    effect: dict[str, Any],
+    *,
+    now: str,
+    source: str,
+    index: int,
+) -> dict[str, Any]:
+    person_id = _required(effect, "person_id")
+    if conn.execute("SELECT 1 FROM people WHERE id = ?", (person_id,)).fetchone() is None:
+        raise ValueError(f"Cannot add commitment for unknown actor: {person_id}")
+    commitment_id = effect.get("id") or _generated_id(
+        conn, "actor_commitments", f"commitment_{_source_slug(source)}", index
+    )
+    conn.execute(
+        """
+        INSERT INTO actor_commitments
+          (id, person_id, project_id, commitment_type, description, due_at,
+           status, created_at, updated_at, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            commitment_id,
+            person_id,
+            effect.get("project_id"),
+            effect.get("commitment_type", "commitment"),
+            _required(effect, "description"),
+            effect.get("due_at"),
+            effect.get("status", "open"),
+            effect.get("created_at", now),
+            effect.get("updated_at", now),
+            dumps({"source": source, **effect.get("metadata", {})}),
+        ),
+    )
+    return {"id": commitment_id, "person_id": person_id}
+
+
+def _apply_update_actor_commitment(
+    conn: sqlite3.Connection,
+    effect: dict[str, Any],
+    *,
+    now: str,
+) -> dict[str, Any]:
+    commitment_id = _required(effect, "id")
+    updates = []
+    values: list[Any] = []
+    for key in ("status", "due_at", "description", "commitment_type"):
+        if key in effect:
+            updates.append(f"{key} = ?")
+            values.append(effect[key])
+    if not updates:
+        raise ValueError("update_actor_commitment effect must include a mutable field.")
+    updates.append("updated_at = ?")
+    values.append(now)
+    values.append(commitment_id)
+    cursor = conn.execute(
+        f"UPDATE actor_commitments SET {', '.join(updates)} WHERE id = ?",
+        values,
+    )
+    if cursor.rowcount == 0:
+        raise ValueError(f"Cannot update unknown actor commitment: {commitment_id}")
+    return {"id": commitment_id, "updated": sorted(key for key in effect if key not in {"type", "id"})}
+
+
+def _apply_update_actor_goal(conn: sqlite3.Connection, effect: dict[str, Any]) -> dict[str, Any]:
+    goal_id = _required(effect, "id")
+    updates = []
+    values: list[Any] = []
+    for key in ("status", "priority", "description"):
+        if key in effect:
+            updates.append(f"{key} = ?")
+            values.append(effect[key])
+    if not updates:
+        raise ValueError("update_actor_goal effect must include a mutable field.")
+    values.append(goal_id)
+    cursor = conn.execute(f"UPDATE actor_goals SET {', '.join(updates)} WHERE id = ?", values)
+    if cursor.rowcount == 0:
+        raise ValueError(f"Cannot update unknown actor goal: {goal_id}")
+    return {"id": goal_id, "updated": sorted(key for key in effect if key not in {"type", "id"})}
 
 
 def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:

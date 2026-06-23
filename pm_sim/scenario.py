@@ -17,7 +17,7 @@ def load_scenario(path: Path | str) -> dict[str, Any]:
     if not scenario_path.exists():
         raise ScenarioError(f"Scenario file not found: {scenario_path}")
 
-    data = _compile_actor_behaviors(_compile_grading_rules(_load_scenario_data(scenario_path)))
+    data = _compile_grading_rules(_load_scenario_data(scenario_path))
     _validate_scenario(data, scenario_path)
     return data
 
@@ -160,65 +160,6 @@ def copy_json_object(data: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(data))
 
 
-def _compile_actor_behaviors(data: dict[str, Any]) -> dict[str, Any]:
-    compiled = copy_json_object(data)
-    behaviors = [
-        behavior
-        for behavior in compiled.get("actor_behaviors", [])
-        if not (isinstance(behavior, dict) and behavior.get("_compiled_from"))
-    ]
-    behavior_ids = {
-        behavior.get("id")
-        for behavior in behaviors
-        if isinstance(behavior, dict) and isinstance(behavior.get("id"), str)
-    }
-
-    for rule in compiled.get("coworker_rules", []):
-        if not isinstance(rule, dict):
-            continue
-        behavior_id = rule.get("id")
-        if behavior_id in behavior_ids:
-            continue
-        behavior_ids.add(behavior_id)
-        behaviors.append(
-            {
-                "id": behavior_id,
-                "kind": "reply",
-                "person_id": rule.get("person_id"),
-                "channel": rule.get("channel", "chat"),
-                "priority": rule.get("priority", 0),
-                "match": rule.get("match", {}),
-                "when": rule.get("when", []),
-                "reply": rule.get("reply", {}),
-                "effects": rule.get("effects", []),
-                "_compiled_from": "coworker_rules",
-            }
-        )
-
-    for policy in compiled.get("coworker_policies", []):
-        if not isinstance(policy, dict):
-            continue
-        behavior_id = policy.get("id")
-        if behavior_id in behavior_ids:
-            continue
-        behavior_ids.add(behavior_id)
-        behaviors.append(
-            {
-                "id": behavior_id,
-                "kind": "policy",
-                "person_id": policy.get("person_id"),
-                "priority": policy.get("priority", 100),
-                "trigger": policy.get("trigger", {}),
-                "when": policy.get("when", []),
-                "effects": policy.get("effects", []),
-                "_compiled_from": "coworker_policies",
-            }
-        )
-
-    compiled["actor_behaviors"] = behaviors
-    return compiled
-
-
 def _semantic_match_for_grading_action(action: dict[str, Any]) -> dict[str, Any]:
     semantic_match = action.get("semantic_match")
     if isinstance(semantic_match, dict):
@@ -267,6 +208,8 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
     _ids(data, "events")
     _ids(data, "coworker_state")
     _ids(data, "actor_behaviors")
+    _ids(data, "actor_goals")
+    _ids(data, "actor_commitments")
 
     valid_actors = people | {"agent"}
 
@@ -289,6 +232,30 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         _require_string(row, "key", "coworker_state")
         if "value" not in row:
             raise ScenarioError(f"Coworker state {row.get('id')} is missing value.")
+
+    for goal in data.get("actor_goals", []):
+        if goal.get("person_id") not in people:
+            raise ScenarioError(f"Actor goal {goal.get('id')} references unknown person_id: {goal.get('person_id')}")
+        project_id = goal.get("project_id")
+        if project_id and project_id not in projects:
+            raise ScenarioError(f"Actor goal {goal.get('id')} references unknown project_id: {project_id}")
+        _require_string(goal, "description", "actor_goals")
+
+    for row in data.get("actor_workload", []):
+        if row.get("person_id") not in people:
+            raise ScenarioError(f"Actor workload references unknown person_id: {row.get('person_id')}")
+
+    for commitment in data.get("actor_commitments", []):
+        if commitment.get("person_id") not in people:
+            raise ScenarioError(
+                f"Actor commitment {commitment.get('id')} references unknown person_id: {commitment.get('person_id')}"
+            )
+        project_id = commitment.get("project_id")
+        if project_id and project_id not in projects:
+            raise ScenarioError(
+                f"Actor commitment {commitment.get('id')} references unknown project_id: {project_id}"
+            )
+        _require_string(commitment, "description", "actor_commitments")
 
     for fact in data.get("facts", []):
         _validate_owner(fact, "fact", valid_actors)
@@ -368,29 +335,6 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         for person in data.get("people", [])
     }
 
-    for rule in data.get("coworker_rules", []):
-        _validate_coworker_rule(
-            rule,
-            people,
-            docs,
-            facts,
-            projects,
-            blockers,
-            tasks,
-            valid_actors,
-            response_delays,
-        )
-
-    _validate_coworker_policies(
-        data.get("coworker_policies", []),
-        people,
-        docs,
-        facts,
-        projects,
-        blockers,
-        tasks,
-        valid_actors,
-    )
     _validate_actor_behaviors(
         data.get("actor_behaviors", []),
         people,
@@ -471,7 +415,7 @@ def _validate_owner(item: dict[str, Any], label: str, valid_actors: set[str]) ->
         raise ScenarioError(f"{label.title()} {item.get('id')} references unknown owner_id: {owner_id}")
 
 
-def _validate_coworker_rule(
+def _validate_actor_reply_behavior(
     rule: dict[str, Any],
     people: set[str],
     docs: set[str],
@@ -484,41 +428,41 @@ def _validate_coworker_rule(
 ) -> None:
     rule_id = rule.get("id")
     if not isinstance(rule_id, str) or not rule_id:
-        raise ScenarioError("Coworker rule must have a string id.")
+        raise ScenarioError("Actor reply behavior must have a string id.")
     person_id = rule.get("person_id")
     if person_id not in people:
-        raise ScenarioError(f"Coworker rule {rule_id} references unknown person_id: {person_id}")
+        raise ScenarioError(f"Actor behavior {rule_id} references unknown person_id: {person_id}")
     match = rule.get("match", rule)
     if not isinstance(match, dict):
-        raise ScenarioError(f"Coworker rule {rule_id} match must be an object.")
-    _validate_string_list(match.get("terms_any", []), f"Coworker rule {rule_id} terms_any")
-    _validate_string_list(match.get("terms_all", []), f"Coworker rule {rule_id} terms_all")
+        raise ScenarioError(f"Actor behavior {rule_id} match must be an object.")
+    _validate_string_list(match.get("terms_any", []), f"Actor behavior {rule_id} terms_any")
+    _validate_string_list(match.get("terms_all", []), f"Actor behavior {rule_id} terms_all")
     for group in match.get("term_groups_all", []):
-        _validate_string_list(group, f"Coworker rule {rule_id} term group")
+        _validate_string_list(group, f"Actor behavior {rule_id} term group")
     for key in ("required_facts", "required_facts_any", "absent_facts"):
         for fact_id in match.get(key, []):
             if fact_id not in facts:
-                raise ScenarioError(f"Coworker rule {rule_id} references unknown {key} fact: {fact_id}")
+                raise ScenarioError(f"Actor behavior {rule_id} references unknown {key} fact: {fact_id}")
     _validate_conditions(
         rule.get("when", []),
-        label=f"Coworker rule {rule_id}",
+        label=f"Actor behavior {rule_id}",
         facts=facts,
         valid_actors=valid_actors,
     )
 
     reply = rule.get("reply", {})
     if not isinstance(reply.get("body"), str) or not reply["body"].strip():
-        raise ScenarioError(f"Coworker rule {rule_id} reply.body must be a non-empty string.")
+        raise ScenarioError(f"Actor behavior {rule_id} reply.body must be a non-empty string.")
     delay = reply.get("delay_minutes", response_delays.get(person_id))
     if not isinstance(delay, int) or delay <= 0:
         raise ScenarioError(
-            f"Coworker rule {rule_id} must define positive integer reply.delay_minutes "
+            f"Actor behavior {rule_id} must define positive integer reply.delay_minutes "
             f"or use a person with response_delay_minutes."
         )
 
     _validate_effects(
         rule.get("effects", []),
-        label=f"Coworker rule {rule_id}",
+        label=f"Actor behavior {rule_id}",
         docs=docs,
         facts=facts,
         projects=projects,
@@ -565,8 +509,8 @@ def _validate_event_rules(
         )
 
 
-def _validate_coworker_policies(
-    policies: list[dict[str, Any]],
+def _validate_actor_policy_behavior(
+    behavior: dict[str, Any],
     people: set[str],
     docs: set[str],
     facts: set[str],
@@ -575,53 +519,43 @@ def _validate_coworker_policies(
     tasks: set[str],
     valid_actors: set[str],
 ) -> None:
-    if not isinstance(policies, list):
-        raise ScenarioError("coworker_policies must be a list.")
-    seen = set()
-    for policy in policies:
-        policy_id = policy.get("id")
-        if not isinstance(policy_id, str) or not policy_id:
-            raise ScenarioError("Coworker policy must have a string id.")
-        if policy_id in seen:
-            raise ScenarioError(f"Coworker policies have duplicate id: {policy_id}")
-        seen.add(policy_id)
-
-        person_id = policy.get("person_id")
-        if person_id not in people:
-            raise ScenarioError(
-                f"Coworker policy {policy_id} references unknown person_id: {person_id}"
-            )
-
-        trigger = policy.get("trigger")
-        if not isinstance(trigger, dict):
-            raise ScenarioError(f"Coworker policy {policy_id} trigger must be an object.")
-        trigger_at = trigger.get("at") or trigger.get("at_or_after")
-        if not isinstance(trigger_at, str) or not trigger_at:
-            raise ScenarioError(
-                f"Coworker policy {policy_id} trigger must include at or at_or_after."
-            )
-        _parse_datetime(trigger_at, f"Coworker policy {policy_id} trigger")
-
-        _validate_conditions(
-            policy.get("when", []),
-            label=f"Coworker policy {policy_id}",
-            facts=facts,
-            valid_actors=valid_actors,
+    behavior_id = behavior["id"]
+    person_id = behavior.get("person_id")
+    if person_id not in people:
+        raise ScenarioError(
+            f"Actor behavior {behavior_id} references unknown person_id: {person_id}"
         )
 
-        effects = policy.get("effects", [])
-        if not isinstance(effects, list) or not effects:
-            raise ScenarioError(f"Coworker policy {policy_id} effects must be a non-empty list.")
-        _validate_effects(
-            effects,
-            label=f"Coworker policy {policy_id}",
-            docs=docs,
-            facts=facts,
-            projects=projects,
-            blockers=blockers,
-            tasks=tasks,
-            valid_actors=valid_actors,
+    trigger = behavior.get("trigger")
+    if not isinstance(trigger, dict):
+        raise ScenarioError(f"Actor behavior {behavior_id} trigger must be an object.")
+    trigger_at = trigger.get("at") or trigger.get("at_or_after")
+    if not isinstance(trigger_at, str) or not trigger_at:
+        raise ScenarioError(
+            f"Actor behavior {behavior_id} trigger must include at or at_or_after."
         )
+    _parse_datetime(trigger_at, f"Actor behavior {behavior_id} trigger")
+
+    _validate_conditions(
+        behavior.get("when", []),
+        label=f"Actor behavior {behavior_id}",
+        facts=facts,
+        valid_actors=valid_actors,
+    )
+
+    effects = behavior.get("effects", [])
+    if not isinstance(effects, list) or not effects:
+        raise ScenarioError(f"Actor behavior {behavior_id} effects must be a non-empty list.")
+    _validate_effects(
+        effects,
+        label=f"Actor behavior {behavior_id}",
+        docs=docs,
+        facts=facts,
+        projects=projects,
+        blockers=blockers,
+        tasks=tasks,
+        valid_actors=valid_actors,
+    )
 
 
 def _validate_actor_behaviors(
@@ -648,7 +582,7 @@ def _validate_actor_behaviors(
 
         kind = behavior.get("kind")
         if kind == "reply":
-            _validate_coworker_rule(
+            _validate_actor_reply_behavior(
                 behavior,
                 people,
                 docs,
@@ -661,8 +595,8 @@ def _validate_actor_behaviors(
             )
             continue
         if kind == "policy":
-            _validate_coworker_policies(
-                [behavior],
+            _validate_actor_policy_behavior(
+                behavior,
                 people,
                 docs,
                 facts,
@@ -841,8 +775,6 @@ def _validate_scored_evidence_is_state_derived(data: dict[str, Any]) -> None:
     for section in (
         "actor_behaviors",
         "event_rules",
-        "coworker_rules",
-        "coworker_policies",
         "meeting_rules",
         "action_rules",
         "task_gate_rules",
@@ -999,6 +931,27 @@ def _validate_effects(
                     raise ScenarioError(f"{label} has invalid update_coworker_state key.")
             elif not isinstance(values, dict) or not values:
                 raise ScenarioError(f"{label} has invalid update_coworker_state values.")
+        if effect_type == "update_actor_workload":
+            person_id = effect.get("person_id")
+            if person_id not in valid_actors or person_id == "agent":
+                raise ScenarioError(f"{label} references unknown actor workload person_id: {person_id}")
+        if effect_type == "add_actor_commitment":
+            person_id = effect.get("person_id")
+            if person_id not in valid_actors or person_id == "agent":
+                raise ScenarioError(f"{label} references unknown actor commitment person_id: {person_id}")
+            project_id = effect.get("project_id")
+            if project_id and project_id not in projects:
+                raise ScenarioError(f"{label} references unknown actor commitment project_id: {project_id}")
+            if not isinstance(effect.get("description"), str) or not effect["description"]:
+                raise ScenarioError(f"{label} has invalid actor commitment description.")
+        if effect_type == "update_actor_commitment":
+            commitment_id = effect.get("id")
+            if not isinstance(commitment_id, str) or not commitment_id:
+                raise ScenarioError(f"{label} has invalid actor commitment id.")
+        if effect_type == "update_actor_goal":
+            goal_id = effect.get("id")
+            if not isinstance(goal_id, str) or not goal_id:
+                raise ScenarioError(f"{label} has invalid actor goal id.")
         if effect_type == "update_blocker" and effect.get("blocker_id") not in blockers:
             raise ScenarioError(
                 f"{label} references unknown update_blocker blocker_id: {effect.get('blocker_id')}"

@@ -259,6 +259,16 @@
           "project_id": "project_audit_log_export",
           "risk_level": "medium",
           "audit_export_status": "needs_scope"
+        },
+        {
+          "type": "add_actor_commitment",
+          "id": "commitment_daisy_koopa_scoped_answer",
+          "person_id": "daisy",
+          "project_id": "project_audit_log_export",
+          "commitment_type": "customer_update",
+          "description": "Send Koopa Bank a scoped audit-log export answer through Daisy.",
+          "due_at": "2026-06-25T12:00:00",
+          "status": "open"
         }
       ]
     },
@@ -298,9 +308,10 @@
       ]
     }
   ],
-  "coworker_policies": [
+  "actor_behaviors": [
     {
       "id": "peach_autonomous_onboarding_risk_nudge",
+      "kind": "policy",
       "person_id": "peach",
       "priority": 40,
       "trigger": {
@@ -349,6 +360,7 @@
     },
     {
       "id": "daisy_autonomous_customer_wording_nudge",
+      "kind": "policy",
       "person_id": "daisy",
       "priority": 45,
       "trigger": {
@@ -390,6 +402,15 @@
           "value": true
         },
         {
+          "type": "update_actor_workload",
+          "person_id": "daisy",
+          "current_focus": "recover Nimbus wording before customer update",
+          "load_level": "high",
+          "metadata": {
+            "pressure_reason": "customer wording missing near Thursday update threshold"
+          }
+        },
+        {
           "type": "update_project",
           "project_id": "project_pr_review_agent",
           "stakeholder_pressure_delta": 1,
@@ -401,15 +422,15 @@
           }
         }
       ]
-    }
-  ],
-  "coworker_rules": [
+    },
     {
       "id": "luigi_email_acknowledgement",
+      "kind": "reply",
       "person_id": "luigi",
       "channel": "email",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "subject": "Re: received",
         "body": "Received. If you need a technical decision, chat is faster; I will respond here when I have source-of-truth detail."
@@ -418,10 +439,12 @@
     },
     {
       "id": "toad_email_acknowledgement",
+      "kind": "reply",
       "person_id": "toad",
       "channel": "email",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "subject": "Re: received",
         "body": "Received. For approvals, make sure the risk, customer impact, and recommended scope are explicit."
@@ -430,10 +453,12 @@
     },
     {
       "id": "daisy_email_acknowledgement",
+      "kind": "reply",
       "person_id": "daisy",
       "channel": "email",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "subject": "Re: received",
         "body": "Received. I will use email as the source of truth for customer-ready wording."
@@ -442,10 +467,12 @@
     },
     {
       "id": "peach_email_acknowledgement",
+      "kind": "reply",
       "person_id": "peach",
       "channel": "email",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "subject": "Re: received",
         "body": "Received. I still need launch scope to be explicit before I treat onboarding as unblocked."
@@ -454,6 +481,7 @@
     },
     {
       "id": "luigi_audit_export_feasibility",
+      "kind": "reply",
       "person_id": "luigi",
       "channel": "chat",
       "priority": 130,
@@ -470,6 +498,7 @@
           "security review"
         ]
       },
+      "when": [],
       "reply": {
         "delay_minutes": 120,
         "body": "For Koopa, a one-time CSV export of admin audit logs is feasible for the security review. A full self-serve export is a bigger feature and should be follow-up after the PR Review Agent launch."
@@ -495,6 +524,7 @@
     },
     {
       "id": "toad_aligns_koopa_audit_scope",
+      "kind": "reply",
       "person_id": "toad",
       "channel": "chat",
       "priority": 110,
@@ -513,6 +543,7 @@
           "scope"
         ]
       },
+      "when": [],
       "reply": {
         "delay_minutes": 90,
         "body": "Scope Koopa to a one-time CSV for Thursday's security review. Do not commit the team to full self-serve export this week; keep that as follow-up so Nimbus launch readiness stays protected."
@@ -549,6 +580,7 @@
     },
     {
       "id": "luigi_private_repo_security_doc",
+      "kind": "reply",
       "person_id": "luigi",
       "channel": "chat",
       "priority": 120,
@@ -567,6 +599,7 @@
           "permissions"
         ]
       },
+      "when": [],
       "reply": {
         "delay_minutes": 120,
         "body": "Use the private repo security baseline doc before answering Daisy. Short version: we process source snippets transiently for review generation, do not store raw source long term, and retain generated draft suggestions plus metadata for the beta audit window."
@@ -586,18 +619,10 @@
     },
     {
       "id": "luigi_repeat_repo_sync_risk",
+      "kind": "reply",
       "person_id": "luigi",
       "channel": "chat",
       "priority": 110,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "luigi",
-            "key": "risk_surfaced",
-            "equals": true
-          }
-        }
-      ],
       "match": {
         "required_facts": [
           "fact_repo_sync_stale"
@@ -620,6 +645,15 @@
           "auto-commenting"
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "luigi",
+            "key": "risk_surfaced",
+            "equals": true
+          }
+        }
+      ],
       "reply": {
         "delay_minutes": 120,
         "body": "Same repo sync risk as before: the review context pipeline is solid, but webhook ordering can still make the agent review a stale commit. I still recommend draft mode unless Toad accepts the auto-commenting risk."
@@ -628,18 +662,10 @@
     },
     {
       "id": "luigi_reveals_repo_sync_risk",
+      "kind": "reply",
       "person_id": "luigi",
       "channel": "chat",
       "priority": 100,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "luigi",
-            "key": "risk_surfaced",
-            "equals": false
-          }
-        }
-      ],
       "match": {
         "absent_facts": [
           "fact_repo_sync_stale"
@@ -662,6 +688,15 @@
           "auto-commenting"
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "luigi",
+            "key": "risk_surfaced",
+            "equals": false
+          }
+        }
+      ],
       "reply": {
         "delay_minutes": 120,
         "body": "The risky part is repo sync. The review context pipeline is solid, but webhook events can arrive out of order, so the agent may review a stale commit on Friday. I can keep hardening the worker, but I recommend draft mode unless Toad accepts the auto-commenting risk."
@@ -702,10 +737,12 @@
     },
     {
       "id": "luigi_default_status",
+      "kind": "reply",
       "person_id": "luigi",
       "channel": "chat",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "delay_minutes": 120,
         "body": "I am working on repo sync hardening. If you need launch confidence, ask me specifically about stale-code or auto-commenting risk."
@@ -714,6 +751,7 @@
     },
     {
       "id": "mario_accepts_draft_if_risk_known",
+      "kind": "reply",
       "person_id": "mario",
       "channel": "chat",
       "priority": 100,
@@ -722,6 +760,7 @@
           "fact_repo_sync_stale"
         ]
       },
+      "when": [],
       "reply": {
         "delay_minutes": 60,
         "body": "Auto-commenting is still the strongest product story, but I do not want a Friday demo failure. If Luigi's stale-code risk is real, align Daisy and Toad on draft mode and keep auto-commenting as a follow-up."
@@ -747,6 +786,7 @@
     },
     {
       "id": "mario_accepts_draft_if_risk_message_is_concrete",
+      "kind": "reply",
       "person_id": "mario",
       "channel": "chat",
       "priority": 90,
@@ -762,6 +802,7 @@
           "commit"
         ]
       },
+      "when": [],
       "reply": {
         "delay_minutes": 60,
         "body": "Auto-commenting is still the strongest product story, but I do not want a Friday demo failure. If Luigi's stale-code risk is real, align Daisy and Toad on draft mode and keep auto-commenting as a follow-up."
@@ -787,10 +828,12 @@
     },
     {
       "id": "mario_default_auto_comment_push",
+      "kind": "reply",
       "person_id": "mario",
       "channel": "chat",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "delay_minutes": 60,
         "body": "Please push for the auto-commenting beta. Nimbus needs to see the agent comment on pull requests if we can possibly ship it."
@@ -815,18 +858,10 @@
     },
     {
       "id": "daisy_already_has_customer_update",
+      "kind": "reply",
       "person_id": "daisy",
       "channel": "chat",
       "priority": 120,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "daisy",
-            "key": "customer_update_received",
-            "equals": true
-          }
-        }
-      ],
       "match": {
         "terms_any": [
           "nimbus",
@@ -838,6 +873,15 @@
           "confidence"
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "customer_update_received",
+            "equals": true
+          }
+        }
+      ],
       "reply": {
         "delay_minutes": 45,
         "body": "I have the Nimbus update. Unless the launch mode, security wording, or Koopa scope changes, I do not need another chat; send any final customer-ready wording by email."
@@ -846,18 +890,10 @@
     },
     {
       "id": "daisy_aligns_on_customer_safe_draft_mode",
+      "kind": "reply",
       "person_id": "daisy",
       "channel": "chat",
       "priority": 100,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "daisy",
-            "key": "reliability_preference_shared",
-            "equals": false
-          }
-        }
-      ],
       "match": {
         "term_groups_all": [
           [
@@ -885,6 +921,15 @@
           ]
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "daisy",
+            "key": "reliability_preference_shared",
+            "equals": false
+          }
+        }
+      ],
       "reply": {
         "delay_minutes": 45,
         "body": "For Nimbus, reliability matters more than auto-posting comments. I can message draft mode as a safer beta if you give me clear language by Thursday morning."
@@ -915,6 +960,7 @@
     },
     {
       "id": "daisy_asks_for_customer_safe_wording",
+      "kind": "reply",
       "person_id": "daisy",
       "channel": "chat",
       "priority": 50,
@@ -937,6 +983,7 @@
           "human approval"
         ]
       },
+      "when": [],
       "reply": {
         "delay_minutes": 45,
         "body": "I understand there is launch risk, but I still need customer-safe wording: what Nimbus will see Friday, whether comments post automatically, and what limitation remains."
@@ -945,10 +992,12 @@
     },
     {
       "id": "daisy_default_confidence_request",
+      "kind": "reply",
       "person_id": "daisy",
       "channel": "chat",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "delay_minutes": 45,
         "body": "Nimbus expects the beta on Friday. I need to know what we can confidently show them and what language I should use with their team."
@@ -957,18 +1006,10 @@
     },
     {
       "id": "peach_already_unblocked",
+      "kind": "reply",
       "person_id": "peach",
       "channel": "chat",
       "priority": 120,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "peach",
-            "key": "scope_unblocked",
-            "equals": true
-          }
-        }
-      ],
       "match": {
         "terms_any": [
           "onboarding",
@@ -978,6 +1019,15 @@
           "auto-commenting"
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "peach",
+            "key": "scope_unblocked",
+            "equals": true
+          }
+        }
+      ],
       "reply": {
         "delay_minutes": 90,
         "body": "I am already unblocked on onboarding and am using the draft-mode scope: human approval before posting, with auto-commenting left out of Friday."
@@ -986,18 +1036,10 @@
     },
     {
       "id": "peach_unblocks_draft_mode_docs",
+      "kind": "reply",
       "person_id": "peach",
       "channel": "chat",
       "priority": 100,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "peach",
-            "key": "scope_unblocked",
-            "equals": false
-          }
-        }
-      ],
       "match": {
         "required_facts_any": [
           "fact_nimbus_values_reliability",
@@ -1029,6 +1071,15 @@
           ]
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "peach",
+            "key": "scope_unblocked",
+            "equals": false
+          }
+        }
+      ],
       "reply": {
         "delay_minutes": 90,
         "body": "That unblocks the onboarding work. I will finalize the draft-mode flow with human approval before comments are posted and a clear note that auto-commenting is follow-up."
@@ -1069,10 +1120,12 @@
     },
     {
       "id": "peach_default_scope_blocked",
+      "kind": "reply",
       "person_id": "peach",
       "channel": "chat",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "delay_minutes": 90,
         "body": "I am still blocked on onboarding. I need the Friday launch mode, human-approval requirement, and auto-commenting limitation made explicit before I can finish the draft-mode flow."
@@ -1087,18 +1140,10 @@
     },
     {
       "id": "toad_already_approved_draft_mode",
+      "kind": "reply",
       "person_id": "toad",
       "channel": "chat",
       "priority": 120,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "toad",
-            "key": "approval_recorded",
-            "equals": true
-          }
-        }
-      ],
       "match": {
         "term_groups_all": [
           [
@@ -1116,6 +1161,15 @@
           ]
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "toad",
+            "key": "approval_recorded",
+            "equals": true
+          }
+        }
+      ],
       "reply": {
         "delay_minutes": 90,
         "body": "The approval is already recorded: Friday is draft mode with human approval, and auto-commenting stays follow-up. Use the decision record as the source of truth."
@@ -1124,18 +1178,10 @@
     },
     {
       "id": "toad_approves_friday_draft_mode",
+      "kind": "reply",
       "person_id": "toad",
       "channel": "chat",
       "priority": 100,
-      "when": [
-        {
-          "coworker_state": {
-            "person_id": "toad",
-            "key": "approval_recorded",
-            "equals": false
-          }
-        }
-      ],
       "match": {
         "required_facts": [
           "fact_repo_sync_stale",
@@ -1167,6 +1213,15 @@
           ]
         ]
       },
+      "when": [
+        {
+          "coworker_state": {
+            "person_id": "toad",
+            "key": "approval_recorded",
+            "equals": false
+          }
+        }
+      ],
       "reply": {
         "delay_minutes": 90,
         "body": "Approved to de-scope auto-commenting for Friday. Ship draft mode with human approval, keep Luigi on repo sync hardening, and update the Friday Launch Decision Record with auto-commenting as the follow-up."
@@ -1206,10 +1261,12 @@
     },
     {
       "id": "toad_default_needs_evidence",
+      "kind": "reply",
       "person_id": "toad",
       "channel": "chat",
       "priority": 0,
       "match": {},
+      "when": [],
       "reply": {
         "delay_minutes": 90,
         "body": "I need the concrete launch risk, customer impact, and safer Friday scope before approving any de-scope. Bring me Luigi's blocker and Daisy's customer-facing constraint."

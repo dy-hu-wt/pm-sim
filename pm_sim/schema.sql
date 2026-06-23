@@ -27,6 +27,44 @@ CREATE TABLE IF NOT EXISTS coworker_state (
 CREATE INDEX IF NOT EXISTS idx_coworker_state_person
   ON coworker_state(person_id, key);
 
+CREATE TABLE IF NOT EXISTS actor_goals (
+  id TEXT PRIMARY KEY,
+  person_id TEXT NOT NULL REFERENCES people(id),
+  project_id TEXT REFERENCES projects(id),
+  description TEXT NOT NULL,
+  priority INTEGER NOT NULL DEFAULT 50,
+  status TEXT NOT NULL DEFAULT 'active',
+  metadata_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_actor_goals_person
+  ON actor_goals(person_id, status, priority);
+
+CREATE TABLE IF NOT EXISTS actor_workload (
+  person_id TEXT PRIMARY KEY REFERENCES people(id),
+  current_focus TEXT NOT NULL DEFAULT '',
+  capacity_minutes_remaining INTEGER NOT NULL DEFAULT 0,
+  load_level TEXT NOT NULL DEFAULT 'normal',
+  updated_at TEXT NOT NULL,
+  metadata_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS actor_commitments (
+  id TEXT PRIMARY KEY,
+  person_id TEXT NOT NULL REFERENCES people(id),
+  project_id TEXT REFERENCES projects(id),
+  commitment_type TEXT NOT NULL,
+  description TEXT NOT NULL,
+  due_at TEXT,
+  status TEXT NOT NULL DEFAULT 'open',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  metadata_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_actor_commitments_person
+  ON actor_commitments(person_id, status, due_at);
+
 CREATE TABLE IF NOT EXISTS projects (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

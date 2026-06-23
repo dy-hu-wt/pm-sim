@@ -177,7 +177,7 @@ Asynchronous examples:
 - a blocker gets worse if ignored
 - a stakeholder escalates after missed communication
 
-When time advances, the engine processes all due events and due autonomous coworker policies in deterministic order. Events and policies can mutate state and schedule more events.
+When time advances, the engine processes all due events and due autonomous actor policies in deterministic order. Events and policies can mutate state and schedule more events.
 
 The system should record:
 
@@ -283,23 +283,23 @@ Scenario data should define most of the setup:
 - background event rules
 - meeting rules
 - outcome rules
-- autonomous coworker policies
+- actor behaviors
 
-Python owns reusable interpreters and mutation semantics, while scenario-specific scoring, outcomes, autonomous coworker policies, proactive events, action-derived effects, and meeting semantics should be data-authored. The current implementation uses a small reusable condition language for task gates, action rules, state-derived evidence rows, harmful-action rules, autonomous coworker policies, background event rules, meeting rules, and outcome classification. Action rules use deterministic causal conditions plus local `semantic_match` criteria rather than a global keyword-claim registry.
+Python owns reusable interpreters and mutation semantics, while scenario-specific scoring, outcomes, actor behaviors, proactive events, action-derived effects, and meeting semantics should be data-authored. The current implementation uses a small reusable condition language for task gates, action rules, state-derived evidence rows, harmful-action rules, actor behaviors, background event rules, meeting rules, and outcome classification. Action rules use deterministic causal conditions plus local `semantic_match` criteria rather than a global keyword-claim registry.
 
 The defensible split is:
 
 ```text
 Reusable engine:
   storage, tool actions, event delivery, timelines, effect application,
-  condition evaluation, coworker rule matching, action logs, task gates,
-  state-derived evidence, coworker state, autonomous policy delivery,
+  condition evaluation, actor behavior matching, action logs, task gates,
+  state-derived evidence, coworker state, autonomous actor policy delivery,
   harm checks, background event rules, outcome rules, and evaluator scoring
 
 Scenario-specific v1 data:
-  people, coworker state, facts, docs, tasks, blockers, events, coworker rules,
-  coworker policies, task gates, state evidence rules, harm rules, background
-  event rules, and outcome rules
+  people, coworker state, facts, docs, tasks, blockers, events, actor behaviors,
+  task gates, state evidence rules, harm rules, background event rules, and
+  outcome rules
 
 Remaining boundary:
   two scenarios now use the same engine surface. The next scaling step is

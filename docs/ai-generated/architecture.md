@@ -4,7 +4,7 @@ This generated note is kept in `docs/ai-generated/` as reviewer-facing scaffoldi
 
 ## Core Shape
 
-`pm-sim` is a single-node simulation backend. A scenario manifest includes `world.json`, `interactions.json`, and `evaluation.json`; SQLite stores the mutable state, CLI commands expose the tools, scheduled events advance background activity, deterministic coworker rules emit effects, and the evaluator scores the resulting state.
+`pm-sim` is a single-node simulation backend. A scenario manifest includes `world.json`, `interactions.json`, and `evaluation.json`; SQLite stores the mutable state, CLI commands expose the tools, scheduled events advance background activity, deterministic actor behaviors emit effects, and the evaluator scores the resulting state.
 
 The main backend flow is:
 
@@ -93,7 +93,7 @@ The current implementation keeps direct coworker behavior, chat/email/doc-derive
 
 ## Effects
 
-Effects are small mutation commands emitted by actions, coworker rules, and event handlers. Examples:
+Effects are small mutation commands emitted by actions, actor behaviors, and event handlers. Examples:
 
 ```text
 create_message
@@ -173,7 +173,7 @@ The engine should stay scenario-agnostic where possible. A new scenario should m
 - initial messages
 - scheduled events
 - evaluation targets
-- coworker rules
+- actor behaviors
 - background event rules
 - state evidence rules
 - task gate rules
@@ -181,8 +181,8 @@ The engine should stay scenario-agnostic where possible. A new scenario should m
 - outcome rules
 - optional agent policies
 
-Direct coworker chat, action-derived chat/email/doc effects, background events, and meetings use structured rule interpreters. Rules can match on trigger terms, term groups, required facts, absent facts, attendees, action context, causal conditions, semantic criteria, and priority. The rule then emits fixed text where needed plus deterministic effects. Semantic criteria are evaluated after deterministic gates and can run through either the offline matcher or a cached fail-closed lightweight model judge. For example, Luigi's security-doc reveal, Toad's draft-mode approval, Daisy readiness scoring, and meeting transcripts are authored in scenario JSON instead of Python branches.
+Direct coworker chat, action-derived chat/email/doc effects, background events, and meetings use structured interpreters. Actor behaviors and rules can match on trigger terms, term groups, required facts, absent facts, attendees, action context, causal conditions, semantic criteria, and priority. They then emit fixed text where needed plus deterministic effects. Semantic criteria are evaluated after deterministic gates and can run through either the offline matcher or a cached fail-closed lightweight model judge. For example, Luigi's security-doc reveal, Toad's draft-mode approval, Daisy readiness scoring, and meeting transcripts are authored in scenario JSON instead of Python branches.
 
 This is the main answer to the scaling concern: scenario files should describe the world, while engine code should define common simulation semantics.
 
-The common engine pieces are storage, tool actions, event delivery, timelines, effect application, condition evaluation, coworker state, coworker rule matching, action rules, background event rules, meeting rules, action logs, task gates, state-derived evidence, harm checks, outcome rules, and evaluator component scoring. A second scenario should primarily add new data files instead of adding custom Python branches for every project.
+The common engine pieces are storage, tool actions, event delivery, timelines, effect application, condition evaluation, coworker state, actor behavior matching, action rules, background event rules, meeting rules, action logs, task gates, state-derived evidence, harm checks, outcome rules, and evaluator component scoring. A second scenario should primarily add new data files instead of adding custom Python branches for every project.

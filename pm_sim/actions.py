@@ -11,8 +11,9 @@ from .effects import apply_effects
 from .conditions import all_conditions_match
 from .jsonutil import dumps, loads
 from .paths import DEFAULT_DB_PATH
+from .runtime_config import action_rules, actor_behaviors, response_delays, task_gate_rules
 from .semantic_match import semantic_match
-from .state import AGENT_ID, get_current_time, get_state_value, log_action
+from .state import AGENT_ID, get_current_time, log_action
 from .time import consume_action_time
 
 COMPLETED_STATUSES = {"complete", "completed", "done", "resolved"}
@@ -415,8 +416,7 @@ def _validate_task_update(conn: sqlite3.Connection, task_id: str, new_status: st
 
 
 def _task_gate_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    rules = loads(get_state_value(conn, "task_gate_rules_json") or "[]", [])
-    return rules if isinstance(rules, list) else []
+    return task_gate_rules(conn)
 
 
 def _is_completion_status(status: str | None) -> bool:
@@ -618,8 +618,7 @@ def _action_rule_match_result(
 
 
 def _action_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    rules = loads(get_state_value(conn, "action_rules_json") or "[]", [])
-    return sorted(rules, key=lambda rule: int(rule.get("priority", 0)), reverse=True)
+    return action_rules(conn)
 
 
 def _schedule_meeting_occurs(
@@ -668,14 +667,10 @@ def _behavior_state(conn: sqlite3.Connection) -> dict[str, Any]:
         WHERE visible_at IS NOT NULL
         """
     ).fetchall()
-    rules = loads(get_state_value(conn, "coworker_rules_json") or "[]", [])
-    actor_behaviors = loads(get_state_value(conn, "actor_behaviors_json") or "[]", [])
-    response_delays = loads(get_state_value(conn, "response_delays_json") or "{}", {})
     return {
         "discovered_facts": [row["id"] for row in facts],
-        "coworker_rules": rules,
-        "actor_behaviors": actor_behaviors,
-        "response_delays": response_delays,
+        "actor_behaviors": actor_behaviors(conn),
+        "response_delays": response_delays(conn),
     }
 
 

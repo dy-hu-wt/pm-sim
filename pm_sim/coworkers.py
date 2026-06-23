@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .conditions import all_conditions_match
-from .jsonutil import loads
+from .runtime_config import event_rules
 
 
 Effect = dict[str, Any]
@@ -103,13 +103,13 @@ def _structured_replies_for_channel(
 
 def _reply_behaviors(state: dict[str, Any]) -> list[dict[str, Any]]:
     actor_behaviors = state.get("actor_behaviors")
-    if isinstance(actor_behaviors, list) and actor_behaviors:
+    if isinstance(actor_behaviors, list):
         return [
             behavior
             for behavior in actor_behaviors
             if isinstance(behavior, dict) and behavior.get("kind") == "reply"
         ]
-    return state.get("coworker_rules", [])
+    return []
 
 
 def _reply_delay_minutes(person_id: str, reply: dict[str, Any], state: dict[str, Any]) -> int:
@@ -199,8 +199,7 @@ def effects_for_event(
 
 
 def _event_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    row = conn.execute("SELECT value FROM sim_state WHERE key = 'event_rules_json'").fetchone()
-    return loads(row["value"], []) if row is not None else []
+    return event_rules(conn)
 
 
 def effects_for_meeting(payload: dict[str, Any], state: dict[str, Any] | None = None) -> list[Effect]:
