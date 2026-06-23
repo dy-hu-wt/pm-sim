@@ -312,7 +312,7 @@ def _compose_selected_reply(
 
 
 def _coworker_mode() -> str:
-    mode = os.environ.get("PM_SIM_COWORKER_MODE", "deterministic").strip().lower()
+    mode = os.environ.get("PM_SIM_COWORKER_MODE", "llm").strip().lower()
     return "llm" if mode == "llm" else "deterministic"
 
 

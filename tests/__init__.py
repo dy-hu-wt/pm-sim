@@ -5,6 +5,7 @@ import re
 
 
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
+os.environ.setdefault("PM_SIM_COWORKER_MODE", "deterministic")
 
 
 def _install_fake_concept_matcher() -> None:

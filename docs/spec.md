@@ -121,7 +121,7 @@ The runtime uses two generic interpreters:
 
 That keeps scenario-specific logic in YAML instead of Python branches. The same effect system handles direct actions, coworker replies, proactive policies, scheduled events, and meetings.
 
-Coworker replies are generated as structured candidates first. Each candidate has authored conditions, fallback text, and effects. By default the runtime selects candidates deterministically. With `PM_SIM_COWORKER_MODE=llm`, a model may choose and rephrase only from the allowed candidate IDs. The engine validates the selected IDs and applies only the selected candidates' authored effects; model text cannot create facts, resolve blockers, complete tasks, or award score.
+Coworker replies are generated as structured candidates first. Each candidate has authored conditions, fallback text, and effects. By default the runtime uses `PM_SIM_COWORKER_MODE=llm`, where a model may choose and rephrase only from the allowed candidate IDs. Set `PM_SIM_COWORKER_MODE=deterministic` for fully local/offline replay. The engine validates the selected IDs and applies only the selected candidates' authored effects; model text cannot create facts, resolve blockers, complete tasks, or award score.
 
 ## Evaluation
 
