@@ -22,11 +22,11 @@ action_behaviors:
     task_id: write_move_plan
     status: complete
   - type: update_coworker_state
-    person_id: nora
+    person_id: alice
     key: move_note_received
     value: true
   - type: update_coworker_state
-    person_id: felix
+    person_id: bob
     key: move_note_received
     value: true
   match:
@@ -50,11 +50,11 @@ action_behaviors:
       - old inbox stays read-only for one week
       - old inbox remains available as backup for one week
       must_be_asserted: true
-    - id: nora_and_felix_named
-      description: Nora and Felix are both named as aligned owners.
+    - id: alice_and_bob_named
+      description: Alice and Bob are both named as aligned owners.
       exemplars:
-      - Nora and Felix are aligned
-      - Nora owns saved replies and Felix owns VIP routing
+      - Alice and Bob are aligned
+      - Alice owns saved replies and Bob owns VIP routing
       must_be_asserted: true
     forbidden_concepts:
     - id: old_inbox_closed_immediately

@@ -1,40 +1,40 @@
 policy_behaviors:
-- id: nora_autonomous_saved_reply_nudge
-  person_id: nora
+- id: alice_autonomous_saved_reply_nudge
+  person_id: alice
   priority: 40
   trigger:
     at: '2026-06-25T09:30:00'
   when:
   - not:
       coworker_state:
-        person_id: nora
+        person_id: alice
         key: support_update_ready
         equals: true
   effects:
   - type: create_message
     channel: chat
-    sender_id: nora
+    sender_id: alice
     recipient_id: agent
     body: 'I still need the support-team wording for Thursday: which saved replies moved, and whether the old inbox stays available as backup.'
   - type: increase_pressure
     pressure_id: saved_replies_pressure
     by: 2
     reason: Support still does not have written saved-reply instructions Thursday morning.
-- id: felix_autonomous_routing_nudge
-  person_id: felix
+- id: bob_autonomous_routing_nudge
+  person_id: bob
   priority: 40
   trigger:
     at: '2026-06-25T10:00:00'
   when:
   - not:
       coworker_state:
-        person_id: felix
+        person_id: bob
         key: routing_update_ready
         equals: true
   effects:
   - type: create_message
     channel: email
-    sender_id: felix
+    sender_id: bob
     recipient_id: agent
     subject: VIP routing still needs written plan
     body: I still need the final routing note. The VIP forwarding allowlist should be tested before we call the new help desk ready.

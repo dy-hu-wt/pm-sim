@@ -1,8 +1,8 @@
 meeting_behaviors:
 - id: inbox_move_checkin
   required_attendees:
-  - nora
-  - felix
+  - alice
+  - bob
   topic_match:
     mode: deterministic
     intents:
@@ -17,8 +17,8 @@ meeting_behaviors:
     require_all:
     - inbox_move_signal
   transcript_lines:
-  - Nora confirmed the top 12 saved replies must move before Thursday.
-  - Felix confirmed VIP aliases need a tested forwarding allowlist.
+  - Alice confirmed the top 12 saved replies must move before Thursday.
+  - Bob confirmed VIP aliases need a tested forwarding allowlist.
   - The PM agreed to write the move plan and send both owners the final wording.
   effects:
   - type: discover_fact
@@ -46,18 +46,18 @@ meeting_behaviors:
     task_id: test_vip_routing
     status: in_progress
   - type: update_coworker_state
-    person_id: nora
+    person_id: alice
     key: saved_reply_risk_shared
     value: true
   - type: update_coworker_state
-    person_id: nora
+    person_id: alice
     key: saved_reply_plan_confirmed
     value: true
   - type: update_coworker_state
-    person_id: felix
+    person_id: bob
     key: vip_routing_risk_shared
     value: true
   - type: update_coworker_state
-    person_id: felix
+    person_id: bob
     key: vip_routing_plan_confirmed
     value: true

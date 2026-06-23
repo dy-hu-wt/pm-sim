@@ -1,6 +1,6 @@
 reply_behaviors:
-  nora:
-  - id: nora_reveals_saved_reply_gap
+  alice:
+  - id: alice_reveals_saved_reply_gap
     channel: chat
     priority: 100
     match:
@@ -23,7 +23,7 @@ reply_behaviors:
       mode: deterministic
     when:
     - coworker_state:
-        person_id: nora
+        person_id: alice
         key: saved_reply_risk_shared
         equals: false
     reply:
@@ -32,10 +32,10 @@ reply_behaviors:
     effects:
     - type: discover_fact
       fact_id: saved_replies_missing
-      source: nora_chat_reply
+      source: alice_chat_reply
     - type: discover_fact
       fact_id: top_saved_replies_can_move
-      source: nora_chat_reply
+      source: alice_chat_reply
     - type: reveal_doc
       doc_id: old_inbox_notes
     - type: update_blocker
@@ -45,14 +45,14 @@ reply_behaviors:
       task_id: move_saved_replies
       status: in_progress
     - type: update_coworker_state
-      person_id: nora
+      person_id: alice
       key: saved_reply_risk_shared
       value: true
     - type: update_coworker_state
-      person_id: nora
+      person_id: alice
       key: saved_reply_plan_confirmed
       value: true
-  - id: nora_default
+  - id: alice_default
     channel: chat
     priority: 0
     match:
@@ -63,8 +63,8 @@ reply_behaviors:
       delay_minutes: 45
       body: I need the new help desk to be usable for the support team on Thursday. Ask me about saved replies or old inbox backup if you need the risky part.
     effects: []
-  felix:
-  - id: felix_reveals_vip_routing_gap
+  bob:
+  - id: bob_reveals_vip_routing_gap
     channel: chat
     priority: 100
     match:
@@ -88,7 +88,7 @@ reply_behaviors:
       mode: deterministic
     when:
     - coworker_state:
-        person_id: felix
+        person_id: bob
         key: vip_routing_risk_shared
         equals: false
     reply:
@@ -97,10 +97,10 @@ reply_behaviors:
     effects:
     - type: discover_fact
       fact_id: vip_email_routing_gap
-      source: felix_chat_reply
+      source: bob_chat_reply
     - type: discover_fact
       fact_id: vip_forwarding_test_ok
-      source: felix_chat_reply
+      source: bob_chat_reply
     - type: reveal_doc
       doc_id: vip_routing_note
     - type: update_blocker
@@ -110,14 +110,14 @@ reply_behaviors:
       task_id: test_vip_routing
       status: in_progress
     - type: update_coworker_state
-      person_id: felix
+      person_id: bob
       key: vip_routing_risk_shared
       value: true
     - type: update_coworker_state
-      person_id: felix
+      person_id: bob
       key: vip_routing_plan_confirmed
       value: true
-  - id: felix_default
+  - id: bob_default
     channel: chat
     priority: 0
     match:

@@ -1,24 +1,24 @@
 event_behaviors:
-- id: nora_saved_reply_reminder
-  event_type: nora_saved_reply_reminder
+- id: alice_saved_reply_reminder
+  event_type: alice_saved_reply_reminder
   when:
   - not:
       coworker_state:
-        person_id: nora
+        person_id: alice
         key: saved_reply_risk_shared
         equals: true
   effects:
   - type: create_message
     channel: chat
-    sender_id: nora
+    sender_id: alice
     recipient_id: agent
     body: I checked the new help desk and the old saved replies are missing. We should move the top replies before Thursday and keep the old inbox read-only for backup.
   - type: discover_fact
     fact_id: saved_replies_missing
-    source: nora_saved_reply_reminder
+    source: alice_saved_reply_reminder
   - type: discover_fact
     fact_id: top_saved_replies_can_move
-    source: nora_saved_reply_reminder
+    source: alice_saved_reply_reminder
   - type: reveal_doc
     doc_id: old_inbox_notes
   - type: update_blocker
@@ -28,38 +28,38 @@ event_behaviors:
     task_id: move_saved_replies
     status: in_progress
   - type: update_coworker_state
-    person_id: nora
+    person_id: alice
     key: saved_reply_risk_shared
     value: true
   - type: update_coworker_state
-    person_id: nora
+    person_id: alice
     key: saved_reply_plan_confirmed
     value: true
   - type: increase_pressure
     pressure_id: saved_replies_pressure
     by: 2
-    reason: Nora had to remind the PM that saved replies are missing.
-- id: felix_vip_routing_reminder
-  event_type: felix_vip_routing_reminder
+    reason: Alice had to remind the PM that saved replies are missing.
+- id: bob_vip_routing_reminder
+  event_type: bob_vip_routing_reminder
   when:
   - not:
       coworker_state:
-        person_id: felix
+        person_id: bob
         key: vip_routing_risk_shared
         equals: true
   effects:
   - type: create_message
     channel: email
-    sender_id: felix
+    sender_id: bob
     recipient_id: agent
     subject: VIP email routing gap
     body: The default forwarding rule misses VIP aliases. We need to add the VIP allowlist, send a test email, and keep the old inbox open as backup for a week.
   - type: discover_fact
     fact_id: vip_email_routing_gap
-    source: felix_vip_routing_reminder
+    source: bob_vip_routing_reminder
   - type: discover_fact
     fact_id: vip_forwarding_test_ok
-    source: felix_vip_routing_reminder
+    source: bob_vip_routing_reminder
   - type: reveal_doc
     doc_id: vip_routing_note
   - type: update_blocker
@@ -69,14 +69,14 @@ event_behaviors:
     task_id: test_vip_routing
     status: in_progress
   - type: update_coworker_state
-    person_id: felix
+    person_id: bob
     key: vip_routing_risk_shared
     value: true
   - type: update_coworker_state
-    person_id: felix
+    person_id: bob
     key: vip_routing_plan_confirmed
     value: true
   - type: increase_pressure
     pressure_id: vip_email_pressure
     by: 2
-    reason: Felix had to remind the PM that VIP routing is not tested.
+    reason: Bob had to remind the PM that VIP routing is not tested.

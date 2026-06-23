@@ -15,32 +15,32 @@ projects:
 pressures:
 - id: saved_replies_pressure
   project_id: support_inbox_move
-  owner_id: nora
+  owner_id: alice
   kind: support_readiness
   intensity: 5
   min_intensity: 1
   max_intensity: 10
-  reason: Nora needs the old saved replies moved before the support team switches tools.
+  reason: Alice needs the old saved replies moved before the support team switches tools.
   due_at: '2026-06-25T12:00:00'
 - id: vip_email_pressure
   project_id: support_inbox_move
-  owner_id: felix
+  owner_id: bob
   kind: email_routing
   intensity: 5
   min_intensity: 1
   max_intensity: 10
-  reason: Felix needs the VIP forwarding rule tested before the old inbox becomes backup-only.
+  reason: Bob needs the VIP forwarding rule tested before the old inbox becomes backup-only.
   due_at: '2026-06-25T12:00:00'
 people:
-- id: nora
-  name: Nora
+- id: alice
+  name: Alice
   role: Support Lead
   goals:
   - Make sure the team can answer common customer questions on Thursday.
   - Keep the old inbox available as a backup for one week.
   constraints:
   - The new help desk does not automatically import saved replies.
-  - Nora needs written wording the support team can follow.
+  - Alice needs written wording the support team can follow.
   availability:
   - day: Monday
     start: 09:00
@@ -70,15 +70,15 @@ people:
   private_fact_ids:
   - saved_replies_missing
   - top_saved_replies_can_move
-- id: felix
-  name: Felix
+- id: bob
+  name: Bob
   role: Infrastructure Engineer
   goals:
   - Make sure VIP customer emails route to the new help desk.
   - Avoid changing all email routing until the VIP rule has been tested.
   constraints:
   - The default forwarding rule misses VIP aliases.
-  - Felix needs a test before the switch is called ready.
+  - Bob needs a test before the switch is called ready.
   availability:
   - day: Monday
     start: '10:00'
@@ -109,60 +109,60 @@ people:
   - vip_email_routing_gap
   - vip_forwarding_test_ok
 coworker_state:
-- id: state_nora_saved_reply_risk_shared
-  person_id: nora
+- id: state_alice_saved_reply_risk_shared
+  person_id: alice
   key: saved_reply_risk_shared
   value: false
-- id: state_nora_saved_reply_plan_confirmed
-  person_id: nora
+- id: state_alice_saved_reply_plan_confirmed
+  person_id: alice
   key: saved_reply_plan_confirmed
   value: false
-- id: state_nora_move_note_received
-  person_id: nora
+- id: state_alice_move_note_received
+  person_id: alice
   key: move_note_received
   value: false
-- id: state_nora_support_update_ready
-  person_id: nora
+- id: state_alice_support_update_ready
+  person_id: alice
   key: support_update_ready
   value: false
-- id: state_felix_vip_routing_risk_shared
-  person_id: felix
+- id: state_bob_vip_routing_risk_shared
+  person_id: bob
   key: vip_routing_risk_shared
   value: false
-- id: state_felix_vip_routing_plan_confirmed
-  person_id: felix
+- id: state_bob_vip_routing_plan_confirmed
+  person_id: bob
   key: vip_routing_plan_confirmed
   value: false
-- id: state_felix_move_note_received
-  person_id: felix
+- id: state_bob_move_note_received
+  person_id: bob
   key: move_note_received
   value: false
-- id: state_felix_routing_update_ready
-  person_id: felix
+- id: state_bob_routing_update_ready
+  person_id: bob
   key: routing_update_ready
   value: false
 facts:
 - id: saved_replies_missing
   visibility_scope: hidden
-  owner_id: nora
+  owner_id: alice
   summary: The old inbox has saved replies that the new help desk did not import.
   revealed_by:
-  - Ask Nora about saved replies, support templates, or what the support team needs.
-  - Wait for Nora's Tuesday reminder.
+  - Ask Alice about saved replies, support templates, or what the support team needs.
+  - Wait for Alice's Tuesday reminder.
 - id: top_saved_replies_can_move
   visibility_scope: hidden
-  owner_id: nora
+  owner_id: alice
   summary: Moving the top 12 saved replies is enough for Thursday if the old inbox stays read-only for one week.
 - id: vip_email_routing_gap
   visibility_scope: hidden
-  owner_id: felix
+  owner_id: bob
   summary: VIP customer aliases bypass the default forwarding rule and may keep landing in the old inbox.
   revealed_by:
-  - Ask Felix about VIP email routing, forwarding, aliases, or testing the switch.
-  - Wait for Felix's Tuesday reminder.
+  - Ask Bob about VIP email routing, forwarding, aliases, or testing the switch.
+  - Wait for Bob's Tuesday reminder.
 - id: vip_forwarding_test_ok
   visibility_scope: hidden
-  owner_id: felix
+  owner_id: bob
   summary: A tested VIP forwarding allowlist fixes the routing gap while the old inbox stays available as backup.
 - id: inbox_move_plan
   visibility_scope: derived
@@ -171,8 +171,8 @@ tasks:
 - id: move_saved_replies
   project_id: support_inbox_move
   title: Move top saved replies
-  description: Nora needs the most-used saved replies in the new help desk before the team switches.
-  owner_id: nora
+  description: Alice needs the most-used saved replies in the new help desk before the team switches.
+  owner_id: alice
   status: blocked
   priority: high
   due_at: '2026-06-25T12:00:00'
@@ -180,8 +180,8 @@ tasks:
 - id: test_vip_routing
   project_id: support_inbox_move
   title: Test VIP email routing
-  description: Felix needs VIP aliases forwarded to the new help desk before the old inbox becomes backup-only.
-  owner_id: felix
+  description: Bob needs VIP aliases forwarded to the new help desk before the old inbox becomes backup-only.
+  owner_id: bob
   status: blocked
   priority: high
   due_at: '2026-06-25T12:00:00'
@@ -196,7 +196,7 @@ tasks:
   blocked_by: move_plan_missing
 - id: send_owner_updates
   project_id: support_inbox_move
-  title: Send Nora and Felix the final plan
+  title: Send Alice and Bob the final plan
   description: Both owners need written confirmation before the switch is called ready.
   status: not_started
   priority: medium
@@ -207,12 +207,12 @@ dependencies:
   project_id: support_inbox_move
   upstream_task_id: move_saved_replies
   downstream_task_id: write_move_plan
-  description: The move plan needs Nora's saved reply scope.
+  description: The move plan needs Alice's saved reply scope.
 - id: dep_plan_needs_vip_routing
   project_id: support_inbox_move
   upstream_task_id: test_vip_routing
   downstream_task_id: write_move_plan
-  description: The move plan needs Felix's VIP routing test.
+  description: The move plan needs Bob's VIP routing test.
 - id: dep_updates_need_plan
   project_id: support_inbox_move
   upstream_task_id: write_move_plan
@@ -224,7 +224,7 @@ blockers:
   title: Saved replies are missing
   status: open
   severity: high
-  owner_id: nora
+  owner_id: alice
   visibility_scope: hidden
   description: The support team cannot answer common questions quickly if saved replies are not moved.
 - id: vip_email_routing_gap
@@ -232,7 +232,7 @@ blockers:
   title: VIP email routing is not tested
   status: open
   severity: high
-  owner_id: felix
+  owner_id: bob
   visibility_scope: hidden
   description: VIP customer emails may keep landing in the old inbox after Thursday.
 - id: move_plan_missing
@@ -260,43 +260,43 @@ docs:
   title: Old Inbox Saved Reply Notes
   kind: support_note
   visibility_scope: hidden
-  owner_id: nora
+  owner_id: alice
   metadata:
-    owner_id: nora
+    owner_id: alice
   body: The new help desk did not import saved replies. Move the 12 most-used saved replies before Thursday and keep the old inbox read-only for one week as backup.
 - id: vip_routing_note
   title: VIP Email Routing Note
   kind: engineering_note
   visibility_scope: hidden
-  owner_id: felix
+  owner_id: bob
   metadata:
-    owner_id: felix
+    owner_id: bob
   body: VIP customer aliases bypass the default forwarding rule. Add the VIP aliases to the forwarding allowlist, send a test email, and keep the old inbox open as backup for one week.
 messages:
-- id: msg_initial_nora
+- id: msg_initial_alice
   sent_at: '2026-06-22T08:50:00'
   channel: chat
-  sender_id: nora
+  sender_id: alice
   recipient_id: agent
   body: Can you drive the support inbox move this week? We need the new help desk ready by Thursday afternoon.
-- id: msg_initial_felix
+- id: msg_initial_bob
   sent_at: '2026-06-22T08:55:00'
   channel: email
-  sender_id: felix
+  sender_id: bob
   recipient_id: agent
   subject: Inbox move routing check
   body: I can help with email routing for the new help desk. Please make sure we test anything customer-facing before the old inbox becomes backup-only.
 events:
-- id: event_nora_saved_reply_reminder
-  event_type: nora_saved_reply_reminder
+- id: event_alice_saved_reply_reminder
+  event_type: alice_saved_reply_reminder
   scheduled_at: '2026-06-23T10:00:00'
   status: pending
   priority: 100
   payload:
     project_id: support_inbox_move
     blocker_id: saved_replies_missing
-- id: event_felix_vip_routing_reminder
-  event_type: felix_vip_routing_reminder
+- id: event_bob_vip_routing_reminder
+  event_type: bob_vip_routing_reminder
   scheduled_at: '2026-06-23T11:00:00'
   status: pending
   priority: 100
