@@ -14,7 +14,7 @@ from .agents.llm import _load_llm_session, llm_session_state, start_llm_session,
 from .agents.scripted import run_scripted_step, scripted_policy_steps
 from .db import connect
 from .evaluator import evaluate
-from .formatters import format_output
+from .formatters import format_agent_progress_html, format_agent_tool_progress, format_output
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .scenario import load_scenario
 from .state import get_state_value, observe, reset, set_state_value
@@ -189,6 +189,7 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
         display = _display_entry(entry)
         if display:
             display_timeline.append(display)
+    log_lines = _log_lines(all_entries, llm_state)
     return {
         "scenario": {
             "id": scenario.get("id"),
@@ -206,7 +207,8 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
         "tasks": list_tasks(db_path),
         "timeline": entries,
         "display_timeline": display_timeline,
-        "log_lines": _log_lines(all_entries, llm_state),
+        "log_lines": log_lines,
+        "log_entries": _log_entries(log_lines),
         "authored_schedule": _authored_schedule(scenario),
         "scripted_demo": _scripted_demo_state(db_path, scenario_path),
         "llm_session": llm_state,
@@ -429,30 +431,28 @@ def _log_lines(entries: list[dict[str, Any]], llm_state: dict[str, Any]) -> list
 
     lines: list[str] = []
     for entry in entries:
-        kind = entry.get("kind")
-        if kind == "action":
-            action_type = str(entry.get("action_type") or "")
-            if action_type in {"reset", "finalize_to_deadline", "advance_time"}:
-                continue
-            payload = entry.get("payload") or {}
-            detail = _action_detail(action_type, payload)
-            title = _action_title(action_type, payload).upper()
-            lines.append(f"[{_pretty_time(entry.get('time'))}] {title} - {detail}")
-        elif kind == "event_delivered":
-            if entry.get("event_type") == "coworker_reply":
-                continue
-            lines.append(
-                f"[{_pretty_time(entry.get('time'))}] EVENT - {_label(entry.get('event_type'))}"
-            )
-        elif kind == "message":
-            channel = str(entry.get("channel") or "").upper()
-            sender = _label(entry.get("sender_id"))
-            recipient = _label(entry.get("recipient_id") or "all")
-            text = str(entry.get("subject") or entry.get("body") or "Message")
-            lines.append(
-                f"[{_pretty_time(entry.get('time'))}] {channel} {sender} -> {recipient} - {text}"
-            )
+        if entry.get("kind") != "action":
+            continue
+        action_type = str(entry.get("action_type") or "")
+        if action_type in {"reset", "finalize_to_deadline"}:
+            continue
+        payload = entry.get("payload") or {}
+        result = entry.get("result") or {}
+        lines.append(
+            f"[{_pretty_time(entry.get('time'))}] "
+            f"{format_agent_tool_progress(action_type, payload, result)}"
+        )
     return lines[-80:]
+
+
+def _log_entries(lines: list[str]) -> list[dict[str, str]]:
+    return [
+        {
+            "text": line,
+            "html": format_agent_progress_html(line),
+        }
+        for line in lines
+    ]
 
 
 def _action_title(action_type: str, payload: dict[str, Any]) -> str:
@@ -606,6 +606,13 @@ section { margin:14px 0; overflow:hidden; }
 .log-console { max-height:360px; overflow:auto; padding:14px; border:1px solid var(--line); border-radius:10px; background:#101722; color:#d9e7ff; font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
 .log-line { white-space:pre-wrap; border-bottom:1px solid rgba(255,255,255,.06); padding:6px 0; }
 .log-line:last-child { border-bottom:none; }
+.agent-prefix, .agent-muted, .agent-message.muted { color:#7f8ea3; }
+.agent-time, .agent-tool-email { color:#5cc8ff; }
+.agent-tool-read { color:#8ab4ff; }
+.agent-tool-chat { color:#e7a1ff; }
+.agent-tool-meeting, .agent-tool-task, .agent-cost { color:#ffd166; }
+.agent-tool-wait, .agent-message.good { color:#67e09c; }
+.agent-person { color:#f3f7ff; font-weight:800; }
 .helper { color:var(--muted); font-size:12px; margin:8px 14px 0; }
 .columns { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px; }
 .list { padding:14px; display:grid; gap:8px; }
@@ -985,11 +992,14 @@ function render(state) {
   ].join("");
 
   renderReplay(state.display_timeline || [], scenario);
+  const logEntries = state.log_entries || [];
   const logs = state.log_lines || [];
   const logEl = $("playback");
   const shouldStick = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 24;
-  logEl.innerHTML = logs.length
-    ? logs.map(line => `<div class="log-line">${esc(line)}</div>`).join("")
+  logEl.innerHTML = logEntries.length
+    ? logEntries.map(entry => `<div class="log-line">${entry.html || esc(entry.text || "")}</div>`).join("")
+    : logs.length
+      ? logs.map(line => `<div class="log-line">${esc(line)}</div>`).join("")
     : `<div class="empty">No log output yet.</div>`;
   if (shouldStick) {
     logEl.scrollTop = logEl.scrollHeight;

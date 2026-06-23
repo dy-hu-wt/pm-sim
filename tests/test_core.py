@@ -35,7 +35,7 @@ from pm_sim.scenario import ScenarioError, load_scenario
 from pm_sim.state import action_log, event_log, observe, reset
 from pm_sim.time import advance_time
 from pm_sim.timeline import timeline
-from pm_sim.ui import _run_next_ui_step, _scripted_demo_state
+from pm_sim.ui import _run_next_ui_step, _scripted_demo_state, _state_payload
 
 
 class ScenarioValidationTests(unittest.TestCase):
@@ -832,6 +832,18 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(final["index"], final["total"])
         self.assertEqual(evaluation["score"], 120)
         self.assertEqual(evaluation["score"], evaluation["max_score"])
+
+    def test_live_ui_log_uses_pretty_agent_progress(self) -> None:
+        _run_next_ui_step(self.db_path, DEFAULT_SCENARIO_PATH)
+
+        payload = _state_payload(self.db_path, DEFAULT_SCENARIO_PATH, timeline_limit=20)
+        log_lines = payload["log_lines"]
+        log_entries = payload["log_entries"]
+
+        self.assertTrue(any("[agent]" not in line and "READ doc_project_brief" in line for line in log_lines))
+        self.assertTrue(any("(+15m)" in line for line in log_lines))
+        self.assertTrue(any("agent-prefix" in entry["html"] for entry in log_entries))
+        self.assertTrue(any("agent-tool-read" in entry["html"] for entry in log_entries))
 
     def test_live_ui_can_step_llm_policy(self) -> None:
         client = _FakeResponsesClient(

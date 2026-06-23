@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import html
 import json
+import re
 from datetime import datetime
 from typing import Any
 
@@ -31,6 +33,199 @@ def format_output(command: str | None, value: Any) -> str:
     if command == "ui":
         return _format_ui(value)
     return str(value)
+
+
+def format_agent_tool_progress(name: str, args: dict[str, Any], result: Any) -> str:
+    action = _agent_args_summary(name, args) or name
+    summary = _agent_result_summary(name, result)
+    if summary:
+        return f"{action} — {summary}"
+    return action
+
+
+def format_agent_progress_console(message: str, *, color: bool) -> str:
+    if not color:
+        return f"[agent] {message}"
+
+    prefix = _ansi("2", "[agent]")
+    body = _highlight_agent_progress(message, mode="ansi")
+    if "model requested" in message:
+        return f"{prefix} {_ansi('2', body)}"
+    if "full score reached" in message or "evaluation complete" in message:
+        return f"{prefix} {_ansi('32', body)}"
+    return f"{prefix} {body}"
+
+
+def format_agent_progress_html(message: str) -> str:
+    body = _highlight_agent_progress(html.escape(message), mode="html")
+    classes = "agent-message"
+    if "model requested" in message:
+        classes += " muted"
+    if "full score reached" in message or "evaluation complete" in message:
+        classes += " good"
+    return f'<span class="agent-prefix">[agent]</span> <span class="{classes}">{body}</span>'
+
+
+def _agent_args_summary(name: str, args: dict[str, Any]) -> str:
+    if name == "send_chat":
+        return f"CHAT to {args.get('person_id')}: {_short(args.get('body', ''), 80)}"
+    if name == "send_email":
+        return f"EMAIL to {args.get('person_id')} [{_short(args.get('subject', ''), 60)}]"
+    if name == "read_doc":
+        return f"READ {args.get('doc_id')}"
+    if name == "update_doc":
+        return f"UPDATE_DOC {args.get('doc_id')}"
+    if name == "advance_time":
+        return f"WAIT {args.get('target')}"
+    if name == "update_task":
+        updates = ", ".join(
+            f"{key}={value}" for key, value in args.items() if key in {"status", "priority"}
+        )
+        suffix = f" {updates}" if updates else ""
+        return f"TASK {args.get('task_id')}{suffix}"
+    if name == "schedule_meeting":
+        attendees = ", ".join(args.get("attendees", []))
+        return (
+            f"MEETING [{_short(args.get('title', ''), 60)}] "
+            f"{args.get('start_at')}->{args.get('end_at')} with {attendees}"
+        )
+    if name == "observe":
+        return "OBSERVE"
+    if name == "list_tasks":
+        return "TASKS"
+    if name == "finish":
+        return f"FINISH: {_short(args.get('reason', ''), 80)}"
+    return ""
+
+
+def _agent_result_summary(name: str, result: Any) -> str:
+    if not isinstance(result, dict):
+        try:
+            return f"{len(result)} row(s)"
+        except TypeError:
+            return ""
+    if not result.get("ok", True):
+        return f"failed: {result.get('error')}"
+    if name == "observe":
+        return f"current time {_pretty_time(result.get('current_time'))}"
+    if name == "advance_time":
+        delivered = result.get("delivered_events", [])
+        if delivered:
+            event_types = ", ".join(event.get("event_type", "event") for event in delivered)
+            return f"{_pretty_time(result.get('to'))}; events: {event_types}"
+        return f"{_pretty_time(result.get('to'))}; events: none"
+    if name == "send_chat":
+        replies = result.get("scheduled_reply_ids", [])
+        return f"scheduled {len(replies)} reply event(s){_agent_time_cost_summary(result)}"
+    if name == "send_email":
+        effects = result.get("applied_effects", [])
+        return f"applied {len(effects)} effect(s){_agent_time_cost_summary(result)}"
+    if name == "read_doc":
+        doc = result.get("doc", {})
+        return f"{doc.get('title', 'unknown doc')}{_agent_time_cost_summary(result)}"
+    if name == "update_doc":
+        effects = result.get("applied_effects", [])
+        return (
+            f"updated {result.get('doc_id')}; applied {len(effects)} effect(s)"
+            f"{_agent_time_cost_summary(result)}"
+        )
+    if name == "schedule_meeting":
+        return f"scheduled {result.get('meeting_id')}{_agent_time_cost_summary(result)}"
+    if name == "update_task":
+        return f"updated{_agent_time_cost_summary(result)}"
+    return ""
+
+
+def _agent_time_cost_summary(result: dict[str, Any]) -> str:
+    time_cost = result.get("time_cost")
+    if not isinstance(time_cost, dict):
+        return ""
+    delivered = time_cost.get("delivered_events") or []
+    delivered_summary = ""
+    if delivered:
+        event_types = ", ".join(event.get("event_type", "event") for event in delivered)
+        delivered_summary = f"; events: {event_types}"
+    return f" (+{time_cost.get('minutes')}m){delivered_summary}"
+
+
+def _highlight_agent_progress(message: str, *, mode: str) -> str:
+    message = re.sub(
+        r"^\[([^\]]+)\]",
+        lambda match: _agent_span("time", match.group(0), mode),
+        message,
+    )
+    message = re.sub(
+        r"\(\+\d+m\)",
+        lambda match: _agent_span("cost", match.group(0), mode),
+        message,
+    )
+    message = _highlight_agent_people(message, mode=mode)
+    for label, css_class, ansi_code in (
+        ("READ", "tool-read", "34"),
+        ("UPDATE_DOC", "tool-read", "34"),
+        ("CHAT", "tool-chat", "35"),
+        ("EMAIL", "tool-email", "36"),
+        ("MEETING", "tool-meeting", "33"),
+        ("TASKS", "muted", "2"),
+        ("TASK", "tool-task", "33"),
+        ("WAIT", "tool-wait", "32"),
+        ("OBSERVE", "muted", "2"),
+        ("FINISH", "tool-wait", "32"),
+    ):
+        message = re.sub(
+            rf"\b{label}\b",
+            lambda match, css_class=css_class, ansi_code=ansi_code: _agent_span(
+                css_class,
+                match.group(0),
+                mode,
+                ansi_code=ansi_code,
+            ),
+            message,
+            count=1,
+        )
+    return message
+
+
+def _highlight_agent_people(message: str, *, mode: str) -> str:
+    message = re.sub(
+        r"\b(to) ([a-z][a-z0-9_-]*)\b",
+        lambda match: f"{match.group(1)} {_agent_span('person', match.group(2), mode, ansi_code='1;37')}",
+        message,
+        count=1,
+    )
+
+    def color_attendees(match: re.Match[str]) -> str:
+        names = [
+            _agent_span("person", part.strip(), mode, ansi_code="1;37") if part.strip() else part
+            for part in match.group(1).split(",")
+        ]
+        return "with " + ", ".join(names)
+
+    return re.sub(r"\bwith ([a-z][a-z0-9_-]*(?:, [a-z][a-z0-9_-]*)*)", color_attendees, message)
+
+
+def _agent_span(css_class: str, text: str, mode: str, *, ansi_code: str | None = None) -> str:
+    if mode == "ansi":
+        return _ansi(ansi_code or _AGENT_ANSI_BY_CLASS.get(css_class, "0"), text)
+    return f'<span class="agent-{css_class}">{text}</span>'
+
+
+_AGENT_ANSI_BY_CLASS = {
+    "time": "36",
+    "cost": "33",
+    "person": "1;37",
+    "muted": "2",
+    "tool-read": "34",
+    "tool-chat": "35",
+    "tool-email": "36",
+    "tool-meeting": "33",
+    "tool-task": "33",
+    "tool-wait": "32",
+}
+
+
+def _ansi(code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m"
 
 
 def _format_reset(value: dict[str, Any]) -> str:

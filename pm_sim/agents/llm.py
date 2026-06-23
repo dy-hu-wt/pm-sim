@@ -18,6 +18,7 @@ from ..actions import (
 from ..calendar import validate_finish
 from ..db import connect
 from ..evaluator import evaluate
+from ..formatters import format_agent_tool_progress
 from ..jsonutil import dumps, loads
 from ..paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH, REPO_ROOT
 from ..state import get_state_value, observe, reset, set_state_value
@@ -534,35 +535,6 @@ def _pretty_time(value: str | None) -> str:
     return parsed.strftime("%a %Y-%m-%d %H:%M")
 
 
-def _args_summary(name: str, args: dict[str, Any]) -> str:
-    if name == "send_chat":
-        return f"CHAT to {args.get('person_id')}: {_short(args.get('body', ''), 80)}"
-    if name == "send_email":
-        return f"EMAIL to {args.get('person_id')} [{_short(args.get('subject', ''), 60)}]"
-    if name == "read_doc":
-        return f"READ {args.get('doc_id')}"
-    if name == "update_doc":
-        return f"UPDATE_DOC {args.get('doc_id')}"
-    if name == "advance_time":
-        return f"WAIT {args.get('target')}"
-    if name == "update_task":
-        updates = ", ".join(
-            f"{key}={value}" for key, value in args.items() if key in {"status", "priority"}
-        )
-        suffix = f" {updates}" if updates else ""
-        return f"TASK {args.get('task_id')}{suffix}"
-    if name == "schedule_meeting":
-        attendees = ", ".join(args.get("attendees", []))
-        return f"MEETING [{_short(args.get('title', ''), 60)}] {args.get('start_at')}->{args.get('end_at')} with {attendees}"
-    if name == "observe":
-        return "OBSERVE"
-    if name == "list_tasks":
-        return "TASKS"
-    if name == "finish":
-        return f"FINISH: {_short(args.get('reason', ''), 80)}"
-    return ""
-
-
 def _tool_call_summary(tool_calls: list[Any]) -> str:
     names = [str(getattr(call, "name", "unknown")) for call in tool_calls]
     counts: dict[str, int] = {}
@@ -575,62 +547,7 @@ def _tool_call_summary(tool_calls: list[Any]) -> str:
 
 
 def _tool_progress_line(name: str, args: dict[str, Any], result: ToolResult) -> str:
-    action = _args_summary(name, args) or name
-    summary = _result_summary(name, result)
-    if summary:
-        return f"{action} — {summary}"
-    return action
-
-
-def _result_summary(name: str, result: ToolResult) -> str:
-    if not isinstance(result, dict):
-        return f"{len(result)} row(s)"
-    if not result.get("ok", True):
-        return f"failed: {result.get('error')}"
-    if name == "observe":
-        return f"current time {_pretty_time(result.get('current_time'))}"
-    if name == "advance_time":
-        delivered = result.get("delivered_events", [])
-        if delivered:
-            event_types = ", ".join(event.get("event_type", "event") for event in delivered)
-            return f"{_pretty_time(result.get('to'))}; events: {event_types}"
-        return f"{_pretty_time(result.get('to'))}; events: none"
-    if name == "send_chat":
-        replies = result.get("scheduled_reply_ids", [])
-        return f"scheduled {len(replies)} reply event(s){_time_cost_summary(result)}"
-    if name == "send_email":
-        effects = result.get("applied_effects", [])
-        return f"applied {len(effects)} effect(s){_time_cost_summary(result)}"
-    if name == "read_doc":
-        doc = result.get("doc", {})
-        return f"{doc.get('title', 'unknown doc')}{_time_cost_summary(result)}"
-    if name == "update_doc":
-        effects = result.get("applied_effects", [])
-        return f"updated {result.get('doc_id')}; applied {len(effects)} effect(s){_time_cost_summary(result)}"
-    if name == "schedule_meeting":
-        return f"scheduled {result.get('meeting_id')}{_time_cost_summary(result)}"
-    if name == "update_task":
-        return f"updated{_time_cost_summary(result)}"
-    return ""
-
-
-def _time_cost_summary(result: dict[str, Any]) -> str:
-    time_cost = result.get("time_cost")
-    if not isinstance(time_cost, dict):
-        return ""
-    delivered = time_cost.get("delivered_events") or []
-    delivered_summary = ""
-    if delivered:
-        event_types = ", ".join(event.get("event_type", "event") for event in delivered)
-        delivered_summary = f"; events: {event_types}"
-    return f" (+{time_cost.get('minutes')}m){delivered_summary}"
-
-
-def _short(value: str, limit: int) -> str:
-    text = " ".join(str(value).split())
-    if len(text) <= limit:
-        return text
-    return f"{text[: limit - 3]}..."
+    return format_agent_tool_progress(name, args, result)
 
 
 def _load_llm_session(db_path: Path | str) -> dict[str, Any] | None:

@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -20,7 +19,7 @@ from .actions import (
 from .agents.llm import LlmAgentError, run_llm_agent
 from .agents.scripted import run_scripted_agent
 from .evaluator import evaluate
-from .formatters import format_output
+from .formatters import format_agent_progress_console, format_output
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .report import DEFAULT_UI_PATH, generate_report
 from .scenario import ScenarioError
@@ -330,49 +329,7 @@ def _agent_progress(message: str) -> None:
 
 
 def _color_agent_message(message: str) -> str:
-    prefix = _dim("[agent]")
-    if not _stderr_supports_color():
-        return f"[agent] {message}"
-
-    message = re.sub(r"^\[([^\]]+)\]", lambda match: _cyan(match.group(0)), message)
-    if "model requested" in message:
-        return f"{prefix} {_dim(message)}"
-    if "full score reached" in message or "evaluation complete" in message:
-        return f"{prefix} {_green(message)}"
-    message = re.sub(r"\(\+\d+m\)", lambda match: _yellow(match.group(0)), message)
-    message = _highlight_people(message)
-    for label, color in {
-        "READ": _blue,
-        "UPDATE_DOC": _blue,
-        "CHAT": _magenta,
-        "EMAIL": _cyan,
-        "MEETING": _yellow,
-        "TASKS": _dim,
-        "TASK": _yellow,
-        "WAIT": _green,
-        "OBSERVE": _dim,
-        "FINISH": _green,
-    }.items():
-        message = re.sub(rf"\b{label}\b", lambda match, color=color: color(match.group(0)), message, count=1)
-    return f"{prefix} {message}"
-
-
-def _highlight_people(message: str) -> str:
-    message = re.sub(
-        r"\b(to) ([a-z][a-z0-9_-]*)\b",
-        lambda match: f"{match.group(1)} {_person(match.group(2))}",
-        message,
-        count=1,
-    )
-
-    def color_attendees(match: re.Match[str]) -> str:
-        names = [
-            _person(part.strip()) if part.strip() else part
-            for part in match.group(1).split(",")
-        ]
-        return "with " + ", ".join(names)
-
-    return re.sub(r"\bwith ([a-z][a-z0-9_-]*(?:, [a-z][a-z0-9_-]*)*)", color_attendees, message)
+    return format_agent_progress_console(message, color=_stderr_supports_color())
 
 
 def _stderr_supports_color() -> bool:
@@ -393,30 +350,6 @@ def _ansi(code: str, text: str) -> str:
 
 def _dim(text: str) -> str:
     return _ansi("2", text)
-
-
-def _green(text: str) -> str:
-    return _ansi("32", text)
-
-
-def _cyan(text: str) -> str:
-    return _ansi("36", text)
-
-
-def _blue(text: str) -> str:
-    return _ansi("34", text)
-
-
-def _magenta(text: str) -> str:
-    return _ansi("35", text)
-
-
-def _yellow(text: str) -> str:
-    return _ansi("33", text)
-
-
-def _person(text: str) -> str:
-    return _ansi("1;37", text)
 
 
 def sqlite_missing_reset_error() -> tuple[type[Exception], ...]:
