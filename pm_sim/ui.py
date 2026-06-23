@@ -446,12 +446,13 @@ def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
         direction = "reply"
     elif kind == "event_delivered":
         event_type = str(entry.get("event_type") or "")
+        payload = entry.get("payload") or {}
         title = _label(event_type)
         detail = "Event delivered"
         card_kind = "event"
-        badge = _event_badge(event_type)
+        badge = _event_badge(event_type, payload)
         route = ""
-        tone = _event_tone(event_type)
+        tone = _event_tone(event_type, payload)
         direction = "neutral"
     else:
         action_type = str(entry.get("action_type") or "")
@@ -602,41 +603,23 @@ def _message_badge(channel: str) -> str:
     return "REPLY"
 
 
-def _event_badge(event_type: str) -> str:
+def _event_badge(event_type: str, payload: dict[str, Any]) -> str:
+    display = payload.get("display") if isinstance(payload.get("display"), dict) else {}
+    badge = str(display.get("badge") or "").strip()
+    if badge:
+        return badge.upper()
     if event_type == "project_deadline":
         return "DEADLINE"
-    if event_type in {"luigi_proactive_repo_risk", "mario_auto_comment_push"}:
-        return "RISK"
-    if event_type in {"daisy_confidence_check", "nimbus_launch_mode_question"}:
-        return "CUSTOMER"
-    if event_type == "daisy_private_repo_security_question":
-        return "SECURITY"
-    if event_type == "koopa_audit_export_request":
-        return "PORTFOLIO"
-    if event_type == "peach_design_blocked_escalation":
-        return "BLOCKER"
-    if event_type == "thursday_final_readiness_check":
-        return "READINESS"
     return "EVENT"
 
 
-def _event_tone(event_type: str) -> str:
+def _event_tone(event_type: str, payload: dict[str, Any]) -> str:
+    display = payload.get("display") if isinstance(payload.get("display"), dict) else {}
+    tone = str(display.get("tone") or "").strip().lower()
+    if tone:
+        return tone
     if event_type == "project_deadline":
         return "deadline"
-    if event_type == "luigi_proactive_repo_risk":
-        return "risk"
-    if event_type == "mario_auto_comment_push":
-        return "scope"
-    if event_type in {"daisy_confidence_check", "nimbus_launch_mode_question"}:
-        return "customer"
-    if event_type == "daisy_private_repo_security_question":
-        return "security"
-    if event_type == "koopa_audit_export_request":
-        return "portfolio"
-    if event_type == "peach_design_blocked_escalation":
-        return "blocker"
-    if event_type == "thursday_final_readiness_check":
-        return "readiness"
     return "neutral"
 
 

@@ -670,6 +670,9 @@ events:
   priority: 100
   payload:
     project_id: pr_review_agent
+    display:
+      badge: risk
+      tone: scope
 - id: event_peach_design_blocked_escalation
   event_type: peach_design_blocked_escalation
   scheduled_at: '2026-06-24T11:00:00'
@@ -678,6 +681,9 @@ events:
   payload:
     project_id: pr_review_agent
     task_id: draft_mode_docs
+    display:
+      badge: blocker
+      tone: blocker
 - id: event_daisy_confidence_check
   event_type: daisy_confidence_check
   scheduled_at: '2026-06-24T13:00:00'
@@ -685,6 +691,9 @@ events:
   priority: 100
   payload:
     project_id: pr_review_agent
+    display:
+      badge: customer
+      tone: customer
 - id: event_koopa_audit_export_request
   event_type: koopa_audit_export_request
   scheduled_at: '2026-06-24T10:00:00'
@@ -692,6 +701,9 @@ events:
   priority: 100
   payload:
     project_id: audit_log_export
+    display:
+      badge: portfolio
+      tone: portfolio
 - id: event_nimbus_launch_mode_question
   event_type: nimbus_launch_mode_question
   scheduled_at: '2026-06-24T15:30:00'
@@ -699,6 +711,9 @@ events:
   priority: 100
   payload:
     project_id: pr_review_agent
+    display:
+      badge: customer
+      tone: customer
 - id: event_daisy_private_repo_security_question
   event_type: daisy_private_repo_security_question
   scheduled_at: '2026-06-24T14:00:00'
@@ -706,6 +721,9 @@ events:
   priority: 100
   payload:
     project_id: pr_review_agent
+    display:
+      badge: security
+      tone: security
 - id: event_luigi_proactive_repo_risk
   event_type: luigi_proactive_repo_risk
   scheduled_at: '2026-06-25T10:00:00'
@@ -714,6 +732,9 @@ events:
   payload:
     project_id: pr_review_agent
     blocker_id: repo_sync_stale
+    display:
+      badge: risk
+      tone: risk
 - id: event_thursday_final_readiness_check
   event_type: thursday_final_readiness_check
   scheduled_at: '2026-06-25T12:00:00'
@@ -721,6 +742,9 @@ events:
   priority: 100
   payload:
     project_id: pr_review_agent
+    display:
+      badge: readiness
+      tone: readiness
     calendar_obligation:
       title: Daisy final Nimbus go/no-go
       attendees:

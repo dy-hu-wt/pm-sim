@@ -102,6 +102,7 @@ def _event_entries(conn) -> list[dict[str, Any]]:
                     "event_type": row["event_type"],
                     "scheduled_at": row["scheduled_at"],
                     "status": row["status"],
+                    "payload": payload,
                     "result": result,
                 }
             )

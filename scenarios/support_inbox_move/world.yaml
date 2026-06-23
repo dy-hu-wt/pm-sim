@@ -297,6 +297,9 @@ events:
   payload:
     project_id: support_inbox_move
     blocker_id: saved_replies_missing
+    display:
+      badge: blocker
+      tone: blocker
 - id: event_bob_vip_routing_reminder
   event_type: bob_vip_routing_reminder
   scheduled_at: '2026-06-23T11:00:00'
@@ -305,6 +308,9 @@ events:
   payload:
     project_id: support_inbox_move
     blocker_id: vip_email_routing_gap
+    display:
+      badge: risk
+      tone: risk
 - id: event_support_inbox_move_deadline
   event_type: project_deadline
   scheduled_at: '2026-06-26T15:00:00'
