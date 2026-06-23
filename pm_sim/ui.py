@@ -252,8 +252,8 @@ p { margin:0 0 8px; }
 section { margin:14px 0; overflow:hidden; }
 .section-head { padding:13px 15px; border-bottom:1px solid var(--line); background:#fbfcfe; }
 .playback-controls { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:8px; padding:14px 14px 0; }
-.replay { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(320px,.9fr); gap:12px; padding:14px; align-items:start; }
-.calendar-board { display:grid; grid-auto-flow:column; gap:10px; overflow-x:auto; padding-bottom:4px; }
+.replay { display:grid; grid-template-columns:1fr; gap:12px; padding:14px; align-items:start; }
+.calendar-board { display:grid; gap:10px; overflow-x:auto; padding-bottom:4px; }
 .day { min-height:180px; border:1px solid var(--line); border-radius:10px; background:#f8fafc; overflow:hidden; }
 .day-head { padding:9px 10px; border-bottom:1px solid var(--line); background:#fff; }
 .day-head strong { display:block; }
@@ -261,7 +261,7 @@ section { margin:14px 0; overflow:hidden; }
 .calendar-event { margin:8px; padding:8px; border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:8px; background:#fff; }
 .calendar-event.event { border-left-color:var(--purple); }
 .calendar-event.current { outline:2px solid rgba(37,92,153,.24); background:#f2f7ff; }
-.playback { display:grid; gap:8px; max-height:520px; overflow:auto; padding-right:4px; }
+.playback { display:grid; gap:8px; max-height:360px; overflow:auto; padding-right:4px; }
 .item { border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:8px; background:#fff; padding:10px; }
 .item.event { border-left-color:var(--purple); }
 .item.current { outline:2px solid rgba(37,92,153,.24); background:#f2f7ff; }
@@ -274,7 +274,6 @@ section { margin:14px 0; overflow:hidden; }
 .badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:800; background:#eef2f7; }
 .good { color:var(--good); } .warn { color:var(--warn); } .bad { color:var(--bad); }
 .empty { color:var(--muted); font-style:italic; padding:14px; }
-@media (max-width:900px) { .replay { grid-template-columns:1fr; } }
 @media (max-width:800px) { .top,.hero { display:block; } .controls { margin-top:10px; } .score { text-align:left; margin-top:12px; } }
 </style>
 </head>
@@ -397,7 +396,7 @@ function renderReplay(items, scenario) {
 
   const days = scenarioDays(scenario || {}, items);
   $("calendar-board").style.gridTemplateColumns = days.length
-    ? `repeat(${days.length}, minmax(170px, 1fr))`
+    ? `repeat(${days.length}, minmax(150px, 1fr))`
     : "";
   $("calendar-board").innerHTML = days.length
     ? days.map(day => {

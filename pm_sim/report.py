@@ -207,7 +207,7 @@ body {
   background: #f8fafc;
 }
 .nav-links a:hover { background: #e8f1fb; border-color: #bdd3ed; color: var(--blue); }
-.content { max-width: 1280px; width: 100%; padding: 28px; }
+.content { max-width: 1280px; width: 100%; margin: 0 auto; padding: 28px; }
 .hero {
   display: flex;
   justify-content: space-between;
@@ -250,7 +250,7 @@ p { margin: 0 0 8px; }
 }
 .replay-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(320px, .9fr);
+  grid-template-columns: 1fr;
   gap: 14px;
   padding: 14px;
   align-items: start;
@@ -318,7 +318,7 @@ p { margin: 0 0 8px; }
 .playback-track {
   display: grid;
   gap: 8px;
-  max-height: 420px;
+  max-height: 360px;
   overflow: auto;
   padding-right: 6px;
 }
@@ -593,7 +593,7 @@ def _week_calendar(entries: list[dict[str, Any]], scenario: dict[str, Any]) -> s
             f"{cards}"
             "</div>"
         )
-    style = f' style="grid-template-columns: repeat({len(days)}, minmax(180px, 1fr));"'
+    style = f' style="grid-template-columns: repeat({len(days)}, minmax(150px, 1fr));"'
     return f'<div class="week-grid"{style}>' + "".join(columns) + "</div>"
 
 
