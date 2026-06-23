@@ -263,10 +263,10 @@ The first scenario should not be a pile of one-off code.
 
 Scenario data should define most of the setup:
 
-- a `scenario.json` manifest with `include` entries
-- a `world.json` starting-state file
-- an `interactions.json` behavior file
-- an `evaluation.json` grading/outcome file
+- a `scenario.yaml` manifest with `include` entries
+- a `world.yaml` starting-state file
+- an `interactions.yaml` behavior file
+- an `evaluation.yaml` grading/outcome file
 - people
 - coworker state
 - projects

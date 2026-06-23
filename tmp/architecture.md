@@ -12,16 +12,16 @@ scenario JSON -> SQLite schema/state -> CLI -> actions -> engine/time -> actor/e
 
 ## Files
 
-- `scenarios/launch_readiness/scenario.json`
-  - Scenario manifest: identity, start time, and includes for `world.json`, `interactions.json`, and `evaluation.json`.
+- `scenarios/launch_readiness/scenario.yaml`
+  - Scenario manifest: identity, start time, and includes for `world.yaml`, `interactions.yaml`, and `evaluation.yaml`.
 
-- `scenarios/launch_readiness/world.json`
+- `scenarios/launch_readiness/world.yaml`
   - Authored starting world: people, project, tasks, blockers, facts, docs, initial messages, and scheduled events.
 
-- `scenarios/launch_readiness/interactions.json`
+- `scenarios/launch_readiness/interactions.yaml`
   - Authored interaction rules: actor replies, autonomous actor policies, background event rules, meeting rules, and action-derived effects.
 
-- `scenarios/launch_readiness/evaluation.json`
+- `scenarios/launch_readiness/evaluation.yaml`
   - Authored grading rules: agent brief, task gates, state evidence rules, harmful-action rules, outcome rules, and scoring rubric.
   - Scenario load validates references before DB reset: owners, projects, dependencies, event payload project IDs, duplicate IDs, event times, and evaluation target shape.
 

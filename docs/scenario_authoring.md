@@ -1,6 +1,6 @@
 # Scenario Authoring
 
-`pm-sim` scenarios are data-authored directories. The engine owns storage, time, tools, event delivery, condition evaluation, effects, scoring, and timelines. Scenario JSON owns the company setup, coworker behavior, deadlines, scoring targets, and scripted demo path.
+`pm-sim` scenarios are data-authored directories. The engine owns storage, time, tools, event delivery, condition evaluation, effects, scoring, and timelines. Scenario YAML owns the company setup, coworker behavior, deadlines, scoring targets, and scripted demo path.
 
 ## Required Files
 
@@ -8,30 +8,31 @@ Each scenario directory has this shape:
 
 ```text
 scenarios/<scenario_id>/
-  scenario.json      # manifest and includes
-  world.json         # seeded company/project state
-  interactions.json  # coworker, event, meeting, and action behavior
-  evaluation.json    # grading, gates, outcomes, baseline, scripted path
+  scenario.yaml      # manifest and includes
+  world.yaml         # seeded company/project state
+  interactions.yaml  # coworker, event, meeting, and action behavior
+  evaluation.yaml    # grading, gates, outcomes, baseline, scripted path
 ```
 
-`scenario.json` is intentionally small:
+`scenario.yaml` is intentionally small:
 
-```json
-{
-  "id": "billing_migration",
-  "name": "Billing Migration Readiness",
-  "company": "Fireflower",
-  "start_time": "2026-06-22T09:00:00",
-  "timezone": "America/New_York",
-  "include": ["world.json", "interactions.json", "evaluation.json"]
-}
+```yaml
+id: billing_migration
+name: Billing Migration Readiness
+company: Fireflower
+start_time: "2026-06-22T09:00:00"
+timezone: America/New_York
+include:
+  - world.yaml
+  - interactions.yaml
+  - evaluation.yaml
 ```
 
 Use `pm-sim reset --scenario scenarios/<scenario_id>` to validate and load it.
 
 ## World State
 
-`world.json` defines the persistent starting state:
+`world.yaml` defines the persistent starting state:
 
 - `people`: coworkers, roles, goals, constraints, availability, private knowledge, and behavior notes.
 - `coworker_state`: mutable actor memory such as `risk_shared`, `approval_recorded`, or `customer_update_received`.
@@ -50,7 +51,7 @@ Visibility is standardized with nullable `visible_at`: if it is `null`, the item
 
 ## Interactions
 
-`interactions.json` defines how coworkers and background dynamics change the world. Reply behavior
+`interactions.yaml` defines how coworkers and background dynamics change the world. Reply behavior
 and proactive coworker behavior live in one `actor_behaviors` list:
 
 - `actor_behaviors`: the reusable actor model. `kind: "reply"` entries respond to chat/email;
@@ -63,39 +64,30 @@ and proactive coworker behavior live in one `actor_behaviors` list:
 
 `actor_behaviors` is the single scenario surface for coworker replies and proactive actor behavior.
 
-```json
-{
-  "id": "daisy_customer_wording_nudge",
-  "kind": "policy",
-  "person_id": "daisy",
-  "trigger": {"at": "2026-06-25T09:30:00"},
-  "when": [
-    {
-      "not": {
-        "coworker_state": {
-          "person_id": "daisy",
-          "key": "customer_message_ready",
-          "equals": true
-        }
-      }
-    }
-  ],
-  "effects": [
-    {
-      "type": "create_message",
-      "channel": "email",
-      "sender_id": "daisy",
-      "recipient_id": "agent",
-      "subject": "Customer wording risk",
-      "body": "I still need written customer-ready wording."
-    }
-  ]
-}
+```yaml
+id: daisy_customer_wording_nudge
+kind: policy
+person_id: daisy
+trigger:
+  at: "2026-06-25T09:30:00"
+when:
+  - not:
+      coworker_state:
+        person_id: daisy
+        key: customer_message_ready
+        equals: true
+effects:
+  - type: create_message
+    channel: email
+    sender_id: daisy
+    recipient_id: agent
+    subject: Customer wording risk
+    body: I still need written customer-ready wording.
 ```
 
 ## Evaluation
 
-`evaluation.json` defines grading and reviewer/demo behavior:
+`evaluation.yaml` defines grading and reviewer/demo behavior:
 
 - `agent_brief`: scenario-specific operating guidance for LLM-driven runs, including objective,
   timing guidance, finish criteria, and optional tool hints.
@@ -113,13 +105,27 @@ PM objective and durable-work expectations; it should not reveal hidden facts or
 
 Effects are reusable state mutations:
 
-```json
-{"type": "discover_fact", "fact_id": "fact_backfill_checksum_mismatch"}
-{"type": "update_coworker_state", "person_id": "toad", "key": "stage_approved", "value": true}
-{"type": "update_actor_workload", "person_id": "daisy", "load_level": "high"}
-{"type": "add_actor_commitment", "person_id": "daisy", "description": "Send customer update."}
-{"type": "update_project", "project_id": "project_billing_migration", "decision": "staged_shadow_mode"}
-{"type": "create_message", "channel": "email", "sender_id": "daisy", "recipient_id": "agent", "body": "..."}
+```yaml
+- type: discover_fact
+  fact_id: fact_backfill_checksum_mismatch
+- type: update_coworker_state
+  person_id: toad
+  key: stage_approved
+  value: true
+- type: update_actor_workload
+  person_id: daisy
+  load_level: high
+- type: add_actor_commitment
+  person_id: daisy
+  description: Send customer update.
+- type: update_project
+  project_id: project_billing_migration
+  decision: staged_shadow_mode
+- type: create_message
+  channel: email
+  sender_id: daisy
+  recipient_id: agent
+  body: ...
 ```
 
 ## Multiple Valid Paths
@@ -138,44 +144,40 @@ Meetings must be at least 10 minutes long. This keeps meetings distinct from ins
 
 Use `grading_rules` for scored communication. A grading rule says: only after prerequisites are true, a matching action mutates coworker state; the evaluator then derives evidence from that state.
 
-```json
-{
-  "id": "atlas_customer_update",
-  "template": "grounded_communication",
-  "requires": [
-    {"fact_discovered": "fact_backfill_checksum_mismatch"},
-    {"project_decision": {"project_id": "project_billing_migration", "equals": "staged_shadow_mode"}}
-  ],
-  "action": {
-    "type": "send_email",
-    "recipient_id": "daisy",
-    "match": {
-      "mode": "semantic",
-      "intents": [
-        {
-          "id": "staged_shadow",
-          "description": "The message says the migration will use staged shadow mode.",
-          "signals": ["staged shadow", "shadow mode"]
-        },
-        {
-          "id": "invoice_correctness",
-          "description": "The message explains the invoice correctness or checksum rationale.",
-          "signals": ["invoice correctness", "checksum"]
-        }
-      ],
-      "require_all": ["staged_shadow", "invoice_correctness"]
-    }
-  },
-  "state": {
-    "person_id": "daisy",
-    "key": "atlas_update_received",
-    "value": true
-  },
-  "evidence": {
-    "key": "atlas_update_sent",
-    "note": "Daisy received grounded Atlas customer wording by email."
-  }
-}
+```yaml
+id: atlas_customer_update
+template: grounded_communication
+requires:
+  - fact_discovered: fact_backfill_checksum_mismatch
+  - project_decision:
+      project_id: project_billing_migration
+      equals: staged_shadow_mode
+action:
+  type: send_email
+  recipient_id: daisy
+  match:
+    mode: semantic
+    intents:
+      - id: staged_shadow
+        description: The message says the migration will use staged shadow mode.
+        signals:
+          - staged shadow
+          - shadow mode
+      - id: invoice_correctness
+        description: The message explains the invoice correctness or checksum rationale.
+        signals:
+          - invoice correctness
+          - checksum
+    require_all:
+      - staged_shadow
+      - invoice_correctness
+state:
+  person_id: daisy
+  key: atlas_update_received
+  value: true
+evidence:
+  key: atlas_update_sent
+  note: Daisy received grounded Atlas customer wording by email.
 ```
 
 This keeps scoring causal:
@@ -191,31 +193,38 @@ Scored evidence must be state-derived. The scenario validator rejects direct `ad
 
 Allowed:
 
-```json
-{"type": "update_coworker_state", "person_id": "daisy", "key": "customer_update_received", "value": true}
+```yaml
+type: update_coworker_state
+person_id: daisy
+key: customer_update_received
+value: true
 ```
 
 Then:
 
-```json
-{
-  "evidence_key": "customer_update_sent",
-  "when": [
-    {"coworker_state": {"person_id": "daisy", "key": "customer_update_received", "equals": true}}
-  ],
-  "created_at": {"coworker_state": {"person_id": "daisy", "key": "customer_update_received"}}
-}
+```yaml
+evidence_key: customer_update_sent
+when:
+  - coworker_state:
+      person_id: daisy
+      key: customer_update_received
+      equals: true
+created_at:
+  coworker_state:
+    person_id: daisy
+    key: customer_update_received
 ```
 
 Not allowed for scored keys:
 
-```json
-{"type": "add_evaluation_evidence", "key": "customer_update_sent"}
+```yaml
+type: add_evaluation_evidence
+key: customer_update_sent
 ```
 
 ## Adding A Scenario Without Python
 
-1. Create `scenarios/<id>/scenario.json`, `world.json`, `interactions.json`, and `evaluation.json`.
+1. Create `scenarios/<id>/scenario.yaml`, `world.yaml`, `interactions.yaml`, and `evaluation.yaml`.
 2. Seed at least one project, several coworkers, hidden facts, blockers, tasks, docs, messages, and deadline events.
 3. Add actor behaviors that reveal private facts, mutate coworker state, and model proactive pressure.
 4. Add `grading_rules` or `state_evidence_rules` so score comes from state.

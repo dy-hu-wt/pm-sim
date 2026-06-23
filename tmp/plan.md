@@ -48,7 +48,7 @@ Goal: make the world model persistent and inspectable.
 
 ### 3. Scenario Seed
 
-Create `scenarios/launch_readiness/scenario.json` with `world.json`, `interactions.json`, and `evaluation.json` includes.
+Create `scenarios/launch_readiness/scenario.yaml` with `world.yaml`, `interactions.yaml`, and `evaluation.yaml` includes.
 
 Seed:
 

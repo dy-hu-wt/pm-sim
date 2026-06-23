@@ -96,7 +96,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--scenario",
         type=Path,
         default=DEFAULT_SCENARIO_PATH,
-        help=f"Scenario JSON path. Default: {DEFAULT_SCENARIO_PATH}",
+        help=f"Scenario YAML path. Default: {DEFAULT_SCENARIO_PATH}",
     )
     reset_parser.set_defaults(func=lambda args: reset(args.db, args.scenario))
 
@@ -174,7 +174,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--scenario",
         type=Path,
         default=DEFAULT_SCENARIO_PATH,
-        help=f"Scenario JSON path. Default: {DEFAULT_SCENARIO_PATH}",
+        help=f"Scenario YAML path. Default: {DEFAULT_SCENARIO_PATH}",
     )
     evaluate_parser.set_defaults(func=_evaluate_command)
 
@@ -195,7 +195,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--scenario",
         type=Path,
         default=DEFAULT_SCENARIO_PATH,
-        help=f"Scenario JSON path. Default: {DEFAULT_SCENARIO_PATH}",
+        help=f"Scenario YAML path. Default: {DEFAULT_SCENARIO_PATH}",
     )
     ui_parser.add_argument(
         "--static",
@@ -282,7 +282,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--scenario",
         type=Path,
         default=DEFAULT_SCENARIO_PATH,
-        help=f"Scenario JSON path. Default: {DEFAULT_SCENARIO_PATH}",
+        help=f"Scenario YAML path. Default: {DEFAULT_SCENARIO_PATH}",
     )
     agent_parser.set_defaults(func=_run_agent_command)
 

@@ -11,6 +11,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import yaml
+
 from pm_sim.actions import (
     list_tasks,
     read_doc,
@@ -276,8 +278,8 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
     def test_private_repo_security_reply_is_actor_behavior_driven(self) -> None:
         scenario = load_scenario(DEFAULT_SCENARIO_PATH)
         scenario["actor_behaviors"] = []
-        scenario_path = Path(self.tmpdir.name) / "no_actor_behaviors.json"
-        scenario_path.write_text(json.dumps(scenario))
+        scenario_path = Path(self.tmpdir.name) / "no_actor_behaviors.yaml"
+        scenario_path.write_text(yaml.safe_dump(scenario, sort_keys=False))
         reset(self.db_path, scenario_path)
 
         send_chat(

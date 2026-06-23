@@ -15,15 +15,15 @@ The hidden risk is that repo sync can process stale commit context. If Fireflowe
 The scenario is authored as four JSON files:
 
 ```text
-scenarios/launch_readiness/scenario.json      # id, start time, include list
-scenarios/launch_readiness/world.json         # people, coworker state, project, facts, tasks, docs, events
-scenarios/launch_readiness/interactions.json  # coworker, event, meeting, and action behavior
-scenarios/launch_readiness/evaluation.json    # scoring, gates, outcomes, baseline, scripted path
+scenarios/launch_readiness/scenario.yaml      # id, start time, include list
+scenarios/launch_readiness/world.yaml         # people, coworker state, project, facts, tasks, docs, events
+scenarios/launch_readiness/interactions.yaml  # coworker, event, meeting, and action behavior
+scenarios/launch_readiness/evaluation.yaml    # scoring, gates, outcomes, baseline, scripted path
 ```
 
 The loader merges the included files, validates the result, and then `reset` writes the active run into SQLite.
 
-Coworker state starts in `world.json` and changes through effects during the run. It gives each NPC explicit memory for important commitments: Luigi has surfaced risk, Mario has accepted draft mode, Peach is unblocked, Daisy has received customer/security answers, and Toad has recorded approval.
+Coworker state starts in `world.yaml` and changes through effects during the run. It gives each NPC explicit memory for important commitments: Luigi has surfaced risk, Mario has accepted draft mode, Peach is unblocked, Daisy has received customer/security answers, and Toad has recorded approval.
 
 ## What The Agent Must Do
 
@@ -132,7 +132,7 @@ Good behavior is to keep Nimbus as the main launch path while quickly scoping Ko
 ## Meetings
 
 Meetings are scheduled events. When the meeting end time arrives, the simulator creates a transcript and applies deterministic effects based on attendees, topic, and known state.
-The authored matching rules, transcript lines, and effects live in `scenarios/launch_readiness/interactions.json` under `meeting_rules`.
+The authored matching rules, transcript lines, and effects live in `scenarios/launch_readiness/interactions.yaml` under `meeting_rules`.
 
 Meeting behavior is intentionally stateful:
 

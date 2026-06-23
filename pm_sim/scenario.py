@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import json
+import copy
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 
 class ScenarioError(ValueError):
@@ -13,9 +15,11 @@ class ScenarioError(ValueError):
 def load_scenario(path: Path | str) -> dict[str, Any]:
     scenario_path = Path(path)
     if scenario_path.is_dir():
-        scenario_path = scenario_path / "scenario.json"
+        scenario_path = scenario_path / "scenario.yaml"
     if not scenario_path.exists():
         raise ScenarioError(f"Scenario file not found: {scenario_path}")
+    if scenario_path.suffix not in {".yaml", ".yml"}:
+        raise ScenarioError(f"Scenario files must be YAML: {scenario_path}")
 
     data = _compile_grading_rules(_load_scenario_data(scenario_path))
     _validate_scenario(data, scenario_path)
@@ -23,7 +27,7 @@ def load_scenario(path: Path | str) -> dict[str, Any]:
 
 
 def _load_scenario_data(path: Path) -> dict[str, Any]:
-    data = _load_json_object(path)
+    data = _load_yaml_object(path)
     includes = data.get("include", [])
     if includes is None:
         includes = []
@@ -35,7 +39,7 @@ def _load_scenario_data(path: Path) -> dict[str, Any]:
         if not isinstance(include, str) or not include:
             raise ScenarioError(f"{path} include entries must be non-empty strings.")
         include_path = path.parent / include
-        included = _load_json_object(include_path)
+        included = _load_yaml_object(include_path)
         for key, value in included.items():
             if key in merged:
                 raise ScenarioError(
@@ -45,12 +49,14 @@ def _load_scenario_data(path: Path) -> dict[str, Any]:
     return merged
 
 
-def _load_json_object(path: Path) -> dict[str, Any]:
+def _load_yaml_object(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise ScenarioError(f"Scenario include file not found: {path}")
-    data = json.loads(path.read_text())
+    if path.suffix not in {".yaml", ".yml"}:
+        raise ScenarioError(f"Scenario include files must be YAML: {path}")
+    data = yaml.safe_load(path.read_text())
     if not isinstance(data, dict):
-        raise ScenarioError(f"Scenario file must contain a JSON object: {path}")
+        raise ScenarioError(f"Scenario file must contain a YAML object: {path}")
     return data
 
 
@@ -61,7 +67,7 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(grading_rules, list):
         raise ScenarioError("grading_rules must be a list.")
 
-    compiled = copy_json_object(data)
+    compiled = copy_object(data)
     generated_action_ids = {
         f"grading_{_required_string(rule, 'id', 'grading rule')}_action"
         for rule in grading_rules
@@ -156,8 +162,8 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
     return compiled
 
 
-def copy_json_object(data: dict[str, Any]) -> dict[str, Any]:
-    return json.loads(json.dumps(data))
+def copy_object(data: dict[str, Any]) -> dict[str, Any]:
+    return copy.deepcopy(data)
 
 
 def _match_for_grading_action(action: dict[str, Any]) -> dict[str, Any]:

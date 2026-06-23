@@ -15,10 +15,10 @@ The agent's job is to discover the stale-code risk, align Mario, Luigi, Peach, D
 The launch scenario is authored as four JSON files:
 
 ```text
-scenarios/launch_readiness/scenario.json      # manifest: id, start time, includes
-scenarios/launch_readiness/world.json         # people, coworker state, projects, facts, tasks, docs, events
-scenarios/launch_readiness/interactions.json  # coworker, event, meeting, and action behavior
-scenarios/launch_readiness/evaluation.json    # grading, gates, outcomes, baseline, scripted path
+scenarios/launch_readiness/scenario.yaml      # manifest: id, start time, includes
+scenarios/launch_readiness/world.yaml         # people, coworker state, projects, facts, tasks, docs, events
+scenarios/launch_readiness/interactions.yaml  # coworker, event, meeting, and action behavior
+scenarios/launch_readiness/evaluation.yaml    # grading, gates, outcomes, baseline, scripted path
 ```
 
 `pm-sim reset` loads the manifest, merges included files, validates the scenario, and writes the active run into SQLite.
@@ -137,7 +137,7 @@ The same path can be run by the deterministic scripted agent:
 pm-sim run-agent --policy scripted --reset
 ```
 
-The scripted policy steps are authored in `scenarios/launch_readiness/evaluation.json` under `scripted_policy`; the runner only dispatches those steps through normal tool functions. It does not mutate database state directly.
+The scripted policy steps are authored in `scenarios/launch_readiness/evaluation.yaml` under `scripted_policy`; the runner only dispatches those steps through normal tool functions. It does not mutate database state directly.
 
 ## Second Scenario
 
@@ -321,13 +321,13 @@ pm-sim evaluate --explain
 pm-sim --json evaluate
 ```
 
-The score comes from the rubric in `scenarios/launch_readiness/evaluation.json`. It rewards outcomes and state improvements, not raw tool usage or activity volume. Evidence must show that the agent improved the project: discovering blockers, aligning stakeholders, unblocking real work, approving a defensible draft-mode launch, and avoiding harmful state. `avoid_harmful_actions` includes a light, capped penalty for excessive direct outreach, calibrated for a week with two active project threads.
+The score comes from the rubric in `scenarios/launch_readiness/evaluation.yaml`. It rewards outcomes and state improvements, not raw tool usage or activity volume. Evidence must show that the agent improved the project: discovering blockers, aligning stakeholders, unblocking real work, approving a defensible draft-mode launch, and avoiding harmful state. `avoid_harmful_actions` includes a light, capped penalty for excessive direct outreach, calibrated for a week with two active project threads.
 
 Task updates are checked against the surrounding world state to resist reward hacking. For example, marking repo sync complete while the stale-code blocker is unresolved is penalized, and draft-mode onboarding progress only counts when draft-mode scope is confirmed and the scope blocker is resolved.
 
 After the Friday deadline event is delivered, `evaluate` also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
-The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, `interactions.json`, and `evaluation.json`. Most scenario semantics now live in data: task gates, coworker memory, actor behaviors, chat/email/doc-derived effects, state-derived evidence, harmful-action rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger intents, transcript lines, semantic criteria, and effects. `actor_behaviors` is the single behavior authoring and runtime surface: `kind: "reply"` handles chat/email replies, and `kind: "policy"` handles proactive timed/state-driven nudges. Matching now uses one `match` object: deterministic actor routing uses `mode: "deterministic"` and authored intents/signals, while action-derived scoring uses `mode: "semantic"` after causal `when` conditions pass. Semantic communication checks default to the cached fail-closed LLM matcher for phrasing equivalence. Set `PM_SIM_SEMANTIC_MATCHER=deterministic` for fully offline/reproducible runs; scripted policy and tests force that deterministic mode explicitly. The `ui` command is an operator surface over the same SQLite state; its live playback advances time through the same backend event queue rather than replaying separate UI state.
+The scenario is split across `scenarios/launch_readiness/scenario.yaml`, `world.yaml`, `interactions.yaml`, and `evaluation.yaml`. Most scenario semantics now live in data: task gates, coworker memory, actor behaviors, chat/email/doc-derived effects, state-derived evidence, harmful-action rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger intents, transcript lines, semantic criteria, and effects. `actor_behaviors` is the single behavior authoring and runtime surface: `kind: "reply"` handles chat/email replies, and `kind: "policy"` handles proactive timed/state-driven nudges. Matching now uses one `match` object: deterministic actor routing uses `mode: "deterministic"` and authored intents/signals, while action-derived scoring uses `mode: "semantic"` after causal `when` conditions pass. Semantic communication checks default to the cached fail-closed LLM matcher for phrasing equivalence. Set `PM_SIM_SEMANTIC_MATCHER=deterministic` for fully offline/reproducible runs; scripted policy and tests force that deterministic mode explicitly. The `ui` command is an operator surface over the same SQLite state; its live playback advances time through the same backend event queue rather than replaying separate UI state.
 
 Coworkers are deterministic autonomous actors, not freeform LLM NPCs. Their distinct roles come from authored personas, agenda fields (`current_focus`, `needs_from_pm`, `known_constraints`), private facts, mutable `coworker_state`, schema-backed actor goals/workload/commitments, response-delay/availability windows, proactive scheduled events, and prioritized actor behaviors. Actor behaviors use the shared condition language through `when`, so behavior can depend on actor memory, project decisions, blocker status, evidence, or time. This keeps grading reproducible while still modeling PM-relevant behavior such as delayed answers, private owner knowledge, stakeholder pressure, escalation, workload changes, explicit commitments, and different responses after someone has already answered or approved something.
 

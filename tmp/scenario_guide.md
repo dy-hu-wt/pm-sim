@@ -311,7 +311,7 @@ Meeting semantics are stateful:
 - Toad can approve only if risk and scope are available in the meeting context.
 - Daisy in a relevant meeting can create customer reliability context.
 
-The concrete meeting matching rules, transcript lines, and effects live in `scenarios/launch_readiness/interactions.json` under `meeting_rules`.
+The concrete meeting matching rules, transcript lines, and effects live in `scenarios/launch_readiness/interactions.yaml` under `meeting_rules`.
 
 Tool actions also consume deterministic simulated effort. Chat costs 5 minutes, email costs 10 minutes, reading a doc costs 15 minutes, updating a doc costs 20 minutes, scheduling a meeting costs 5 minutes, and task updates cost 1 minute. If an action crosses a scheduled event time, that event is delivered during the action.
 
@@ -459,7 +459,7 @@ The deterministic scripted agent runs the scenario-authored good path through th
 run-agent --policy scripted --reset
 ```
 
-This is not an LLM policy and does not train anything. The steps live in `scenarios/launch_readiness/evaluation.json` under `scripted_policy`; the runner is just a generic dispatcher and one-command reviewer demo.
+This is not an LLM policy and does not train anything. The steps live in `scenarios/launch_readiness/evaluation.yaml` under `scripted_policy`; the runner is just a generic dispatcher and one-command reviewer demo.
 
 The LLM policy runs the same kind of loop, but the model chooses tool calls:
 

@@ -4,7 +4,7 @@ This generated note is kept in `docs/ai-generated/` as reviewer-facing scaffoldi
 
 ## Core Shape
 
-`pm-sim` is a single-node simulation backend. A scenario manifest includes `world.json`, `interactions.json`, and `evaluation.json`; SQLite stores the mutable state, CLI commands expose the tools, scheduled events advance background activity, deterministic actor behaviors emit effects, and the evaluator scores the resulting state.
+`pm-sim` is a single-node simulation backend. A scenario manifest includes `world.yaml`, `interactions.yaml`, and `evaluation.yaml`; SQLite stores the mutable state, CLI commands expose the tools, scheduled events advance background activity, deterministic actor behaviors emit effects, and the evaluator scores the resulting state.
 
 The main backend flow is:
 
@@ -15,10 +15,10 @@ scenario JSON -> SQLite state -> CLI tools -> actions -> event queue -> effects 
 The authored launch scenario lives in four files:
 
 ```text
-scenarios/launch_readiness/scenario.json      # id, start time, include list
-scenarios/launch_readiness/world.json         # starting world state and coworker memory
-scenarios/launch_readiness/interactions.json  # coworker, event, meeting, and action behavior
-scenarios/launch_readiness/evaluation.json    # scoring, gates, outcomes, baseline, scripted path
+scenarios/launch_readiness/scenario.yaml      # id, start time, include list
+scenarios/launch_readiness/world.yaml         # starting world state and coworker memory
+scenarios/launch_readiness/interactions.yaml  # coworker, event, meeting, and action behavior
+scenarios/launch_readiness/evaluation.yaml    # scoring, gates, outcomes, baseline, scripted path
 ```
 
 Agent policies add one harness step after the action loop:
@@ -163,7 +163,7 @@ pm-sim evaluate --explain
 
 The engine should stay scenario-agnostic where possible. A new scenario should mostly define:
 
-- a `scenario.json` manifest
+- a `scenario.yaml` manifest
 - people
 - coworker state
 - project state

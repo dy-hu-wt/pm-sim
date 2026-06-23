@@ -3,13 +3,14 @@ from __future__ import annotations
 import copy
 import contextlib
 import io
-import json
 import tempfile
 import unittest
 import unittest.mock
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+
+import yaml
 
 from pm_sim.actions import (
     list_tasks,
@@ -183,13 +184,13 @@ class ScenarioValidationTests(unittest.TestCase):
 
         root = Path(self.tmpdir.name) / "scenario_dir"
         root.mkdir()
-        (root / "scenario.json").write_text(
-            json.dumps({**manifest, "include": ["world.json", "rules.json"]})
+        (root / "scenario.yaml").write_text(
+            yaml.safe_dump({**manifest, "include": ["world.yaml", "rules.yaml"]}, sort_keys=False)
         )
-        (root / "world.json").write_text(json.dumps(world))
-        (root / "rules.json").write_text(json.dumps(rules))
+        (root / "world.yaml").write_text(yaml.safe_dump(world, sort_keys=False))
+        (root / "rules.yaml").write_text(yaml.safe_dump(rules, sort_keys=False))
 
-        loaded = load_scenario(root / "scenario.json")
+        loaded = load_scenario(root / "scenario.yaml")
 
         self.assertEqual(loaded["id"], "launch_readiness")
         self.assertEqual(len(loaded["people"]), 5)
@@ -200,14 +201,15 @@ class ScenarioValidationTests(unittest.TestCase):
         self.assertEqual(loaded_from_dir["id"], "launch_readiness")
 
     def test_missing_manifest_include_raises_scenario_error(self) -> None:
-        path = Path(self.tmpdir.name) / "scenario.json"
+        path = Path(self.tmpdir.name) / "scenario.yaml"
         path.write_text(
-            json.dumps(
+            yaml.safe_dump(
                 {
                     "id": "broken",
                     "start_time": "2026-06-22T09:00:00",
-                    "include": ["missing.json"],
-                }
+                    "include": ["missing.yaml"],
+                },
+                sort_keys=False,
             )
         )
 
@@ -222,6 +224,6 @@ class ScenarioValidationTests(unittest.TestCase):
             load_scenario(self._write_scenario(scenario))
 
     def _write_scenario(self, scenario: dict[str, Any]) -> Path:
-        path = Path(self.tmpdir.name) / "scenario.json"
-        path.write_text(json.dumps(scenario))
+        path = Path(self.tmpdir.name) / "scenario.yaml"
+        path.write_text(yaml.safe_dump(scenario, sort_keys=False))
         return path
