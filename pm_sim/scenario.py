@@ -21,7 +21,8 @@ def load_scenario(path: Path | str) -> dict[str, Any]:
     if scenario_path.suffix not in {".yaml", ".yml"}:
         raise ScenarioError(f"Scenario files must be YAML: {scenario_path}")
 
-    data = _compile_grading_rules(_load_scenario_data(scenario_path))
+    data = _normalize_author_references(_load_scenario_data(scenario_path))
+    data = _compile_grading_rules(data)
     _validate_scenario(data, scenario_path)
     return data
 
@@ -160,6 +161,71 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
     compiled["action_rules"] = action_rules
     compiled["state_evidence_rules"] = state_evidence_rules
     return compiled
+
+
+def _normalize_author_references(data: dict[str, Any]) -> dict[str, Any]:
+    normalized = copy_object(data)
+    task_aliases = _task_aliases(normalized.get("tasks", []))
+    if task_aliases:
+        _canonicalize_task_ids(normalized.get("tasks", []), task_aliases)
+        _rewrite_task_references(normalized, task_aliases)
+    return normalized
+
+
+def _task_aliases(tasks: list[dict[str, Any]]) -> dict[str, str]:
+    aliases: dict[str, str] = {}
+    for task in tasks:
+        task_id = task.get("id")
+        if not isinstance(task_id, str) or not task_id:
+            continue
+        canonical = task_id if task_id.startswith("task_") else f"task_{task_id}"
+        names = {task_id, canonical}
+        if canonical.startswith("task_"):
+            names.add(canonical.removeprefix("task_"))
+        for key in ("key", "slug", "ref"):
+            value = task.get(key)
+            if isinstance(value, str) and value:
+                names.add(value)
+        for name in names:
+            existing = aliases.get(name)
+            if existing and existing != canonical:
+                raise ScenarioError(
+                    f"Ambiguous task reference {name!r}: {existing} and {canonical}"
+                )
+            aliases[name] = canonical
+    return aliases
+
+
+def _canonicalize_task_ids(tasks: list[dict[str, Any]], aliases: dict[str, str]) -> None:
+    for task in tasks:
+        task_id = task.get("id")
+        if isinstance(task_id, str) and task_id in aliases:
+            task["id"] = aliases[task_id]
+
+
+def _rewrite_task_references(value: Any, aliases: dict[str, str]) -> None:
+    task_reference_keys = {"task_id", "upstream_task_id", "downstream_task_id"}
+    if isinstance(value, list):
+        for item in value:
+            _rewrite_task_references(item, aliases)
+        return
+    if not isinstance(value, dict):
+        return
+    for key, item in value.items():
+        if key in task_reference_keys and isinstance(item, str):
+            value[key] = _resolve_task_reference(item, aliases)
+            continue
+        if key == "task_status" and isinstance(item, dict):
+            task_id = item.get("id")
+            if isinstance(task_id, str):
+                item["id"] = _resolve_task_reference(task_id, aliases)
+            _rewrite_task_references(item, aliases)
+            continue
+        _rewrite_task_references(item, aliases)
+
+
+def _resolve_task_reference(task_id: str, aliases: dict[str, str]) -> str:
+    return aliases.get(task_id, task_id)
 
 
 def copy_object(data: dict[str, Any]) -> dict[str, Any]:

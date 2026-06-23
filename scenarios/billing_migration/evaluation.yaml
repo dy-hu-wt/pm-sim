@@ -256,7 +256,7 @@ state_evidence_rules:
       person_id: toad
       key: export_scope_aligned
 task_gate_rules:
-- task_id: task_migration_decision
+- task_id: migration_decision
   statuses:
   - complete
   - completed
@@ -266,8 +266,8 @@ task_gate_rules:
       person_id: toad
       key: stage_approved
       equals: true
-  error: task_migration_decision cannot complete before Toad approves staged shadow mode.
-- task_id: task_atlas_customer_update
+  error: migration_decision cannot complete before Toad approves staged shadow mode.
+- task_id: atlas_customer_update
   statuses:
   - complete
   - completed
@@ -277,8 +277,8 @@ task_gate_rules:
       person_id: daisy
       key: atlas_update_received
       equals: true
-  error: task_atlas_customer_update cannot complete until Daisy receives the Atlas update by email.
-- task_id: task_meridian_update
+  error: atlas_customer_update cannot complete until Daisy receives the Atlas update by email.
+- task_id: meridian_update
   statuses:
   - complete
   - completed
@@ -288,7 +288,7 @@ task_gate_rules:
       person_id: daisy
       key: meridian_update_received
       equals: true
-  error: task_meridian_update cannot complete until Daisy receives the Meridian export update by email.
+  error: meridian_update cannot complete until Daisy receives the Meridian export update by email.
 outcome_rules:
 - id: unsafe_full_cutover
   when:

@@ -345,7 +345,7 @@ facts:
   summary: The Koopa Bank audit log export scope is one-time CSV for the security review, with full self-serve
     export deferred.
 tasks:
-- id: task_repo_sync
+- id: repo_sync
   project_id: project_pr_review_agent
   title: Stabilize repo sync for latest commit reviews
   owner_id: luigi
@@ -356,7 +356,7 @@ tasks:
     blocked_by:
     - blocker_repo_sync_stale
   blocked_by: blocker_repo_sync_stale
-- id: task_review_context_pipeline
+- id: review_context_pipeline
   project_id: project_pr_review_agent
   title: Prepare diff context and test fixtures
   owner_id: luigi
@@ -365,7 +365,7 @@ tasks:
   due_at: '2026-06-24T17:00:00'
   metadata: {}
   blocked_by: ''
-- id: task_draft_mode_docs
+- id: draft_mode_docs
   project_id: project_pr_review_agent
   title: Finalize draft-mode onboarding
   description: Peach needs the approved Friday launch mode early enough to finish onboarding copy before
@@ -378,7 +378,7 @@ tasks:
     blocked_by:
     - blocker_scope_unclear
   blocked_by: blocker_scope_unclear
-- id: task_customer_talk_track
+- id: customer_talk_track
   project_id: project_pr_review_agent
   title: Email Daisy the Nimbus beta talk track
   description: Daisy needs customer-ready Nimbus wording by Thursday morning so she can forward and archive
@@ -391,7 +391,7 @@ tasks:
     blocked_by:
     - blocker_launch_scope_decision
   blocked_by: blocker_launch_scope_decision
-- id: task_beta_rollout_notes
+- id: beta_rollout_notes
   project_id: project_pr_review_agent
   title: Prepare Nimbus beta rollout notes
   description: The rollout note should be grounded in the approved launch mode, human-approval language,
@@ -404,7 +404,7 @@ tasks:
     blocked_by:
     - blocker_launch_scope_decision
   blocked_by: blocker_launch_scope_decision
-- id: task_launch_decision
+- id: launch_decision
   project_id: project_pr_review_agent
   title: Decide auto-commenting versus draft mode
   description: Toad needs an explicit Friday launch option before downstream customer messaging and onboarding
@@ -417,7 +417,7 @@ tasks:
     blocked_by:
     - blocker_launch_scope_decision
   blocked_by: blocker_launch_scope_decision
-- id: task_audit_export_scope
+- id: audit_export_scope
   project_id: project_audit_log_export
   title: Clarify audit log export scope for Koopa Bank
   description: Koopa needs a scoped one-time CSV versus full self-serve export answer before Thursday's
@@ -430,7 +430,7 @@ tasks:
     blocked_by:
     - blocker_audit_export_scope_unclear
   blocked_by: blocker_audit_export_scope_unclear
-- id: task_audit_export_feasibility
+- id: audit_export_feasibility
   project_id: project_audit_log_export
   title: Confirm one-time CSV export feasibility
   description: Luigi should confirm whether a one-time admin audit-log CSV is feasible in time for Koopa's
@@ -441,7 +441,7 @@ tasks:
   due_at: '2026-06-25T12:00:00'
   metadata: {}
   blocked_by: ''
-- id: task_koopa_status_update
+- id: koopa_status_update
   project_id: project_audit_log_export
   title: Email Daisy the Koopa Bank status update
   description: Daisy needs customer-facing Koopa wording by email before the Thursday security review,
@@ -454,7 +454,7 @@ tasks:
     blocked_by:
     - blocker_audit_export_scope_unclear
   blocked_by: blocker_audit_export_scope_unclear
-- id: task_self_serve_audit_export_followup
+- id: self_serve_audit_export_followup
   project_id: project_audit_log_export
   title: Plan self-serve audit export follow-up
   owner_id: mario
@@ -466,28 +466,28 @@ tasks:
 dependencies:
 - id: dep_design_needs_scope
   project_id: project_pr_review_agent
-  upstream_task_id: task_launch_decision
-  downstream_task_id: task_draft_mode_docs
+  upstream_task_id: launch_decision
+  downstream_task_id: draft_mode_docs
   description: Onboarding cannot finish until Friday launch mode is decided.
 - id: dep_talk_track_needs_decision
   project_id: project_pr_review_agent
-  upstream_task_id: task_launch_decision
-  downstream_task_id: task_customer_talk_track
+  upstream_task_id: launch_decision
+  downstream_task_id: customer_talk_track
   description: Customer beta talk track depends on the launch mode decision.
 - id: dep_rollout_notes_need_decision
   project_id: project_pr_review_agent
-  upstream_task_id: task_launch_decision
-  downstream_task_id: task_beta_rollout_notes
+  upstream_task_id: launch_decision
+  downstream_task_id: beta_rollout_notes
   description: Nimbus rollout notes need the final launch mode and safety language.
 - id: dep_auto_commenting_needs_repo_sync
   project_id: project_pr_review_agent
-  upstream_task_id: task_repo_sync
-  downstream_task_id: task_launch_decision
+  upstream_task_id: repo_sync
+  downstream_task_id: launch_decision
   description: Repo sync reliability determines whether auto-commenting is safe.
 - id: dep_koopa_update_needs_scope
   project_id: project_audit_log_export
-  upstream_task_id: task_audit_export_scope
-  downstream_task_id: task_koopa_status_update
+  upstream_task_id: audit_export_scope
+  downstream_task_id: koopa_status_update
   description: Daisy's Koopa update needs a confirmed one-time CSV versus full export scope.
 blockers:
 - id: blocker_repo_sync_stale
@@ -626,7 +626,7 @@ events:
   priority: 100
   payload:
     project_id: project_pr_review_agent
-    task_id: task_draft_mode_docs
+    task_id: draft_mode_docs
 - id: event_daisy_confidence_check
   event_type: daisy_confidence_check
   scheduled_at: '2026-06-24T13:00:00'

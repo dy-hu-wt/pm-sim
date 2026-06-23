@@ -352,7 +352,7 @@ actor_behaviors:
     fact_id: fact_audit_log_one_time_export_feasible
     source: luigi_chat_reply
   - type: update_task
-    task_id: task_audit_export_feasibility
+    task_id: audit_export_feasibility
     status: in_progress
   - type: update_coworker_state
     person_id: luigi
@@ -394,7 +394,7 @@ actor_behaviors:
     blocker_id: blocker_audit_export_scope_unclear
     status: resolved
   - type: update_task
-    task_id: task_audit_export_scope
+    task_id: audit_export_scope
     status: in_progress
   - type: update_project
     project_id: project_audit_log_export
@@ -865,7 +865,7 @@ actor_behaviors:
     fact_id: fact_draft_mode_scope_confirmed
     source: peach_chat_reply
   - type: update_task
-    task_id: task_draft_mode_docs
+    task_id: draft_mode_docs
     status: in_progress
   - type: update_blocker
     blocker_id: blocker_scope_unclear
@@ -1127,7 +1127,7 @@ meeting_rules:
     fact_id: fact_draft_mode_scope_confirmed
     source: meeting_occurs
   - type: update_task
-    task_id: task_draft_mode_docs
+    task_id: draft_mode_docs
     status: in_progress
   - type: update_blocker
     blocker_id: blocker_scope_unclear

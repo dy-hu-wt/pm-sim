@@ -69,6 +69,22 @@ class ScenarioValidationTests(unittest.TestCase):
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
+    def test_readable_task_aliases_are_canonicalized(self) -> None:
+        task_ids = {task["id"] for task in self.base["tasks"]}
+        self.assertIn("task_launch_decision", task_ids)
+        self.assertIn("task_repo_sync", task_ids)
+
+        dependency = next(
+            row
+            for row in self.base["dependencies"]
+            if row["id"] == "dep_auto_commenting_needs_repo_sync"
+        )
+        self.assertEqual(dependency["upstream_task_id"], "task_repo_sync")
+        self.assertEqual(dependency["downstream_task_id"], "task_launch_decision")
+
+        gate = next(rule for rule in self.base["task_gate_rules"] if rule["task_id"] == "task_repo_sync")
+        self.assertIn("complete", gate["statuses"])
+
     def test_invalid_event_project_payload_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.base)
         scenario["events"][0]["payload"]["project_id"] = "missing_project"

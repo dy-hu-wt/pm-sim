@@ -49,6 +49,29 @@ Use `pm-sim reset --scenario scenarios/<scenario_id>` to validate and load it.
 
 Visibility is standardized with nullable `visible_at`: if it is `null`, the item exists in the world but is not visible to the agent yet.
 
+## Readable Task References
+
+Task IDs are authored as short scenario names, and the loader canonicalizes them for SQLite and
+tool APIs. Write this in YAML:
+
+```yaml
+tasks:
+  - id: launch_decision
+    title: Decide auto-commenting versus draft mode
+
+dependencies:
+  - upstream_task_id: launch_decision
+    downstream_task_id: draft_mode_docs
+
+task_gate_rules:
+  - task_id: customer_talk_track
+```
+
+At runtime those become `task_launch_decision`, `task_draft_mode_docs`, and
+`task_customer_talk_track`. This keeps CLI output and database IDs stable while keeping scenario
+source readable. The same alias works anywhere the YAML schema expects `task_id`,
+`upstream_task_id`, `downstream_task_id`, or a `task_status.id` condition.
+
 ## Interactions
 
 `interactions.yaml` defines how coworkers and background dynamics change the world. Reply behavior

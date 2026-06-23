@@ -231,7 +231,7 @@ facts:
   source: null
   metadata: {}
 tasks:
-- id: task_backfill_parity
+- id: backfill_parity
   project_id: project_billing_migration
   title: Investigate billing backfill parity
   description: Luigi needs to explain whether invoice backfill checksums are safe enough for full cutover.
@@ -243,7 +243,7 @@ tasks:
     blocked_by:
     - blocker_backfill_checksum_unknown
   blocked_by: blocker_backfill_checksum_unknown
-- id: task_migration_decision
+- id: migration_decision
   project_id: project_billing_migration
   title: Decide staged shadow mode versus full cutover
   description: Toad needs technical risk, customer impact, and a recommended Friday migration mode.
@@ -255,7 +255,7 @@ tasks:
     blocked_by:
     - blocker_migration_mode_unclear
   blocked_by: blocker_migration_mode_unclear
-- id: task_atlas_customer_update
+- id: atlas_customer_update
   project_id: project_billing_migration
   title: Email Daisy the Atlas migration update
   description: Daisy needs customer-ready Atlas wording by email before Thursday afternoon.
@@ -267,7 +267,7 @@ tasks:
     blocked_by:
     - blocker_migration_mode_unclear
   blocked_by: blocker_migration_mode_unclear
-- id: task_meridian_export_scope
+- id: meridian_export_scope
   project_id: project_invoice_export
   title: Clarify Meridian export scope
   description: Confirm whether this week supports one finance export or a full self-serve export feature.
@@ -279,7 +279,7 @@ tasks:
     blocked_by:
     - blocker_invoice_export_scope
   blocked_by: blocker_invoice_export_scope
-- id: task_meridian_update
+- id: meridian_update
   project_id: project_invoice_export
   title: Email Daisy the Meridian export answer
   description: Daisy needs a scoped Meridian answer by email before the Thursday finance review.
@@ -294,18 +294,18 @@ tasks:
 dependencies:
 - id: dep_backfill_to_decision
   project_id: project_billing_migration
-  upstream_task_id: task_backfill_parity
-  downstream_task_id: task_migration_decision
+  upstream_task_id: backfill_parity
+  downstream_task_id: migration_decision
   description: Migration mode depends on knowing whether backfill parity is safe.
 - id: dep_decision_to_atlas_update
   project_id: project_billing_migration
-  upstream_task_id: task_migration_decision
-  downstream_task_id: task_atlas_customer_update
+  upstream_task_id: migration_decision
+  downstream_task_id: atlas_customer_update
   description: Customer update depends on an approved migration mode.
 - id: dep_export_scope_to_update
   project_id: project_invoice_export
-  upstream_task_id: task_meridian_export_scope
-  downstream_task_id: task_meridian_update
+  upstream_task_id: meridian_export_scope
+  downstream_task_id: meridian_update
   description: Meridian update depends on a scoped export answer.
 blockers:
 - id: blocker_backfill_checksum_unknown
