@@ -90,6 +90,7 @@ class _UiServer(ThreadingHTTPServer):
         self.model = model
         self.max_turns = max_turns
         self.step_lock = threading.Lock()
+        self.last_log_lines: list[str] = []
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -116,6 +117,7 @@ class _Handler(BaseHTTPRequestHandler):
             reset(self.server.db_path, self.server.scenario_path)
             if self.server.policy == "llm":
                 start_llm_session(self.server.db_path, self.server.scenario_path, model=self.server.model)
+            self.server.last_log_lines = []
             self._send_json(_state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit))
             return
         if path == "/api/advance-next":
@@ -137,6 +139,7 @@ class _Handler(BaseHTTPRequestHandler):
             payload = _state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit)
             payload["step_result"] = step_result
             payload["done"] = bool(step_result.get("done"))
+            _emit_new_console_lines(self.server, payload.get("log_lines") or [])
             self._send_json(payload)
             return
         self.send_error(404)
@@ -270,6 +273,18 @@ def _run_next_ui_step(
         "tool": "complete",
         "result": {"ok": True},
     }
+
+
+def _emit_new_console_lines(server: _UiServer, log_lines: list[str]) -> None:
+    previous = server.last_log_lines
+    start = 0
+    if previous and log_lines[: len(previous)] == previous:
+        start = len(previous)
+    elif previous and previous[-1] in log_lines:
+        start = log_lines.index(previous[-1]) + 1
+    for line in log_lines[start:]:
+        print(f"[ui] {line}", flush=True)
+    server.last_log_lines = list(log_lines)
 
 
 def _scripted_demo_state(db_path: Path, scenario_path: Path) -> dict[str, Any]:
@@ -524,14 +539,16 @@ section { margin:14px 0; overflow:hidden; }
 .calendar-event.message { border-left-color:#1a8f6a; }
 .calendar-event.current { outline:2px solid rgba(37,92,153,.24); background:#f2f7ff; }
 .calendar-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
-.calendar-meta { display:flex; align-items:center; gap:8px; min-width:0; }
+.calendar-meta { display:flex; align-items:flex-start; gap:8px; min-width:0; flex:1 1 auto; }
 .tool-badge { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; letter-spacing:.04em; background:#eaf1fb; color:var(--blue); }
 .calendar-event.message .tool-badge { background:#e7f6f0; color:#136c50; }
 .calendar-event.event .tool-badge { background:#f2ebff; color:var(--purple); }
-.calendar-route { font-size:12px; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.calendar-route { font-size:12px; font-weight:700; color:var(--muted); overflow-wrap:anywhere; }
 .calendar-time { font-size:12px; font-weight:800; color:var(--muted); flex:0 0 auto; }
 .calendar-title { font-size:14px; font-weight:800; color:var(--ink); }
 .calendar-detail { font-size:12px; color:var(--muted); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.calendar-event button.card-open { all:unset; display:grid; gap:6px; cursor:pointer; width:100%; }
+.calendar-event button.card-open:focus-visible { outline:2px solid rgba(37,92,153,.35); outline-offset:2px; border-radius:8px; }
 .log-console { max-height:360px; overflow:auto; padding:14px; border:1px solid var(--line); border-radius:10px; background:#101722; color:#d9e7ff; font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
 .log-line { white-space:pre-wrap; border-bottom:1px solid rgba(255,255,255,.06); padding:6px 0; }
 .log-line:last-child { border-bottom:none; }
@@ -559,6 +576,17 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
 .badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:800; background:#eef2f7; }
 .good { color:var(--good); } .warn { color:var(--warn); } .bad { color:var(--bad); }
 .empty { color:var(--muted); font-style:italic; padding:14px; }
+.modal { position:fixed; inset:0; background:rgba(15,24,38,.42); display:flex; align-items:center; justify-content:center; padding:24px; z-index:20; }
+.modal[hidden] { display:none; }
+.modal-card { width:min(760px, 100%); max-height:min(80vh, 720px); overflow:auto; background:#fff; border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); }
+.modal-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:16px 18px 10px; border-bottom:1px solid var(--line); }
+.modal-title { font-size:18px; font-weight:850; }
+.modal-route { color:var(--muted); font-size:13px; margin-top:4px; overflow-wrap:anywhere; }
+.modal-close { all:unset; cursor:pointer; font-size:22px; line-height:1; color:var(--muted); padding:4px; }
+.modal-body { padding:16px 18px 18px; display:grid; gap:12px; }
+.modal-block { display:grid; gap:6px; }
+.modal-label { color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+.modal-text { font-size:14px; color:var(--ink); white-space:pre-wrap; overflow-wrap:anywhere; }
 @keyframes spin { to { transform:rotate(360deg); } }
 @media (max-width:800px) { .top,.hero { display:block; } .controls { margin-top:10px; } .score { text-align:left; margin-top:12px; } }
 </style>
@@ -609,6 +637,31 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
     <div class="list" id="schedule"></div>
   </details>
 </main>
+<div class="modal" id="card-modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="modal-title"></div>
+        <div class="modal-route" id="modal-route"></div>
+      </div>
+      <button class="modal-close" id="modal-close" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-block">
+        <div class="modal-label">Time</div>
+        <div class="modal-text" id="modal-time"></div>
+      </div>
+      <div class="modal-block">
+        <div class="modal-label">Type</div>
+        <div class="modal-text" id="modal-badge"></div>
+      </div>
+      <div class="modal-block">
+        <div class="modal-label">Details</div>
+        <div class="modal-text" id="modal-detail"></div>
+      </div>
+    </div>
+  </div>
+</div>
 <script>
 let timer = null;
 let stepping = false;
@@ -692,6 +745,19 @@ function projectCard(project) {
   `;
 }
 
+function modalOpen(item) {
+  $("modal-title").textContent = item.title || "";
+  $("modal-route").textContent = item.route || "";
+  $("modal-time").textContent = pretty(item.time);
+  $("modal-badge").textContent = item.badge || item.kind || "";
+  $("modal-detail").textContent = item.detail || "";
+  $("card-modal").hidden = false;
+}
+
+function modalClose() {
+  $("card-modal").hidden = true;
+}
+
 function scenarioDays(scenario, items) {
   const values = [
     scenario.start_time,
@@ -721,15 +787,22 @@ function renderReplay(items, scenario) {
           .map((item, index) => ({ item, index }))
           .filter(row => dateKey(row.item.time) === day)
           .map(row => `<div class="calendar-event ${esc(row.item.kind)} ${row.index === latest ? "current" : ""}">
-            <div class="calendar-top">
-              <div class="calendar-meta">
-                <span class="tool-badge">${esc(row.item.badge || row.item.kind)}</span>
-                ${row.item.route ? `<span class="calendar-route">${esc(row.item.route)}</span>` : ""}
+            <button class="card-open" type="button"
+              data-time="${esc(row.item.time)}"
+              data-badge="${esc(row.item.badge || row.item.kind)}"
+              data-route="${esc(row.item.route || "")}"
+              data-title="${esc(row.item.title || "")}"
+              data-detail="${esc(row.item.detail || "")}">
+              <div class="calendar-top">
+                <div class="calendar-meta">
+                  <span class="tool-badge">${esc(row.item.badge || row.item.kind)}</span>
+                  ${row.item.route ? `<span class="calendar-route">${esc(row.item.route)}</span>` : ""}
+                </div>
+                <div class="calendar-time">${esc(timeOnly(row.item.time))}</div>
               </div>
-              <div class="calendar-time">${esc(timeOnly(row.item.time))}</div>
-            </div>
-            <div class="calendar-title">${esc(row.item.title)}</div>
-            ${row.item.detail ? `<div class="calendar-detail">${esc(row.item.detail)}</div>` : ""}
+              <div class="calendar-title">${esc(row.item.title)}</div>
+              ${row.item.detail ? `<div class="calendar-detail">${esc(row.item.detail)}</div>` : ""}
+            </button>
           </div>`)
           .join("");
         return `<div class="day"><div class="day-head"><strong>${esc(dayLabel(day))}</strong><span>${esc(day)}</span></div>${cards || `<div class="empty">No visible activity.</div>`}</div>`;
@@ -830,6 +903,24 @@ $("step").addEventListener("click", step);
 $("pause").addEventListener("click", pause);
 $("reset").addEventListener("click", async () => { pause(); render(await api("/api/reset", { method: "POST" })); });
 refresh();
+$("calendar-board").addEventListener("click", (event) => {
+  const card = event.target.closest(".card-open");
+  if (!card) return;
+  modalOpen({
+    time: card.dataset.time || "",
+    badge: card.dataset.badge || "",
+    route: card.dataset.route || "",
+    title: card.dataset.title || "",
+    detail: card.dataset.detail || "",
+  });
+});
+$("modal-close").addEventListener("click", modalClose);
+$("card-modal").addEventListener("click", (event) => {
+  if (event.target === $("card-modal")) modalClose();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !$("card-modal").hidden) modalClose();
+});
 </script>
 </body>
 </html>"""
