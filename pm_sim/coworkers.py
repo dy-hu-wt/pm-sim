@@ -121,7 +121,7 @@ def _matching_behavior_candidates(
     candidates = []
     rules = priority_sorted(_reply_behaviors(state))
     for rule in rules:
-        if rule.get("channel", "chat").lower() != channel:
+        if channel not in _rule_channels(rule):
             continue
         if rule.get("person_id", "").lower() != person_id:
             continue
@@ -650,6 +650,13 @@ def _reply_behaviors(state: dict[str, Any]) -> list[dict[str, Any]]:
             if isinstance(behavior, dict) and behavior.get("kind") == "reply"
         ]
     return []
+
+
+def _rule_channels(rule: dict[str, Any]) -> set[str]:
+    channels = rule.get("channels")
+    if isinstance(channels, list):
+        return {str(channel).lower() for channel in channels}
+    return {str(rule.get("channel", "chat")).lower()}
 
 
 def _reply_delay_minutes(person_id: str, reply: dict[str, Any], state: dict[str, Any]) -> int:

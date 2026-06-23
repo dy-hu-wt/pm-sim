@@ -114,6 +114,8 @@ dependencies:
     description: Customer wording depends on the launch mode decision.
 ```
 
+Dependencies are causal, not just diagram labels. When an upstream task is completed and every upstream dependency for a blocked downstream task is complete, the engine can move that downstream task to `in_progress` if its blocker is resolved. For example, once the launch decision is complete and the scope blocker is resolved, draft-mode onboarding can move from blocked to active work without a separate bespoke scenario rule.
+
 Use `visible_at: null` for docs, facts, and blockers that exist in the world but should not be known yet. When something becomes visible, an effect sets `visible_at` to the simulated time.
 
 ## Interactions
@@ -256,6 +258,16 @@ grading_rules:
 ```
 
 This rule is causal. The agent must discover the risk and get the decision before the email can update Daisy's state. The evaluator later scores `customer_message_ready` from Daisy's state, not from the raw email body.
+
+## Reusable Patterns
+
+Use these patterns before inventing a one-off structure:
+
+- Grounded communication: prerequisites in `requires`, semantic `action.match`, a state mutation, then a derived `milestone`. Scenario-specific fields are the recipient, required facts, signals, state key, and note; engine-generic fields are `requires`, `action`, `state`, and `milestone`.
+- Blocker discovery: hidden/private fact plus `update_blocker` to `surfaced`, usually from an actor reply, event, or meeting. Scenario-specific fields are the fact, owner, blocker, and wording; engine-generic fields are fact visibility, blocker status, and effects.
+- Stakeholder approval: decision-maker reply or meeting rule records a fact/project decision and coworker state. Scenario-specific fields are who can approve and what evidence they need; engine-generic fields are `project_decision`, `update_project`, `update_coworker_state`, and task gates.
+- Interruption scoping: outside event creates pressure, reveals a scoped fact, and records a commitment or project decision that protects the main project. Scenario-specific fields are customer/project names and tradeoff; engine-generic fields are event delivery, effects, commitments, and harmful-action rules.
+- Final readiness: late-week event asks for a consolidated written update. The grading rule should require prior decisions/facts so a guessed status note cannot score. Scenario-specific fields are required content and deadline; engine-generic fields are scheduled events, causal prerequisites, and derived milestones.
 
 State-derived milestones look like this:
 

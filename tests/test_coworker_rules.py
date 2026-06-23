@@ -183,6 +183,41 @@ class ActorBehaviorTests(unittest.TestCase):
         self.assertEqual(len(replies), 1)
         self.assertEqual(replies[0].body, "Specific risk answer.")
 
+    def test_reply_behavior_channels_can_match_chat_and_email(self) -> None:
+        behaviors = [
+            {
+                "id": "daisy_multi_channel_scope",
+                "kind": "reply",
+                "person_id": "daisy",
+                "channels": ["chat", "email"],
+                "priority": 100,
+                "match": {
+                    "mode": "deterministic",
+                    "intents": [
+                        {"id": "scope", "description": "Scope question.", "signals": ["scope"]}
+                    ],
+                },
+                "reply": {"delay_minutes": 15, "body": "Use the scoped customer wording."},
+            },
+        ]
+
+        chat = replies_for_chat(
+            "daisy",
+            "Can you check scope?",
+            {"actor_behaviors": behaviors, "response_delays": {"daisy": 45}},
+        )
+        email = replies_for_email(
+            "daisy",
+            "Scope",
+            "Can you check scope?",
+            {"actor_behaviors": behaviors, "response_delays": {"daisy": 45}},
+        )
+
+        self.assertEqual(chat[0].channel, "chat")
+        self.assertEqual(email[0].channel, "email")
+        self.assertEqual(chat[0].body, "Use the scoped customer wording.")
+        self.assertEqual(email[0].body, "Use the scoped customer wording.")
+
     def test_actor_planner_combines_matched_reply_with_capacity_constraint(self) -> None:
         behaviors = [
             {

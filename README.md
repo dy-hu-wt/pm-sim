@@ -239,7 +239,10 @@ pm-sim send-email daisy "Nimbus Friday draft-mode status" "Repo sync has stale-c
 pm-sim update-doc doc_launch_decision_record "Friday launch decision: Toad approved draft mode for Nimbus. Draft suggestions require human approval before posting. Auto-commenting is out of Friday scope and remains follow-up work. Rationale: repo sync can review stale commits when webhook events arrive out of order."
 pm-sim update-task task_launch_decision --status in_progress
 pm-sim schedule-meeting "Draft-mode decision" 2026-06-24T10:00:00 2026-06-24T10:30:00 mario luigi daisy toad
+pm-sim finish
 ```
+
+`finish` refuses to stop while visible future calendar obligations or project deadlines remain. Advance time through the remaining visible obligations before calling it again.
 
 Inspect the chronological simulation history:
 
@@ -247,7 +250,7 @@ Inspect the chronological simulation history:
 pm-sim timeline
 pm-sim timeline --limit 20
 pm-sim timeline --kind event
-pm-sim timeline --kind evidence
+pm-sim timeline --kind milestone
 ```
 
 Global options can be placed before or after a subcommand. These are equivalent:

@@ -7,6 +7,7 @@ from typing import Any
 
 from .coworkers import CoworkerReply, replies_for_chat, replies_for_email
 from .db import connect, row_to_dict, rows_to_dicts
+from .dependencies import apply_task_dependency_updates
 from .engine.effects import apply_effects
 from .engine.conditions import all_conditions_match
 from .engine.runtime_config import action_rules, actor_behaviors, response_delays, task_gate_rules
@@ -370,6 +371,7 @@ def update_task(
             """,
             (new_status, new_priority, task_id),
         )
+        dependency_updates = apply_task_dependency_updates(conn, task_id)
         time_cost = consume_action_time(
             conn,
             current_time=current_time,
@@ -385,6 +387,7 @@ def update_task(
             result={
                 "previous": {"status": task["status"], "priority": task["priority"]},
                 "current": {"status": new_status, "priority": new_priority},
+                "dependency_updates": dependency_updates,
                 "time_cost": time_cost,
             },
         )
@@ -395,6 +398,7 @@ def update_task(
             "task_id": task_id,
             "status": new_status,
             "priority": new_priority,
+            "dependency_updates": dependency_updates,
             "time_cost": time_cost,
         }
     finally:

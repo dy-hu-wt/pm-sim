@@ -793,6 +793,50 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertTrue(result["ok"])
         self.assertEqual(task["status"], "complete")
 
+    def test_completing_upstream_task_unblocks_downstream_dependency(self) -> None:
+        with connect(self.db_path) as conn:
+            apply_effects(
+                conn,
+                [
+                    {
+                        "type": "discover_fact",
+                        "fact_id": "fact_draft_mode_approved",
+                    },
+                    {
+                        "type": "update_blocker",
+                        "blocker_id": "blocker_scope_unclear",
+                        "status": "resolved",
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "peach",
+                        "key": "scope_unblocked",
+                        "value": True,
+                    },
+                ],
+                now="2026-06-22T09:00:00",
+                source="test:dependency_ready",
+            )
+            conn.commit()
+
+        result = update_task(self.db_path, "task_launch_decision", status="complete", priority=None)
+        downstream = self._task_state("task_draft_mode_docs")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(downstream["status"], "in_progress")
+        self.assertEqual(downstream["blocked_by"], "")
+        self.assertEqual(
+            result["dependency_updates"],
+            [
+                {
+                    "task_id": "task_draft_mode_docs",
+                    "from": "blocked",
+                    "to": "in_progress",
+                    "reason": "upstream_dependencies_complete",
+                }
+            ],
+        )
+
     def test_cannot_complete_customer_talk_track_without_alignment_and_decision(self) -> None:
         before = self._task_state("task_customer_talk_track")
 
@@ -846,6 +890,15 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertIn("Toad approval", result["error"])
         self.assertEqual(self._task_state("task_launch_decision"), before)
 
+    def test_finish_cli_rejects_and_then_accepts_after_visible_obligations(self) -> None:
+        rejected = self._run_cli("finish")
+        advance_time(self.db_path, "to:2026-06-26T15:00:00")
+        accepted = self._run_cli("finish")
+
+        self.assertIn("Finish rejected", rejected)
+        self.assertIn("Visible calendar obligations remain", rejected)
+        self.assertIn("Finish accepted", accepted)
+
     def _drive_to_draft_approval(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
         advance_time(self.db_path, "until_next_event")
@@ -867,13 +920,17 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         try:
             row = conn.execute(
                 """
-                SELECT status, priority
+                SELECT status, priority, blocked_by
                 FROM tasks
                 WHERE id = ?
                 """,
                 (task_id,),
             ).fetchone()
-            return {"status": row["status"], "priority": row["priority"]}
+            return {
+                "status": row["status"],
+                "priority": row["priority"],
+                "blocked_by": row["blocked_by"],
+            }
         finally:
             conn.close()
 
@@ -884,3 +941,10 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
             return int(row["count"])
         finally:
             conn.close()
+
+    def _run_cli(self, *args: str) -> str:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            exit_code = cli_main(["--db", str(self.db_path), *args])
+        self.assertEqual(exit_code, 0)
+        return output.getvalue()

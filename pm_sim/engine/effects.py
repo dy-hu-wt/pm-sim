@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
+from ..dependencies import apply_task_dependency_updates
 from ..jsonutil import dumps, loads
 
 
@@ -233,7 +234,12 @@ def _apply_update_task(conn: sqlite3.Connection, effect: dict[str, Any]) -> dict
     )
     if cursor.rowcount == 0:
         raise ValueError(f"Cannot update unknown task: {task_id}")
-    return {"task_id": task_id, "updated": sorted(key for key in effect if key != "type")}
+    dependency_updates = apply_task_dependency_updates(conn, task_id)
+    return {
+        "task_id": task_id,
+        "updated": sorted(key for key in effect if key != "type"),
+        "dependency_updates": dependency_updates,
+    }
 
 
 def _apply_update_project(conn: sqlite3.Connection, effect: dict[str, Any]) -> dict[str, Any]:

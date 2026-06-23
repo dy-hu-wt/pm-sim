@@ -107,6 +107,8 @@ create_doc
 record_milestone
 ```
 
+Task dependencies are causal engine state. When an upstream task is completed and every upstream dependency for a blocked downstream task is complete, the shared mutation layer can move the downstream task to `in_progress` once its blocker is resolved.
+
 The important boundary is:
 
 ```text

@@ -28,6 +28,8 @@ def format_output(command: str | None, value: Any) -> str:
         return _format_log(value)
     if command == "timeline":
         return _format_timeline(value)
+    if command == "finish":
+        return _format_finish(value)
     if command == "run-agent":
         return _format_run_agent(value)
     if command == "ui":
@@ -631,6 +633,21 @@ def _format_ui(value: dict[str, Any]) -> str:
             f"  Events:   {value.get('event_log_entries')} rows",
         ]
     )
+
+
+def _format_finish(value: dict[str, Any]) -> str:
+    if value.get("ok"):
+        return "Finish accepted: no visible pending obligations remain."
+    lines = [f"Finish rejected: {value.get('error', 'Cannot finish yet.')}"]
+    obligations = value.get("remaining_obligations", [])
+    for obligation in obligations[:10]:
+        lines.append(
+            f"- {_pretty_time(obligation.get('start_at'))}: "
+            f"{obligation.get('title')} ({obligation.get('kind')})"
+        )
+    if len(obligations) > 10:
+        lines.append(f"... {len(obligations) - 10} more")
+    return "\n".join(lines)
 
 
 def _format_evaluate(value: dict[str, Any]) -> str:

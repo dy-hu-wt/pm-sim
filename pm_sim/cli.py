@@ -18,6 +18,7 @@ from .actions import (
 )
 from .agents.llm import LlmAgentError, run_llm_agent
 from .agents.scripted import run_scripted_agent
+from .calendar import validate_finish
 from .evaluator import evaluate
 from .formatters import format_agent_progress_console, format_output
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
@@ -146,6 +147,12 @@ def _build_parser() -> argparse.ArgumentParser:
             args.db, args.title, args.start_at, args.end_at, args.attendees
         )
     )
+
+    finish_parser = subparsers.add_parser(
+        "finish",
+        help="Validate that the agent can stop without visible pending obligations.",
+    )
+    finish_parser.set_defaults(func=lambda args: validate_finish(args.db))
 
     log_parser = subparsers.add_parser("log", help="Debug direct action log.")
     log_parser.add_argument("--limit", type=int, default=20)

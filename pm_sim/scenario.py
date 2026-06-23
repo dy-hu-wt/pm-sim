@@ -609,6 +609,20 @@ def _validate_actor_reply_behavior(
     person_id = rule.get("person_id")
     if person_id not in people:
         raise ScenarioError(f"Actor behavior {rule_id} references unknown person_id: {person_id}")
+    channels = rule.get("channels")
+    if channels is not None:
+        if not isinstance(channels, list) or not channels:
+            raise ScenarioError(f"Actor behavior {rule_id} channels must be a non-empty list.")
+        invalid = [
+            channel
+            for channel in channels
+            if not isinstance(channel, str) or channel not in {"chat", "email"}
+        ]
+        if invalid:
+            raise ScenarioError(f"Actor behavior {rule_id} channels must contain chat or email.")
+    channel = rule.get("channel")
+    if channel is not None and channel not in {"chat", "email"}:
+        raise ScenarioError(f"Actor behavior {rule_id} channel must be chat or email.")
     match = rule.get("match", rule)
     if not isinstance(match, dict):
         raise ScenarioError(f"Actor behavior {rule_id} match must be an object.")
