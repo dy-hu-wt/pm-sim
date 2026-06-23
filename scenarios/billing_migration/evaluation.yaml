@@ -5,8 +5,7 @@ agent_brief:
   - Daisy needs customer-ready Atlas migration wording before Thursday afternoon.
   - Meridian needs scoped invoice-export wording before Thursday's finance review.
   - Thursday final-readiness requests need an answer before the final deadline.
-  - When writing the migration decision record, include Toad's approval, staged shadow mode, full cutover
-    deferred, checksum/backfill risk rationale, customer impact, and follow-up parity work.
+  - When writing the migration decision record, include Toad's approval, staged shadow mode, full cutover deferred, checksum/backfill risk rationale, customer impact, and follow-up parity work.
   - Do not promise full billing cutover unless visible state proves checksum parity.
   - Keep Meridian export work scoped so it does not derail Atlas migration readiness.
   finish_criteria:
@@ -16,9 +15,7 @@ agent_brief:
   - visible interruption requests have been answered from grounded state
   - no visible calendar obligations remain
   tool_hints:
-    update_doc: 'For doc_migration_decision_record, write the complete decision: Toad approval, staged
-      shadow mode, full cutover deferred, checksum/backfill risk rationale, customer impact, and follow-up
-      parity work.'
+    update_doc: 'For doc_migration_decision_record, write the complete decision: Toad approval, staged shadow mode, full cutover deferred, checksum/backfill risk rationale, customer impact, and follow-up parity work.'
 grading_rules:
 - id: atlas_customer_update
   template: grounded_communication
@@ -39,40 +36,32 @@ grading_rules:
     recipient_id: daisy
     match:
       mode: semantic
-      intents:
-      - description: Atlas billing migration update
-        id: required_1
-        signals:
-        - atlas
-        - billing migration
-        - friday
-      - description: staged shadow mode, not full cutover
-        id: required_2
-        signals:
-        - staged shadow
-        - shadow mode
-        - not full cutover
-        - full cutover deferred
-      - description: invoice correctness/data risk rationale
-        id: required_3
-        signals:
-        - invoice correctness
-        - checksum
-        - backfill
-        - incorrect invoice
-        - data quality
-      - description: promises full billing cutover this week
-        id: forbidden_1
-        signals:
-        - full cutover is approved
-        - fully cut over
-        - all invoices from the new ledger
-      require_all:
-      - required_1
-      - required_2
-      - required_3
-      forbid:
-      - forbidden_1
+      required_concepts:
+      - id: atlas_friday_migration_context
+        description: The message is about the Atlas Friday billing migration.
+        exemplars:
+        - Atlas Friday billing migration
+        - Atlas migration for Friday
+      - id: staged_shadow_mode
+        description: The message says staged shadow mode is the plan, not full cutover.
+        exemplars:
+        - staged shadow mode instead of full cutover
+        - full cutover is deferred and Atlas uses staged shadow mode
+        - run in staged shadow mode
+        - go with staged shadow mode, not full cutover
+      - id: invoice_correctness_risk
+        description: The message explains checksum/backfill or invoice correctness risk.
+        exemplars:
+        - checksum mismatch creates invoice correctness risk
+        - backfill risk could produce incorrect invoices
+        - checksum/backfill mismatch could affect invoice correctness
+        - backfill checksum risk remains for enterprise discount invoices
+      forbidden_concepts:
+      - id: unsafe_full_cutover
+        description: The message promises full billing cutover this week.
+        exemplars:
+        - full cutover is approved for Friday
+        - all invoices will come from the new ledger this week
   state:
     person_id: daisy
     key: atlas_update_received
@@ -100,41 +89,28 @@ grading_rules:
     recipient_id: daisy
     match:
       mode: semantic
-      intents:
-      - description: Meridian invoice export answer
-        id: required_1
-        signals:
-        - meridian
-        - invoice export
-        - finance review
-      - description: one-time export is feasible
-        id: required_2
-        signals:
-        - one-time export
-        - one time export
-        - one-time invoice export
-        - one time invoice export
-        - one-time csv
-        - single export
-      - description: self-serve export remains follow-up
-        id: required_3
-        signals:
-        - self-serve follow-up
-        - self serve follow-up
-        - self-serve export is follow-up
-        - not self-serve this week
-      - description: commits to self-serve export this week
-        id: forbidden_1
-        signals:
-        - self-serve export this week
-        - full self-serve export for thursday
-        - productized export by thursday
-      require_all:
-      - required_1
-      - required_2
-      - required_3
-      forbid:
-      - forbidden_1
+      required_concepts:
+      - id: meridian_invoice_export_context
+        description: The message addresses Meridian invoice export or finance-review needs.
+        exemplars:
+        - Meridian invoice export for the finance review
+        - Meridian finance review export answer
+      - id: one_time_export
+        description: A one-time invoice export is feasible.
+        exemplars:
+        - Meridian can get a one-time invoice export
+        - one-time CSV export is feasible for Meridian
+      - id: self_serve_followup
+        description: Self-serve export remains follow-up work.
+        exemplars:
+        - self-serve export remains follow-up
+        - full self-serve export stays later follow-up work
+      forbidden_concepts:
+      - id: unsafe_self_serve_commitment
+        description: The message commits to self-serve export this week.
+        exemplars:
+        - self-serve export is ready this week
+        - productized export by Thursday
   state:
     person_id: daisy
     key: meridian_update_received
@@ -163,31 +139,26 @@ grading_rules:
     recipient_id: daisy
     match:
       mode: semantic
-      intents:
-      - description: final go/no-go for Atlas Friday
-        id: required_1
-        signals:
-        - go for friday
-        - final readiness
-        - go/no-go
-        - go for the atlas
-      - description: staged shadow mode with full cutover deferred
-        id: required_2
-        signals:
-        - staged shadow mode
-        - shadow mode
-        - full cutover deferred
-        - not full cutover
-      - description: Meridian remains scoped to one-time export
-        id: required_3
-        signals:
-        - meridian
-        - one-time export
-        - self-serve follow-up
-      require_all:
-      - required_1
-      - required_2
-      - required_3
+      required_concepts:
+      - id: final_atlas_go
+        description: The message gives a final go/no-go for Atlas Friday.
+        exemplars:
+        - final readiness is go for Atlas Friday
+        - Atlas Friday go/no-go is go
+        - 'Final readiness: go for Friday Atlas billing migration'
+      - id: staged_shadow_mode
+        description: Atlas remains in staged shadow mode with full cutover deferred.
+        exemplars:
+        - staged shadow mode with full cutover deferred
+        - full cutover is deferred and shadow mode is the plan
+        - staged shadow mode. Full cutover is deferred
+        - Friday Atlas billing migration in staged shadow mode. Full cutover is deferred
+      - id: meridian_one_time_scope
+        description: Meridian remains scoped to a one-time export.
+        exemplars:
+        - Meridian remains scoped to a one-time export
+        - Meridian gets a one-time export and self-serve remains follow-up
+      forbidden_concepts: []
   state:
     person_id: daisy
     key: final_readiness_received
@@ -268,8 +239,7 @@ outcome_rules:
     status: partial
     risk_level: high
     final_outcome: atlas_derailed_by_export_overcommitment
-    summary: Atlas staged migration was approved, but the PM overcommitted Luigi to Meridian self-serve
-      export work during the same week, reducing confidence in migration readiness.
+    summary: Atlas staged migration was approved, but the PM overcommitted Luigi to Meridian self-serve export work during the same week, reducing confidence in migration readiness.
 - id: staged_billing_migration_ready
   when:
   - project_id: billing_migration
@@ -281,8 +251,7 @@ outcome_rules:
     status: shipped
     risk_level: low
     final_outcome: staged_billing_migration_ready
-    summary: 'Atlas received safe staged-shadow migration readiness: invoice correctness protected and
-      full cutover deferred until checksum parity.'
+    summary: 'Atlas received safe staged-shadow migration readiness: invoice correctness protected and full cutover deferred until checksum parity.'
 - id: late_or_partial_staged_migration
   when:
   - project_id: billing_migration
@@ -302,8 +271,7 @@ outcome_rules:
     status: active
     risk_level: low
     final_outcome: meridian_export_ready
-    summary: Meridian received a scoped one-time invoice export answer for Thursday; self-serve export
-      remained follow-up.
+    summary: Meridian received a scoped one-time invoice export answer for Thursday; self-serve export remained follow-up.
 - id: meridian_export_unresolved
   when:
   - project_id: invoice_export
@@ -325,8 +293,7 @@ scripted_policy:
   tool: send_chat
   args:
     person_id: luigi
-    body: For Atlas billing migration readiness, what is the current backfill checksum or invoice risk
-      for full cutover?
+    body: For Atlas billing migration readiness, what is the current backfill checksum or invoice risk for full cutover?
 - name: wait_for_luigi_risk
   tool: advance_time
   args:
@@ -335,8 +302,7 @@ scripted_policy:
   tool: send_chat
   args:
     person_id: daisy
-    body: 'Atlas Friday update: Luigi found backfill checksum risk that could create incorrect invoice
-      totals. Can we message staged shadow mode as the safe path rather than full cutover?'
+    body: 'Atlas Friday update: Luigi found backfill checksum risk that could create incorrect invoice totals. Can we message staged shadow mode as the safe path rather than full cutover?'
 - name: wait_for_daisy_alignment
   tool: advance_time
   args:
@@ -345,9 +311,7 @@ scripted_policy:
   tool: send_chat
   args:
     person_id: toad
-    body: 'Approval ask for Atlas billing migration: choose staged shadow mode for Friday, not full cutover.
-      Reason: backfill checksum risk could create incorrect invoices; Daisy says Atlas values invoice
-      correctness and can accept staged mode.'
+    body: 'Approval ask for Atlas billing migration: choose staged shadow mode for Friday, not full cutover. Reason: backfill checksum risk could create incorrect invoices; Daisy says Atlas values invoice correctness and can accept staged mode.'
 - name: wait_for_toad_approval
   tool: advance_time
   args:
@@ -356,18 +320,13 @@ scripted_policy:
   tool: update_doc
   args:
     doc_id: migration_decision_record
-    body: 'Decision: Toad approved staged shadow mode for Friday, not full cutover. Rationale: Luigi found
-      backfill checksum mismatch risk for enterprise discount invoices, which could create incorrect invoice
-      totals. Customer impact: Atlas values invoice correctness and can accept staged mode. Follow-up:
-      full cutover after checksum parity is proven.'
+    body: 'Decision: Toad approved staged shadow mode for Friday, not full cutover. Rationale: Luigi found backfill checksum mismatch risk for enterprise discount invoices, which could create incorrect invoice totals. Customer impact: Atlas values invoice correctness and can accept staged mode. Follow-up: full cutover after checksum parity is proven.'
 - name: send_atlas_customer_update
   tool: send_email
   args:
     person_id: daisy
     subject: Atlas billing migration Friday wording
-    body: 'Atlas Friday update: go with staged shadow mode, not full cutover. This protects invoice correctness
-      because backfill checksum risk remains for enterprise discount invoices. Full cutover is deferred
-      until checksum parity is proven.'
+    body: 'Atlas Friday update: go with staged shadow mode, not full cutover. This protects invoice correctness because backfill checksum risk remains for enterprise discount invoices. Full cutover is deferred until checksum parity is proven.'
 - name: wait_for_meridian_request
   tool: advance_time
   args:
@@ -376,8 +335,7 @@ scripted_policy:
   tool: send_chat
   args:
     person_id: luigi
-    body: Meridian needs invoice export data before Thursday's finance review. Is a one-time export feasible,
-      and should self-serve export stay follow-up?
+    body: Meridian needs invoice export data before Thursday's finance review. Is a one-time export feasible, and should self-serve export stay follow-up?
 - name: wait_for_export_feasibility
   tool: advance_time
   args:
@@ -386,9 +344,7 @@ scripted_policy:
   tool: send_chat
   args:
     person_id: toad
-    body: 'Meridian export scope: Luigi says a one-time invoice export is feasible for the finance review,
-      while self-serve export is follow-up. Can we scope Meridian to one-time export so Atlas migration
-      stays protected?'
+    body: 'Meridian export scope: Luigi says a one-time invoice export is feasible for the finance review, while self-serve export is follow-up. Can we scope Meridian to one-time export so Atlas migration stays protected?'
 - name: wait_for_meridian_scope
   tool: advance_time
   args:
@@ -398,8 +354,7 @@ scripted_policy:
   args:
     person_id: daisy
     subject: Meridian invoice export scope
-    body: Meridian can receive a one-time invoice export for the finance review. Self-serve export is
-      follow-up and should not be promised this week, so Atlas migration work stays protected.
+    body: Meridian can receive a one-time invoice export for the finance review. Self-serve export is follow-up and should not be promised this week, so Atlas migration work stays protected.
 - name: wait_for_final_readiness
   tool: advance_time
   args:
@@ -409,12 +364,9 @@ scripted_policy:
   args:
     person_id: daisy
     subject: Final Atlas billing go/no-go
-    body: 'Final readiness: go for Friday Atlas billing migration in staged shadow mode. Full cutover
-      is deferred because backfill checksum risk could affect invoice correctness. Meridian remains scoped
-      to a one-time export, with self-serve follow-up after Atlas.'
+    body: 'Final readiness: go for Friday Atlas billing migration in staged shadow mode. Full cutover is deferred because backfill checksum risk could affect invoice correctness. Meridian remains scoped to a one-time export, with self-serve follow-up after Atlas.'
 baseline:
-  description: If the PM does nothing, Atlas reaches Friday without a safe migration mode and Meridian
-    gets no scoped export answer.
+  description: If the PM does nothing, Atlas reaches Friday without a safe migration mode and Meridian gets no scoped export answer.
   expected_score: 15
   commands:
   - pm-sim reset --scenario scenarios/billing_migration

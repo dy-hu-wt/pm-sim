@@ -241,7 +241,15 @@ class EffectApplicationTests(unittest.TestCase):
                 result = semantic_match_module.semantic_match(
                     conn,
                     text="Draft mode with human approval.",
-                    criteria={"required": ["Draft mode with human approval."]},
+                    criteria={
+                        "required": [
+                            {
+                                "id": "draft_mode_approval",
+                                "description": "Draft mode with human approval.",
+                                "exemplars": ["draft mode with human approval"],
+                            }
+                        ]
+                    },
                     rule_id="test_rule",
                 )
             conn.commit()
@@ -271,8 +279,9 @@ class EffectApplicationTests(unittest.TestCase):
                     criteria={
                         "required": [
                             {
+                                "id": "draft_mode_approval",
                                 "description": "Draft mode with human approval.",
-                                "signals": ["draft mode", "human approval"],
+                                "exemplars": ["draft mode with human approval"],
                             }
                         ]
                     },
@@ -291,7 +300,15 @@ class EffectApplicationTests(unittest.TestCase):
             deterministic = semantic_match_module.semantic_match(
                 conn,
                 text="Draft mode with human approval.",
-                criteria={"required": ["Draft mode with human approval."]},
+                criteria={
+                    "required": [
+                        {
+                            "id": "draft_mode_approval",
+                            "description": "Draft mode with human approval.",
+                            "exemplars": ["draft mode with human approval"],
+                        }
+                    ]
+                },
                 rule_id="test_cache_key",
             )
             semantic_match_module._llm_match = lambda text, criteria, *, model=None: {
@@ -313,7 +330,15 @@ class EffectApplicationTests(unittest.TestCase):
                 llm = semantic_match_module.semantic_match(
                     conn,
                     text="Draft mode with human approval.",
-                    criteria={"required": ["Draft mode with human approval."]},
+                    criteria={
+                        "required": [
+                            {
+                                "id": "draft_mode_approval",
+                                "description": "Draft mode with human approval.",
+                                "exemplars": ["draft mode with human approval"],
+                            }
+                        ]
+                    },
                     rule_id="test_cache_key",
                 )
 
@@ -323,6 +348,115 @@ class EffectApplicationTests(unittest.TestCase):
         finally:
             semantic_match_module._llm_match = original
             conn.close()
+
+    def test_concept_match_rejects_keyword_stuffing(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            result = semantic_match_module.semantic_match(
+                conn,
+                text="Nimbus Friday beta repo sync risk draft mode human approval.",
+                criteria={
+                    "required": [
+                        {
+                            "id": "repo_sync_stale_risk",
+                            "description": "Repo sync can cause stale commit reviews.",
+                            "exemplars": ["repo sync can cause stale commit reviews"],
+                        },
+                        {
+                            "id": "human_approval_before_posting",
+                            "description": "A human must approve before posting.",
+                            "exemplars": ["comments require human approval before posting"],
+                        },
+                    ]
+                },
+                rule_id="test_keyword_soup",
+            )
+
+            self.assertFalse(result["matches"])
+            self.assertEqual(result["mode"], "deterministic")
+        finally:
+            conn.close()
+
+    def test_concept_match_handles_forbidden_negation(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            result = semantic_match_module.semantic_match(
+                conn,
+                text=(
+                    "Friday beta is draft mode. Comments require human approval before posting. "
+                    "Auto-commenting is not in scope for Friday."
+                ),
+                criteria={
+                    "required": [
+                        {
+                            "id": "human_approval_before_posting",
+                            "description": "A human must approve before posting.",
+                            "exemplars": ["comments require human approval before posting"],
+                        }
+                    ],
+                    "forbidden": [
+                        {
+                            "id": "unsafe_auto_commenting",
+                            "description": "The message promises automatic comment posting.",
+                            "exemplars": ["auto-commenting is in scope for Friday"],
+                        }
+                    ],
+                },
+                rule_id="test_forbidden_negation",
+            )
+
+            self.assertTrue(result["matches"])
+            self.assertFalse(result["forbidden"][0]["matched"])
+        finally:
+            conn.close()
+
+    def test_deterministic_concept_match_fails_closed_on_paraphrase(self) -> None:
+        conn = connect(self.db_path)
+        try:
+            result = semantic_match_module.semantic_match(
+                conn,
+                text="Use the cautious review-only path so nothing gets published without a person checking it.",
+                criteria={
+                    "required": [
+                        {
+                            "id": "human_approval_before_posting",
+                            "description": "A human must approve before posting.",
+                            "exemplars": ["comments require human approval before posting"],
+                        }
+                    ]
+                },
+                rule_id="test_paraphrase_fail_closed",
+            )
+
+            self.assertFalse(result["matches"])
+        finally:
+            conn.close()
+
+    def test_llm_result_requires_authored_ids_and_rationales(self) -> None:
+        criteria = {
+            "required": [
+                {
+                    "id": "human_approval_before_posting",
+                    "description": "A human must approve before posting.",
+                    "exemplars": ["comments require human approval before posting"],
+                }
+            ],
+            "forbidden": [],
+        }
+
+        result = semantic_match_module._validate_llm_result(
+            {
+                "matches": True,
+                "mode": "llm",
+                "model": "test-model",
+                "required": [{"id": "wrong_id", "matched": True, "rationale": "Looks close."}],
+                "forbidden": [],
+            },
+            criteria,
+        )
+
+        self.assertFalse(result["matches"])
+        self.assertIn("authored concept ids", result["error"])
 
     def test_duplicate_milestones_is_idempotent(self) -> None:
         conn = connect(self.db_path)

@@ -5,13 +5,9 @@ agent_brief:
   - Daisy needs customer-ready Nimbus wording early enough for her Thursday account update.
   - Koopa needs scoped wording before Thursday's security review.
   - Thursday final-readiness requests need an answer before the final agenda.
-  - When writing the launch decision record, include the approved launch mode, Toad's approval, human
-    approval before posting, auto-commenting out of Friday scope or left as follow-up, and the repo-sync
-    stale-commit rationale.
-  - When a customer-facing security or compliance question appears, ask the source-of-truth owner, wait
-    for the reply, read the referenced doc, then answer the customer owner directly.
-  - Do not schedule a meeting for a security wording question unless the needed document or owner answer
-    is unavailable.
+  - When writing the launch decision record, include the approved launch mode, Toad's approval, human approval before posting, auto-commenting out of Friday scope or left as follow-up, and the repo-sync stale-commit rationale.
+  - When a customer-facing security or compliance question appears, ask the source-of-truth owner, wait for the reply, read the referenced doc, then answer the customer owner directly.
+  - Do not schedule a meeting for a security wording question unless the needed document or owner answer is unavailable.
   finish_criteria:
   - launch mode is approved
   - customer messaging is ready
@@ -19,9 +15,7 @@ agent_brief:
   - visible async customer questions have been answered from grounded state
   - no visible calendar obligations remain
   tool_hints:
-    update_doc: 'For doc_launch_decision_record, write the complete decision: Toad approval, draft mode,
-      human approval before posting, auto-commenting out of Friday scope or follow-up, and repo-sync stale-commit
-      rationale.'
+    update_doc: 'For doc_launch_decision_record, write the complete decision: Toad approval, draft mode, human approval before posting, auto-commenting out of Friday scope or follow-up, and repo-sync stale-commit rationale.'
 grading_rules:
 - id: customer_message_ready
   template: grounded_communication
@@ -39,87 +33,52 @@ grading_rules:
     recipient_id: daisy
     match:
       mode: semantic
-      intents:
-      - id: repo_sync_risk_group_1
+      required_concepts:
+      - id: repo_sync_stale_risk
         description: Repo sync or webhook ordering can make the agent review a stale or older commit.
-          signal group 1.
-        signals:
-        - repo sync
-        - repo-sync
-        - webhook
-        - stale
-        - older commit
-        - older diff
-      - id: repo_sync_risk_group_2
-        description: Repo sync or webhook ordering can make the agent review a stale or older commit.
-          signal group 2.
-        signals:
-        - risk
-        - stale
-        - older commit
-        - older diff
-        - commit
-      - id: draft_mode
+        exemplars:
+        - repo sync webhook ordering can leave the agent reviewing an older commit
+        - repo sync can cause stale commit reviews
+        - repo sync has stale-commit risk
+        - repo sync has stale commit risk
+      - id: friday_draft_mode
         description: Friday launch mode is draft mode or queued draft suggestions.
-        signals:
-        - draft mode
-        - draft-mode
-        - draft suggestions
-        - queue draft
-        - queues draft
-        - queued draft
-      - id: nimbus_beta
+        exemplars:
+        - use draft mode for the Friday Nimbus beta
+        - the agent queues draft suggestions for Friday
+        - reliable draft mode for Friday
+        - Friday beta is draft mode
+      - id: nimbus_beta_context
         description: The message is about the Nimbus Friday beta or pilot.
-        signals:
-        - nimbus
-        - friday beta
-        - nimbus beta
-        - friday pilot
-        - pilot
-        - friday
-        - friday draft mode
-        - friday draft-mode
-      - id: human_approval
+        exemplars:
+        - Friday Nimbus beta
+        - Nimbus Friday pilot
+        - Nimbus Friday draft-mode status
+        - Nimbus Friday draft-mode update
+      - id: human_approval_before_posting
         description: A human or reviewer must approve before anything is posted.
-        signals:
-        - human approval
-        - approval before posting
-        - approve before posting
-        - review before posting
-        - reviewer approves
-        - human approves
-        - human review
-        - human-in-the-loop
-        - human in the loop
-        - before posting
-        - before anything is posted
-        - approve suggestions
-        - approve before anything is posted
-      - id: human_approval_group_1
-        description: A human or reviewer must approve before anything is posted. signal group 1.
-        signals:
-        - human
-        - reviewer
-      - id: human_approval_group_2
-        description: A human or reviewer must approve before anything is posted. signal group 2.
-        signals:
-        - approve
-        - approval
-        - review
-      - id: human_approval_group_3
-        description: A human or reviewer must approve before anything is posted. signal group 3.
-        signals:
-        - posted
-        - posting
-        - post
-        - comments
-        - suggestions
-      require_all:
-      - repo_sync_risk_group_1
-      - repo_sync_risk_group_2
-      - draft_mode
-      - nimbus_beta
-      - human_approval
+        exemplars:
+        - a reviewer approves before posting
+        - comments require human approval before posting
+        - with human approval
+      - id: customer_ready_wording
+        description: The message gives Daisy a usable customer-facing sentence about the Friday draft-mode beta.
+        exemplars:
+        - Nimbus can see reliable draft-mode suggestions on Friday
+        - position Friday as reliable draft suggestions with human approval
+        - recommend reliable draft mode for Friday with human approval
+        - the agent queues draft suggestions and a reviewer approves before posting
+      forbidden_concepts:
+      - id: unsafe_auto_commenting
+        description: The message promises automatic comment posting for Friday.
+        exemplars:
+        - comments will post automatically on Friday
+        - auto-commenting is in scope for Friday
+      - id: no_human_approval
+        description: The message says human approval is unnecessary.
+        exemplars:
+        - no human approval is needed
+        - suggestions can post without reviewer approval
   state:
     person_id: daisy
     key: customer_message_ready
@@ -154,72 +113,37 @@ grading_rules:
     recipient_id: daisy
     match:
       mode: semantic
-      intents:
-      - id: nimbus_beta
+      required_concepts:
+      - id: nimbus_beta_context
         description: The message is about the Nimbus Friday beta or pilot.
-        signals:
-        - nimbus
-        - friday beta
-        - nimbus beta
-        - friday pilot
-        - pilot
-        - friday
-        - friday draft mode
-        - friday draft-mode
+        exemplars:
+        - Nimbus Friday beta
+        - Friday Nimbus pilot
+        - Nimbus reviewer
+        - Nimbus private repo security answer
+        - Nimbus private-repo security question
       - id: private_repo_security
         description: The message addresses private repo source-code security handling.
-        signals:
-        - private repo
-        - private repos
-        - source code
-        - raw source
-        - private-repo security
-        - security wording
-        - private repo security wording is covered
-        - security wording is covered
-      - id: transient_source_processing_group_1
-        description: Private repo source is processed transiently and raw source is not retained long
-          term. signal group 1.
-        signals:
-        - transient
-        - transiently
-        - not stored
-        - not retained
-        - no long-term
-        - not store
-      - id: transient_source_processing_group_2
-        description: Private repo source is processed transiently and raw source is not retained long
-          term. signal group 2.
-        signals:
-        - source
-        - source code
-        - raw source
-        - private repo
-        - private-repo
-      - id: beta_audit_retention_group_1
-        description: Generated suggestions or metadata are retained for the beta audit window. signal
-          group 1.
-        signals:
-        - metadata
-        - draft suggestions
-        - generated suggestions
-        - audit
-      - id: beta_audit_retention_group_2
-        description: Generated suggestions or metadata are retained for the beta audit window. signal
-          group 2.
-        signals:
-        - 30 days
-        - thirty days
-        - beta audit
-        - audit window
-        - retained
-      require_all:
-      - transient_source_processing_group_1
-      - transient_source_processing_group_2
-      - beta_audit_retention_group_1
-      - beta_audit_retention_group_2
-      - nimbus_beta
-      - private_repo_security
+        exemplars:
+        - private repo source code security handling
+        - private repo security wording
+        - private repo source code is processed transiently
+      - id: transient_source_processing
+        description: Private repo source is processed transiently and raw source is not retained long term.
+        exemplars:
+        - private repo source code is processed transiently
+        - raw source is not retained long term
+      - id: beta_audit_retention
+        description: Generated suggestions or metadata are retained for the beta audit window.
+        exemplars:
+        - generated draft suggestions and metadata are retained for the 30 days beta audit
+        - metadata is retained for the beta audit window
+      forbidden_concepts:
+      - id: unsafe_raw_source_retention
+        description: The message says raw private repo source is stored or retained long term.
+        exemplars:
+        - raw source is stored long term
+        - raw source is retained long term
   state:
     person_id: daisy
     key: security_answer_received
@@ -242,50 +166,28 @@ grading_rules:
     recipient_id: daisy
     match:
       mode: semantic
-      intents:
-      - id: koopa_audit_group_1
-        description: The message addresses Koopa audit-log or security-review needs. signal group 1.
-        signals:
-        - koopa
-      - id: koopa_audit_group_2
-        description: The message addresses Koopa audit-log or security-review needs. signal group 2.
-        signals:
-        - audit
-        - admin log
-        - admin logs
-        - audit log
-        - audit logs
-        - security review
-      - id: one_time_csv_group_1
-        description: Koopa can receive a one-time CSV export for the security review. signal group 1.
-        signals:
-        - csv
-        - export
-        - csv scope
-        - audit csv
-      - id: one_time_csv_group_2
-        description: Koopa can receive a one-time CSV export for the security review. signal group 2.
-        signals:
-        - one-time
-        - one time
-        - for the review
-        - security review
+      required_concepts:
+      - id: koopa_audit_need
+        description: The message addresses Koopa audit-log or security-review needs.
+        exemplars:
+        - Koopa admin audit logs for the security review
+        - Koopa audit-log export answer
+      - id: one_time_csv
+        description: Koopa can receive a one-time CSV export for the security review.
+        exemplars:
+        - Koopa can get a one-time CSV export for the security review
+        - one-time admin audit log CSV for Thursday
       - id: self_serve_followup
         description: Full self-serve export is deferred as follow-up after launch.
-        signals:
-        - follow-up
-        - follow up
-        - self-serve
-        - self serve
-        - later
-        - after launch
-        - after nimbus launch
-      require_all:
-      - koopa_audit_group_1
-      - koopa_audit_group_2
-      - one_time_csv_group_1
-      - one_time_csv_group_2
-      - self_serve_followup
+        exemplars:
+        - full self-serve export stays follow-up after Nimbus launch
+        - self-serve export remains later follow-up work
+      forbidden_concepts:
+      - id: unsafe_self_serve_commitment
+        description: The message promises full self-serve audit export this week.
+        exemplars:
+        - self-serve export is ready for Thursday
+        - full self-serve audit export this week
   state:
     person_id: daisy
     key: koopa_update_received
@@ -342,127 +244,63 @@ grading_rules:
     recipient_id: daisy
     match:
       mode: semantic
-      intents:
-      - id: final_readiness
+      required_concepts:
+      - id: final_readiness_go
         description: The message gives a final readiness or go/no-go confirmation.
-        signals:
-        - go/no-go
-        - go no-go
-        - go for friday
-        - final readiness
-        - readiness is go
-        - ready
-        - on track
-        - final readiness is go
-      - id: draft_mode
+        exemplars:
+        - Final readiness is go for the Nimbus Friday beta
+        - Thursday go/no-go is go for Friday
+        - Go for Friday in draft mode
+      - id: friday_draft_mode
         description: Friday launch mode is draft mode or queued draft suggestions.
-        signals:
-        - draft mode
-        - draft-mode
-        - draft suggestions
-        - queue draft
-        - queues draft
-        - queued draft
-      - id: human_approval
+        exemplars:
+        - Friday beta is draft mode
+        - draft suggestions are the Friday launch mode
+        - Launch mode is draft mode
+        - Nimbus beta launch mode is draft mode
+      - id: human_approval_before_posting
         description: A human or reviewer must approve before anything is posted.
-        signals:
-        - human approval
-        - approval before posting
-        - approve before posting
-        - review before posting
-        - reviewer approves
-        - human approves
-        - human review
-        - human-in-the-loop
-        - human in the loop
-        - before posting
-        - before anything is posted
-        - approve suggestions
-        - approve before anything is posted
-      - id: human_approval_group_1
-        description: A human or reviewer must approve before anything is posted. signal group 1.
-        signals:
-        - human
-        - reviewer
-      - id: human_approval_group_2
-        description: A human or reviewer must approve before anything is posted. signal group 2.
-        signals:
-        - approve
-        - approval
-        - review
-      - id: human_approval_group_3
-        description: A human or reviewer must approve before anything is posted. signal group 3.
-        signals:
-        - posted
-        - posting
-        - post
-        - comments
-        - suggestions
-      - id: private_repo_security
-        description: The message addresses private repo source-code security handling.
-        signals:
-        - private repo
-        - private repos
-        - source code
-        - raw source
-        - private-repo security
-        - security wording
+        exemplars:
+        - human approval before posting
+        - a reviewer approves before comments are posted
+        - with human approval
+      - id: security_wording_covered
+        description: Private repo security wording has been covered.
+        exemplars:
         - private repo security wording is covered
-        - security wording is covered
-      - id: koopa_audit_group_1
-        description: The message addresses Koopa audit-log or security-review needs. signal group 1.
-        signals:
-        - koopa
-      - id: koopa_audit_group_2
-        description: The message addresses Koopa audit-log or security-review needs. signal group 2.
-        signals:
-        - audit
-        - admin log
-        - admin logs
-        - audit log
-        - audit logs
-        - security review
-      - id: one_time_csv_group_1
-        description: Koopa can receive a one-time CSV export for the security review. signal group 1.
-        signals:
-        - csv
-        - export
-        - csv scope
-        - audit csv
-      - id: one_time_csv_group_2
-        description: Koopa can receive a one-time CSV export for the security review. signal group 2.
-        signals:
-        - one-time
-        - one time
-        - for the review
-        - security review
-      - id: nimbus_beta
+        - private repo source handling answer is covered
+      - id: koopa_one_time_csv
+        description: Koopa remains scoped to a one-time audit CSV export.
+        exemplars:
+        - Koopa stays scoped to a one-time audit CSV
+        - Koopa gets a one-time CSV export
+        - Koopa audit CSV scope stays one-time
+      - id: nimbus_beta_context
         description: The message is about the Nimbus Friday beta or pilot.
-        signals:
-        - nimbus
-        - friday beta
-        - nimbus beta
-        - friday pilot
-        - pilot
-        - friday
-        - friday draft mode
-        - friday draft-mode
-      require_all:
-      - final_readiness
-      - draft_mode
-      - human_approval
-      - private_repo_security
-      - koopa_audit_group_1
-      - one_time_csv_group_1
-      - nimbus_beta
+        exemplars:
+        - Nimbus Friday beta
+        - Friday Nimbus pilot
+        - Nimbus beta launch mode
+      forbidden_concepts:
+      - id: unsafe_auto_commenting
+        description: The message promises automatic comment posting for Friday.
+        exemplars:
+        - comments will post automatically on Friday
+        - auto-commenting is in scope for Friday
+        - auto-commenting is in scope
+      - id: unsafe_self_serve_commitment
+        description: The message promises full self-serve audit export this week.
+        exemplars:
+        - self-serve export is ready for Thursday
+        - full self-serve audit export this week
+        - self-serve export this week
   state:
     person_id: daisy
     key: final_readiness_confirmed
     value: true
   milestone:
     key: final_readiness_confirmed
-    note: Daisy has received the Thursday final readiness note tying together launch mode, security wording,
-      and Koopa scope.
+    note: Daisy has received the Thursday final readiness note tying together launch mode, security wording, and Koopa scope.
 - id: final_readiness_confirmed_chat
   template: grounded_communication
   priority: 65
@@ -503,127 +341,63 @@ grading_rules:
     recipient_id: daisy
     match:
       mode: semantic
-      intents:
-      - id: final_readiness
+      required_concepts:
+      - id: final_readiness_go
         description: The message gives a final readiness or go/no-go confirmation.
-        signals:
-        - go/no-go
-        - go no-go
-        - go for friday
-        - final readiness
-        - readiness is go
-        - ready
-        - on track
-        - final readiness is go
-      - id: draft_mode
+        exemplars:
+        - Final readiness is go for the Nimbus Friday beta
+        - Thursday go/no-go is go for Friday
+        - Go for Friday in draft mode
+      - id: friday_draft_mode
         description: Friday launch mode is draft mode or queued draft suggestions.
-        signals:
-        - draft mode
-        - draft-mode
-        - draft suggestions
-        - queue draft
-        - queues draft
-        - queued draft
-      - id: human_approval
+        exemplars:
+        - Friday beta is draft mode
+        - draft suggestions are the Friday launch mode
+        - Launch mode is draft mode
+        - Nimbus beta launch mode is draft mode
+      - id: human_approval_before_posting
         description: A human or reviewer must approve before anything is posted.
-        signals:
-        - human approval
-        - approval before posting
-        - approve before posting
-        - review before posting
-        - reviewer approves
-        - human approves
-        - human review
-        - human-in-the-loop
-        - human in the loop
-        - before posting
-        - before anything is posted
-        - approve suggestions
-        - approve before anything is posted
-      - id: human_approval_group_1
-        description: A human or reviewer must approve before anything is posted. signal group 1.
-        signals:
-        - human
-        - reviewer
-      - id: human_approval_group_2
-        description: A human or reviewer must approve before anything is posted. signal group 2.
-        signals:
-        - approve
-        - approval
-        - review
-      - id: human_approval_group_3
-        description: A human or reviewer must approve before anything is posted. signal group 3.
-        signals:
-        - posted
-        - posting
-        - post
-        - comments
-        - suggestions
-      - id: private_repo_security
-        description: The message addresses private repo source-code security handling.
-        signals:
-        - private repo
-        - private repos
-        - source code
-        - raw source
-        - private-repo security
-        - security wording
+        exemplars:
+        - human approval before posting
+        - a reviewer approves before comments are posted
+        - with human approval
+      - id: security_wording_covered
+        description: Private repo security wording has been covered.
+        exemplars:
         - private repo security wording is covered
-        - security wording is covered
-      - id: koopa_audit_group_1
-        description: The message addresses Koopa audit-log or security-review needs. signal group 1.
-        signals:
-        - koopa
-      - id: koopa_audit_group_2
-        description: The message addresses Koopa audit-log or security-review needs. signal group 2.
-        signals:
-        - audit
-        - admin log
-        - admin logs
-        - audit log
-        - audit logs
-        - security review
-      - id: one_time_csv_group_1
-        description: Koopa can receive a one-time CSV export for the security review. signal group 1.
-        signals:
-        - csv
-        - export
-        - csv scope
-        - audit csv
-      - id: one_time_csv_group_2
-        description: Koopa can receive a one-time CSV export for the security review. signal group 2.
-        signals:
-        - one-time
-        - one time
-        - for the review
-        - security review
-      - id: nimbus_beta
+        - private repo source handling answer is covered
+      - id: koopa_one_time_csv
+        description: Koopa remains scoped to a one-time audit CSV export.
+        exemplars:
+        - Koopa stays scoped to a one-time audit CSV
+        - Koopa gets a one-time CSV export
+        - Koopa audit CSV scope stays one-time
+      - id: nimbus_beta_context
         description: The message is about the Nimbus Friday beta or pilot.
-        signals:
-        - nimbus
-        - friday beta
-        - nimbus beta
-        - friday pilot
-        - pilot
-        - friday
-        - friday draft mode
-        - friday draft-mode
-      require_all:
-      - final_readiness
-      - draft_mode
-      - human_approval
-      - private_repo_security
-      - koopa_audit_group_1
-      - one_time_csv_group_1
-      - nimbus_beta
+        exemplars:
+        - Nimbus Friday beta
+        - Friday Nimbus pilot
+        - Nimbus beta launch mode
+      forbidden_concepts:
+      - id: unsafe_auto_commenting
+        description: The message promises automatic comment posting for Friday.
+        exemplars:
+        - comments will post automatically on Friday
+        - auto-commenting is in scope for Friday
+        - auto-commenting is in scope
+      - id: unsafe_self_serve_commitment
+        description: The message promises full self-serve audit export this week.
+        exemplars:
+        - self-serve export is ready for Thursday
+        - full self-serve audit export this week
+        - self-serve export this week
   state:
     person_id: daisy
     key: final_readiness_confirmed
     value: true
   milestone:
     key: final_readiness_confirmed
-    note: Daisy has received the Thursday final readiness note tying together launch mode, security wording,
-      and Koopa scope.
+    note: Daisy has received the Thursday final readiness note tying together launch mode, security wording, and Koopa scope.
 task_gate_rules:
 - task_id: repo_sync
   statuses:
@@ -653,8 +427,7 @@ task_gate_rules:
         - draft_mode_selected
         - draft_mode_approved
     - fact_discovered: draft_mode_approved
-  error: draft_mode_docs cannot be marked complete without draft-mode scope confirmation, resolved scope
-    blocker, draft-mode approval or selection.
+  error: draft_mode_docs cannot be marked complete without draft-mode scope confirmation, resolved scope blocker, draft-mode approval or selection.
 - task_id: customer_talk_track
   statuses:
   - complete
@@ -673,8 +446,7 @@ task_gate_rules:
     - project_decision:
         exists: true
     - fact_discovered: draft_mode_approved
-  error: customer_talk_track cannot be marked complete without Daisy alignment, customer-ready Daisy email,
-    launch mode decision.
+  error: customer_talk_track cannot be marked complete without Daisy alignment, customer-ready Daisy email, launch mode decision.
 - task_id: launch_decision
   statuses:
   - complete
@@ -698,8 +470,7 @@ task_gate_rules:
   - blocker_status:
       id: audit_export_scope_unclear
       is: resolved
-  error: audit_export_scope cannot be marked complete without feasible one-time CSV scope and resolved
-    scope blocker.
+  error: audit_export_scope cannot be marked complete without feasible one-time CSV scope and resolved scope blocker.
 - task_id: koopa_status_update
   statuses:
   - complete
@@ -728,8 +499,7 @@ outcome_rules:
     status: shipped
     risk_level: high
     final_outcome: risky_auto_commenting
-    summary: The project shipped with an auto-commenting commitment while repo sync risk remained unresolved,
-      leaving Nimbus exposed to stale-code comments.
+    summary: The project shipped with an auto-commenting commitment while repo sync risk remained unresolved, leaving Nimbus exposed to stale-code comments.
 - id: no_approved_friday_plan
   when:
   - project_id: pr_review_agent
@@ -741,8 +511,7 @@ outcome_rules:
     status: missed
     risk_level: high
     final_outcome: no_approved_friday_plan
-    summary: Friday arrived without an approved reliable launch plan. Auto-commenting remains risky because
-      repo sync can review stale code.
+    summary: Friday arrived without an approved reliable launch plan. Auto-commenting remains risky because repo sync can review stale code.
 - id: late_draft_mode
   when:
   - project_id: pr_review_agent
@@ -804,8 +573,7 @@ outcome_rules:
     status: missed
     risk_level: high
     final_outcome: missed_due_to_blockers
-    summary: 'A launch mode was chosen, but Friday execution was still blocked: customer messaging or
-      draft-mode onboarding was not ready.'
+    summary: 'A launch mode was chosen, but Friday execution was still blocked: customer messaging or draft-mode onboarding was not ready.'
   priority: 0
 - id: draft_mode_beta_shipped
   when:
@@ -814,9 +582,7 @@ outcome_rules:
     status: shipped
     risk_level: low
     final_outcome: draft_mode_beta_shipped
-    summary: 'Nimbus received a Friday PR Review Agent beta in draft mode: human approval is required
-      before posting, repo-sync stale-code risk is contained, onboarding is ready, and customer messaging
-      is aligned.'
+    summary: 'Nimbus received a Friday PR Review Agent beta in draft mode: human approval is required before posting, repo-sync stale-code risk is contained, onboarding is ready, and customer messaging is aligned.'
 - id: koopa_audit_update_ready
   when:
   - project_id: audit_log_export
@@ -828,8 +594,7 @@ outcome_rules:
     status: active
     risk_level: low
     final_outcome: koopa_audit_update_ready
-    summary: 'Koopa Bank received a scoped audit log export answer for Thursday: one-time CSV for the
-      security review, with full self-serve export kept as follow-up.'
+    summary: 'Koopa Bank received a scoped audit log export answer for Thursday: one-time CSV for the security review, with full self-serve export kept as follow-up.'
 - id: koopa_audit_scope_unresolved
   when:
   - project_id: audit_log_export
@@ -837,8 +602,7 @@ outcome_rules:
     status: at_risk
     risk_level: medium
     final_outcome: koopa_audit_scope_unresolved
-    summary: Koopa Bank reached the Thursday security review without a clear scoped answer on audit log
-      export.
+    summary: Koopa Bank reached the Thursday security review without a clear scoped answer on audit log export.
 scripted_policy:
 - name: read_project_brief
   tool: read_doc
@@ -888,16 +652,13 @@ scripted_policy:
   tool: update_doc
   args:
     doc_id: launch_decision_record
-    body: 'Friday launch decision: Toad approved draft mode for Nimbus. Draft suggestions require human
-      approval before posting. Auto-commenting is out of Friday scope and remains follow-up work. Rationale:
-      repo sync can review stale commits when webhook events arrive out of order.'
+    body: 'Friday launch decision: Toad approved draft mode for Nimbus. Draft suggestions require human approval before posting. Auto-commenting is out of Friday scope and remains follow-up work. Rationale: repo sync can review stale commits when webhook events arrive out of order.'
 - name: send_customer_ready_update
   tool: send_email
   args:
     person_id: daisy
     subject: Nimbus Friday draft-mode update
-    body: Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has stale-commit risk, so
-      comments should require human approval before posting.
+    body: Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has stale-commit risk, so comments should require human approval before posting.
 - name: wait_for_security_question
   tool: advance_time
   args:
@@ -920,15 +681,12 @@ scripted_policy:
   args:
     person_id: daisy
     subject: Nimbus private repo security answer
-    body: Nimbus can tell their reviewer that private repo source code is processed transiently. Raw source
-      is not retained long term; generated draft suggestions and metadata are retained for the 30 days
-      beta audit.
+    body: Nimbus can tell their reviewer that private repo source code is processed transiently. Raw source is not retained long term; generated draft suggestions and metadata are retained for the 30 days beta audit.
 - name: ask_luigi_about_koopa_audit_export
   tool: send_chat
   args:
     person_id: luigi
-    body: Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time
-      CSV feasible without derailing Nimbus?
+    body: Koopa Bank needs admin audit log CSV export clarity for Thursday's security review. Is a one-time CSV feasible without derailing Nimbus?
 - name: wait_for_koopa_feasibility_reply
   tool: advance_time
   args:
@@ -937,8 +695,7 @@ scripted_policy:
   tool: send_chat
   args:
     person_id: toad
-    body: Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export
-      is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?
+    body: Luigi says a one-time admin audit log CSV is feasible for Koopa, while full self-serve export is follow-up. Can we scope Koopa to the one-time CSV for Thursday so Nimbus launch stays protected?
 - name: wait_for_koopa_scope_reply
   tool: advance_time
   args:
@@ -948,8 +705,7 @@ scripted_policy:
   args:
     person_id: daisy
     subject: Koopa audit log export scope for Thursday
-    body: Koopa can get a one-time CSV export of admin audit logs for Thursday's security review. Full
-      self-serve export should stay follow-up after Nimbus launch work.
+    body: Koopa can get a one-time CSV export of admin audit logs for Thursday's security review. Full self-serve export should stay follow-up after Nimbus launch work.
 - name: wait_for_final_readiness_check
   tool: advance_time
   args:
@@ -959,14 +715,10 @@ scripted_policy:
   args:
     person_id: daisy
     subject: Thursday final readiness for Nimbus Friday beta
-    body: Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode with human approval
-      before posting, private repo security wording is covered, and Koopa stays scoped to a one-time audit
-      CSV so it does not derail the Friday beta.
+    body: Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode with human approval before posting, private repo security wording is covered, and Koopa stays scoped to a one-time audit CSV so it does not derail the Friday beta.
 baseline:
-  description: No-op baseline waits for scheduled events. Luigi surfaces the stale-code risk on Thursday,
-    which is late for Daisy's customer message and Peach's onboarding work.
-  expected_outcome: Beta remains at risk, draft mode may be chosen late, and stakeholder confidence is
-    lower than an agent-driven path.
+  description: No-op baseline waits for scheduled events. Luigi surfaces the stale-code risk on Thursday, which is late for Daisy's customer message and Peach's onboarding work.
+  expected_outcome: Beta remains at risk, draft mode may be chosen late, and stakeholder confidence is lower than an agent-driven path.
 milestone_rules:
 - note: Luigi has surfaced the stale repo-sync risk.
   when:

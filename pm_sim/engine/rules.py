@@ -102,10 +102,16 @@ def _match_semantic_criteria(match: dict[str, Any]) -> dict[str, Any] | None:
     if mode not in {"semantic", "llm"}:
         return None
     criteria = _criteria_from_intents(match)
+    criteria["matcher_mode"] = "llm" if mode == "llm" else "deterministic"
     return criteria if criteria["required"] or criteria["forbidden"] else None
 
 
 def _criteria_from_intents(match: dict[str, Any]) -> dict[str, Any]:
+    if "required_concepts" in match or "forbidden_concepts" in match:
+        return {
+            "required": _concept_items(match.get("required_concepts", [])),
+            "forbidden": _concept_items(match.get("forbidden_concepts", [])),
+        }
     intents = _intent_map(match)
     required_ids = _required_intent_ids(match, intents)
     forbidden_ids = _forbidden_intent_ids(match)
@@ -125,6 +131,12 @@ def _criteria_from_intents(match: dict[str, Any]) -> dict[str, Any]:
 
 def _semantic_item_from_intent(intent: dict[str, Any]) -> dict[str, Any]:
     return dict(intent)
+
+
+def _concept_items(items: Any) -> list[dict[str, Any]]:
+    if not isinstance(items, list):
+        return []
+    return [dict(item) for item in items if isinstance(item, dict)]
 
 
 def _match_intents(match: dict[str, Any], normalized_text: str) -> bool:

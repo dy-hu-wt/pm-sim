@@ -951,6 +951,30 @@ def _validate_match_spec(spec: dict[str, Any], label: str, *, facts: set[str]) -
             if intent_id not in intent_ids:
                 raise ScenarioError(f"{label} match.{key} references unknown intent: {intent_id}")
 
+    for key in ("required_concepts", "forbidden_concepts"):
+        concepts = spec.get(key, [])
+        if concepts is None:
+            concepts = []
+        if not isinstance(concepts, list):
+            raise ScenarioError(f"{label} match.{key} must be a list.")
+        concept_ids = set()
+        for index, concept in enumerate(concepts, start=1):
+            concept_label = f"{label} match {key} concept {index}"
+            if not isinstance(concept, dict):
+                raise ScenarioError(f"{concept_label} must be an object.")
+            concept_id = concept.get("id")
+            if not isinstance(concept_id, str) or not concept_id:
+                raise ScenarioError(f"{concept_label} must include string id.")
+            if concept_id in concept_ids:
+                raise ScenarioError(f"{label} match.{key} has duplicate concept id: {concept_id}")
+            concept_ids.add(concept_id)
+            if not isinstance(concept.get("description"), str) or not concept.get("description"):
+                raise ScenarioError(f"{concept_label} must include description.")
+            exemplars = concept.get("exemplars", [])
+            if not isinstance(exemplars, list) or not exemplars:
+                raise ScenarioError(f"{concept_label} must include non-empty exemplars.")
+            _validate_string_list(exemplars, f"{concept_label} exemplars")
+
 
 def _validate_scored_milestones_are_state_derived(data: dict[str, Any]) -> None:
     scored_keys = {

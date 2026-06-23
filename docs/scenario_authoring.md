@@ -228,26 +228,27 @@ grading_rules:
       recipient_id: daisy
       match:
         mode: semantic
-        intents:
-          - id: draft_mode
-            description: The message says Friday launch mode is draft mode.
-            signals:
-              - draft mode
-              - draft suggestions
-          - id: human_approval
-            description: The message says a human must approve before posting.
-            signals:
-              - human approval
-              - approve before posting
-          - id: repo_sync_risk
-            description: The message explains stale commit or repo sync risk.
-            signals:
-              - stale commit
-              - repo sync risk
-        require_all:
-          - draft_mode
-          - human_approval
-          - repo_sync_risk
+        required_concepts:
+          - id: friday_draft_mode
+            description: Friday launch mode is draft mode or queued draft suggestions.
+            exemplars:
+              - use draft mode for the Friday beta
+              - the agent queues draft suggestions for Friday
+          - id: human_approval_before_posting
+            description: A human or reviewer must approve before anything is posted.
+            exemplars:
+              - a reviewer approves before posting
+              - comments require human approval before posting
+          - id: repo_sync_stale_risk
+            description: Repo sync can make the agent review stale code.
+            exemplars:
+              - repo sync can cause stale commit reviews
+              - webhook ordering can leave the agent reviewing an older commit
+        forbidden_concepts:
+          - id: unsafe_auto_posting
+            description: The message promises automatic posting for Friday.
+            exemplars:
+              - comments will post automatically on Friday
     state:
       person_id: daisy
       key: customer_update_received
@@ -257,13 +258,15 @@ grading_rules:
       note: Daisy received grounded customer-ready launch wording.
 ```
 
-This rule is causal. The agent must discover the risk and get the decision before the email can update Daisy's state. The evaluator later scores `customer_message_ready` from Daisy's state, not from the raw email body.
+This rule is causal. The agent must discover the risk and get the decision before the email can update Daisy's state. The semantic matcher only checks narrow authored concepts in the action text; the evaluator later scores `customer_message_ready` from Daisy's state, not from the raw email body. Prefer `required_concepts` and `forbidden_concepts` with a few exemplars over long keyword lists for grading rules.
+
+`mode: semantic` uses deterministic exemplar matching. It is intentionally narrow and fail-closed, so broad paraphrases should not score unless the scenario author adds an exemplar. `mode: llm` is reserved for optional model-based matching; it still receives only the authored criteria and message text, caches by mode/model/criteria/text, and rejects responses that do not return every authored concept id with a rationale. The LLM never decides facts, task state, outcome state, or points.
 
 ## Reusable Patterns
 
 Use these patterns before inventing a one-off structure:
 
-- Grounded communication: prerequisites in `requires`, semantic `action.match`, a state mutation, then a derived `milestone`. Scenario-specific fields are the recipient, required facts, signals, state key, and note; engine-generic fields are `requires`, `action`, `state`, and `milestone`.
+- Grounded communication: prerequisites in `requires`, semantic `action.match`, a state mutation, then a derived `milestone`. Scenario-specific fields are the recipient, required facts, concepts/exemplars, state key, and note; engine-generic fields are `requires`, `action`, `state`, and `milestone`.
 - Blocker discovery: hidden/private fact plus `update_blocker` to `surfaced`, usually from an actor reply, event, or meeting. Scenario-specific fields are the fact, owner, blocker, and wording; engine-generic fields are fact visibility, blocker status, and effects.
 - Stakeholder approval: decision-maker reply or meeting rule records a fact/project decision and coworker state. Scenario-specific fields are who can approve and what evidence they need; engine-generic fields are `project_decision`, `update_project`, `update_coworker_state`, and task gates.
 - Interruption scoping: outside event creates pressure, reveals a scoped fact, and records a commitment or project decision that protects the main project. Scenario-specific fields are customer/project names and tradeoff; engine-generic fields are event delivery, effects, commitments, and harmful-action rules.
