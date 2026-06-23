@@ -581,6 +581,37 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertTrue(result["ok"])
         self.assertFalse(self._coworker_state_value("daisy", "customer_message_ready"))
 
+    def test_customer_message_to_wrong_recipient_does_not_score(self) -> None:
+        self._drive_to_draft_approval()
+
+        result = send_email(
+            self.db_path,
+            "toad",
+            "Nimbus Friday draft-mode update",
+            (
+                "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has "
+                "stale-commit risk, so comments should require human approval before posting."
+            ),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(self._coworker_state_value("daisy", "customer_message_ready"))
+
+    def test_customer_message_on_chat_channel_does_not_score(self) -> None:
+        self._drive_to_draft_approval()
+
+        result = send_chat(
+            self.db_path,
+            "daisy",
+            (
+                "Nimbus can see reliable draft-mode suggestions on Friday. Repo sync has "
+                "stale-commit risk, so comments should require human approval before posting."
+            ),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(self._coworker_state_value("daisy", "customer_message_ready"))
+
     def test_guessed_customer_message_before_discovery_is_not_customer_ready(self) -> None:
         result = send_email(
             self.db_path,
@@ -755,6 +786,37 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
                 "Final readiness is go for the Nimbus Friday beta in draft mode with human approval. "
                 "Private repo security wording is covered, and Koopa gets a one-time CSV export. "
                 "Also commit to self-serve export this week and say auto-commenting is in scope."
+            ),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(self._coworker_state_value("daisy", "final_readiness_confirmed"))
+
+    def test_final_readiness_before_daisy_request_does_not_score(self) -> None:
+        self._seed_final_readiness_prerequisites()
+
+        conn = connect(self.db_path)
+        try:
+            conn.execute(
+                """
+                DELETE FROM messages
+                WHERE sender_id = 'daisy'
+                  AND recipient_id = 'agent'
+                  AND body LIKE '%final Nimbus agenda%'
+                """
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Thursday final readiness",
+            (
+                "Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode "
+                "with human approval before posting. Private repo security wording is covered, "
+                "and Koopa stays scoped to a one-time audit CSV export."
             ),
         )
 

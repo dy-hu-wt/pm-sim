@@ -551,9 +551,9 @@ class EvaluatorTests(unittest.TestCase):
         comparison = result["outcome_comparison"]
         critical_path = result["critical_path"]
 
-        self.assertIsNone(comparison["baseline_expected_score"])
+        self.assertEqual(comparison["baseline_expected_score"], 15)
         self.assertEqual(comparison["actual_outcome"], None)
-        self.assertIsNone(comparison["improved_over_baseline"])
+        self.assertFalse(comparison["improved_over_baseline"])
         self.assertGreaterEqual(critical_path["blocked_count"], 1)
         self.assertGreaterEqual(critical_path["dependency_count"], 1)
 

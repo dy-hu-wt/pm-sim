@@ -786,6 +786,7 @@ scripted_policy:
     body: Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode with human approval before posting, private repo security wording is covered, and Koopa stays scoped to a one-time audit CSV so it does not derail the Friday beta.
 baseline:
   description: No-op baseline waits for scheduled events. Luigi surfaces the stale-code risk on Thursday, which is late for Daisy's customer message and Peach's onboarding work.
+  expected_score: 15
   expected_outcome: Beta remains at risk, draft mode may be chosen late, and stakeholder confidence is lower than an agent-driven path.
 milestone_rules:
 - note: Luigi has surfaced the stale repo-sync risk.
