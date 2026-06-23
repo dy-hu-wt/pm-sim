@@ -147,7 +147,7 @@ class ActorBehaviorTests(unittest.TestCase):
         )
         self.assertEqual({effect["type"] for effect in replies[0].effects}, {"discover_fact", "reveal_doc"})
 
-    def test_llm_coworker_mode_selects_only_allowed_candidate_effects(self) -> None:
+    def test_llm_coworker_mode_rephrases_deterministic_candidate_effects(self) -> None:
         behaviors = [
             {
                 "id": "luigi_risk_answer",
@@ -186,11 +186,8 @@ class ActorBehaviorTests(unittest.TestCase):
         with unittest.mock.patch.dict("os.environ", {"PM_SIM_COWORKER_MODE": "llm"}, clear=False):
             with unittest.mock.patch.object(
                 coworkers_module,
-                "_llm_select_candidates",
-                return_value={
-                    "selected_candidate_ids": ["luigi_security_answer"],
-                    "body": "Use the security baseline first.",
-                },
+                "_llm_render_reply",
+                return_value="Repo sync is risky, and the security baseline is the source of truth.",
             ):
                 replies = replies_for_chat(
                     "luigi",
@@ -199,11 +196,17 @@ class ActorBehaviorTests(unittest.TestCase):
                 )
 
         self.assertEqual(len(replies), 1)
-        self.assertEqual(replies[0].body, "Use the security baseline first.")
-        self.assertEqual({effect["type"] for effect in replies[0].effects}, {"reveal_doc"})
-        self.assertEqual(replies[0].matched_rule_ids, ("luigi_security_answer",))
+        self.assertEqual(
+            replies[0].body,
+            "Repo sync is risky, and the security baseline is the source of truth.",
+        )
+        self.assertEqual({effect["type"] for effect in replies[0].effects}, {"discover_fact", "reveal_doc"})
+        self.assertEqual(
+            replies[0].matched_rule_ids,
+            ("luigi_risk_answer", "luigi_security_answer"),
+        )
 
-    def test_llm_coworker_mode_falls_back_on_invalid_selection(self) -> None:
+    def test_llm_coworker_mode_falls_back_on_invalid_render(self) -> None:
         behaviors = [
             {
                 "id": "luigi_risk_answer",
@@ -226,8 +229,8 @@ class ActorBehaviorTests(unittest.TestCase):
         with unittest.mock.patch.dict("os.environ", {"PM_SIM_COWORKER_MODE": "llm"}, clear=False):
             with unittest.mock.patch.object(
                 coworkers_module,
-                "_llm_select_candidates",
-                return_value={"selected_candidate_ids": ["not_allowed"], "body": "Invented wording."},
+                "_llm_render_reply",
+                return_value=None,
             ):
                 replies = replies_for_chat(
                     "luigi",

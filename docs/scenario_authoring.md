@@ -93,7 +93,7 @@ There are two kinds of matching.
 
 Deterministic matching routes stable behavior. It is used for coworker reply candidates, meetings, and similar authored rules where you want predictability.
 
-Coworker replies always start from authored candidates. `PM_SIM_COWORKER_MODE=llm` is the default and lets a model choose candidate IDs and phrase the reply. `PM_SIM_COWORKER_MODE=deterministic` selects and renders candidates locally for offline replay. In both modes, the model cannot add effects or make unsupported facts true. Keep each candidate's effects complete and deterministic because they remain the source of truth.
+Coworker replies always start from authored candidates. Candidate selection is deterministic in every mode. `PM_SIM_COWORKER_MODE=llm` is the default and lets a model rephrase the already-selected fallback text using `people[].behavior.voice`. `PM_SIM_COWORKER_MODE=deterministic` renders the selected fallback text locally for offline replay. In both modes, the model cannot add effects or make unsupported facts true. Keep each candidate's effects complete and deterministic because they remain the source of truth.
 
 `concept_match` is used when an action’s wording matters. It should be used narrowly. It is not the scorer by itself. It only answers whether an already-grounded action communicates the authored required ideas and avoids forbidden ones.
 

@@ -121,7 +121,7 @@ The runtime uses two generic interpreters:
 
 That keeps scenario-specific logic in YAML instead of Python branches. The same effect system handles direct actions, coworker replies, proactive policies, scheduled events, and meetings.
 
-Coworker replies are generated as structured candidates first. Each candidate has authored conditions, fallback text, and effects. By default the runtime uses `PM_SIM_COWORKER_MODE=llm`, where a model may choose and rephrase only from the allowed candidate IDs. Set `PM_SIM_COWORKER_MODE=deterministic` for fully local/offline replay. The engine validates the selected IDs and applies only the selected candidates' authored effects; model text cannot create facts, resolve blockers, complete tasks, or award score.
+Coworker replies are generated as structured candidates first. Each candidate has authored conditions, fallback text, and effects. Candidate selection is deterministic in every mode. By default the runtime uses `PM_SIM_COWORKER_MODE=llm`, where a model may only rephrase the already-selected fallback response using the actor's `voice`. Set `PM_SIM_COWORKER_MODE=deterministic` for fully local/offline replay. The selected candidates' authored effects are the only effects applied; model text cannot create facts, resolve blockers, complete tasks, or award score.
 
 ## Evaluation
 
@@ -138,7 +138,7 @@ action
 -> component score
 ```
 
-LLM use is intentionally bounded. Concept matching checks whether a grounded communication action expresses the authored required ideas and avoids forbidden ones. Optional coworker LLM mode chooses and phrases among already-valid coworker response candidates. Neither path decides project truth, task completion, blocker status, or final score by itself.
+LLM use is intentionally bounded. Concept matching checks whether a grounded communication action expresses the authored required ideas and avoids forbidden ones. Optional coworker LLM mode rephrases already-selected coworker responses but does not choose effects. Neither path decides project truth, task completion, blocker status, or final score by itself.
 
 Scoring comes from state such as:
 

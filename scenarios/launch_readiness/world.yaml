@@ -112,6 +112,7 @@ people:
   private_knowledge: {}
   behavior:
     rule: mario
+    voice: product-minded and upbeat; presses for a strong beta story but accepts concrete risk.
     current_focus: customer-visible PR Review Agent beta scope
     needs_from_pm:
     - clear risk callout before cutting auto-commenting
@@ -153,6 +154,7 @@ people:
     - draft_mode_limits_customer_visible_risk
   behavior:
     rule: luigi
+    voice: concise and risk-focused; pushes back on auto-commenting until repo-sync reliability is proven.
     current_focus: repo sync hardening and private-repo security details
     needs_from_pm:
     - ask specifically about repo-sync stale-commit risk
@@ -194,6 +196,7 @@ people:
     - design_blocked_by_scope
   behavior:
     rule: peach
+    voice: practical and design-focused; asks for clear scope before committing onboarding copy.
     current_focus: draft-mode onboarding and review-flow documentation
     needs_from_pm:
     - explicit Friday launch mode
@@ -235,6 +238,7 @@ people:
     - nimbus_values_reliability
   behavior:
     rule: daisy
+    voice: customer-focused and precise; wants wording she can forward without reinterpretation.
     current_focus: customer-safe Nimbus and Koopa messaging
     needs_from_pm:
     - email-ready Nimbus beta wording
@@ -274,6 +278,7 @@ people:
   private_knowledge: {}
   behavior:
     rule: toad
+    voice: direct and decision-focused; requires explicit risk, customer impact, and tradeoffs.
     current_focus: defensible launch approval and engineering focus
     needs_from_pm:
     - concrete technical risk

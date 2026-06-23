@@ -60,6 +60,7 @@ people:
     - saved_replies_missing
     - top_saved_replies_can_move
   behavior:
+    voice: practical and team-focused; pushes back on vague support updates and early old-inbox shutdown.
     current_focus: moving saved support replies into the new help desk
     needs_from_pm:
     - ask whether the old saved replies are already in the new help desk
@@ -98,6 +99,7 @@ people:
     - vip_email_routing_gap
     - vip_forwarding_test_ok
   behavior:
+    voice: concise and test-focused; pushes back on calling the switch ready before VIP routing is tested.
     current_focus: testing customer email forwarding
     needs_from_pm:
     - ask whether VIP emails reach the new help desk

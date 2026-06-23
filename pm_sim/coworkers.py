@@ -253,24 +253,13 @@ def _select_and_render_candidates(
         return deterministic, None
 
     try:
-        result = _llm_select_candidates(text, snapshot, candidates)
+        body_override = _llm_render_reply(text, snapshot, deterministic)
     except Exception:
         return deterministic, None
 
-    allowed = {_candidate_id(candidate): candidate for candidate in candidates}
-    selected = [
-        allowed[candidate_id]
-        for candidate_id in result.get("selected_candidate_ids", [])
-        if candidate_id in allowed
-    ]
-    if not selected:
+    if not body_override:
         return deterministic, None
-
-    body = result.get("body")
-    body_override = body.strip() if isinstance(body, str) and body.strip() else None
-    if body_override and len(body_override) > 2000:
-        body_override = None
-    return selected[:3], body_override
+    return deterministic, body_override
 
 
 def _select_candidates(candidates: list[ActorCandidate]) -> list[ActorCandidate]:
@@ -324,11 +313,11 @@ def _coworker_model() -> str:
     )
 
 
-def _llm_select_candidates(
+def _llm_render_reply(
     text: str,
     snapshot: ActorSnapshot,
     candidates: list[ActorCandidate],
-) -> dict[str, Any]:
+) -> str | None:
     _load_dotenv()
     if not os.environ.get("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY is required for PM_SIM_COWORKER_MODE=llm.")
@@ -336,7 +325,7 @@ def _llm_select_candidates(
     try:
         from openai import OpenAI
     except ImportError as error:
-        raise RuntimeError("Install the optional OpenAI SDK to use LLM coworker selection.") from error
+        raise RuntimeError("Install the optional OpenAI SDK to use LLM coworker rendering.") from error
 
     payload = {
         "coworker": {
@@ -358,31 +347,34 @@ def _llm_select_candidates(
             ],
         },
         "incoming_message": text,
-        "allowed_candidates": [_candidate_payload(candidate) for candidate in candidates[:8]],
+        "selected_candidates": [_candidate_payload(candidate) for candidate in candidates],
+        "fallback_body": "\n\n".join(candidate.reply.body for candidate in candidates if candidate.reply.body),
     }
 
     client = OpenAI()
     response = client.responses.create(
         model=_coworker_model(),
         instructions=(
-            "You select and phrase a simulated coworker response. "
-            "You must only choose candidate ids from allowed_candidates. "
-            "Do not invent facts, approvals, promises, or effects. "
-            "Return strict JSON with selected_candidate_ids as a list of strings and body as a concise message. "
-            "The simulator will ignore any state changes not attached to selected candidate ids."
+            "You rephrase a simulated coworker response. "
+            "The selected candidates and their effects were already chosen deterministically. "
+            "Preserve every factual point in fallback_body and selected_candidates. "
+            "Use the coworker's voice/personality from behavior.voice if present. "
+            "Do not add facts, approvals, promises, dates, blockers, docs, or effects. "
+            "Return strict JSON with a single string field: body."
         ),
         input=json.dumps(payload, sort_keys=True),
     )
     output_text = getattr(response, "output_text", "") or ""
     parsed = json.loads(output_text)
     if not isinstance(parsed, dict):
-        raise RuntimeError("Coworker selector returned non-object JSON.")
-    selected = parsed.get("selected_candidate_ids")
-    if not isinstance(selected, list) or any(not isinstance(item, str) for item in selected):
-        raise RuntimeError("Coworker selector returned invalid selected_candidate_ids.")
-    if "body" in parsed and not isinstance(parsed["body"], str):
-        raise RuntimeError("Coworker selector returned invalid body.")
-    return parsed
+        raise RuntimeError("Coworker renderer returned non-object JSON.")
+    body = parsed.get("body")
+    if not isinstance(body, str):
+        raise RuntimeError("Coworker renderer returned invalid body.")
+    body = body.strip()
+    if not body or len(body) > 2000:
+        return None
+    return body
 
 
 def _candidate_payload(candidate: ActorCandidate) -> dict[str, Any]:
