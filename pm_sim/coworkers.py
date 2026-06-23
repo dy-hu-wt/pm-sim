@@ -358,7 +358,9 @@ def _llm_render_reply(
             "You rephrase a simulated coworker response. "
             "The selected candidates and their effects were already chosen deterministically. "
             "Preserve every factual point in fallback_body and selected_candidates. "
-            "Use the coworker's voice/personality from behavior.voice if present. "
+            "If behavior.voice is present, the rewritten body must visibly reflect it. "
+            "Interpret behavior.voice directly; do not invent a separate personality. "
+            "Do not merely copy fallback_body when behavior.voice is present; keep the same facts but make the style observably different. "
             "Do not add facts, approvals, promises, dates, blockers, docs, or effects. "
             "Return strict JSON with a single string field: body."
         ),
