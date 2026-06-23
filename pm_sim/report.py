@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -111,14 +112,11 @@ def _render_html(data: dict[str, Any]) -> str:
             _section("Known Blockers", _blockers(observation.get("known_blockers", []))),
             _section("Evaluation", _evaluation(evaluation)),
             "</div>",
+            _section("Week Timeline", _week_calendar(data.get("timeline", []))),
             _section("Tasks", _tasks(data.get("tasks", []))),
             _section("Recent Messages", _messages(observation.get("recent_messages", []))),
             _section("Visible Docs", _docs(data.get("docs", []))),
-            _section("Timeline", _timeline(data.get("timeline", []))),
-            '<div class="dashboard-grid">',
-            _section("Action Log", _actions(data.get("actions", []))),
-            _section("Event Queue", _events(data.get("events", []))),
-            "</div>",
+            _section("Debug Logs", _debug_logs(data)),
             "</main>",
             "</div>",
             "</body>",
@@ -141,6 +139,7 @@ def _css() -> str:
   --warn: #9a5b00;
   --bad: #aa2f2f;
   --blue: #255c99;
+  --purple: #6f4bb2;
   --nav: #111827;
   --nav-muted: #aeb7c6;
   --shadow: 0 16px 40px rgba(24, 35, 52, 0.08);
@@ -216,6 +215,57 @@ p { margin: 0 0 8px; }
   gap: 14px;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
 }
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(210px, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+.day-column {
+  min-height: 220px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.day-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #ffffff;
+}
+.day-header strong { display: block; }
+.day-header span { color: var(--muted); font-size: 12px; }
+.calendar-card {
+  margin: 9px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  background: #ffffff;
+}
+.calendar-card.event { border-left-color: var(--purple); }
+.calendar-card.evidence { border-left-color: var(--good); }
+.calendar-card.message { border-left-color: var(--warn); }
+.calendar-time { color: var(--muted); font-size: 12px; font-weight: 700; }
+.calendar-title { font-weight: 800; margin-top: 3px; }
+.calendar-detail { color: var(--muted); margin-top: 4px; font-size: 12px; }
+.debug-stack { padding: 14px; display: grid; gap: 10px; }
+details {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  font-weight: 800;
+  background: #f8fafc;
+}
+.outcome-summary {
+  padding: 14px 16px 0;
+  color: var(--muted);
+}
 .stat-card, section {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -262,6 +312,7 @@ tbody tr:hover { background: #f9fbff; }
 .badge.warn { background: #fff3d6; color: var(--warn); }
 .badge.bad { background: #fde8e8; color: var(--bad); }
 .badge.blue { background: #e8f1fb; color: var(--blue); }
+.badge.purple { background: #f0eafd; color: var(--purple); }
 .passed { color: var(--good); font-weight: 700; }
 .partial { color: var(--warn); font-weight: 700; }
 .missing, .failed { color: var(--bad); font-weight: 700; }
@@ -275,6 +326,7 @@ tbody tr:hover { background: #f9fbff; }
   .content { padding: 18px; }
   .hero { display: block; }
   .hero-score { text-align: left; margin-top: 14px; }
+  .week-grid { grid-template-columns: 1fr; }
 }
 """.strip()
 
@@ -285,12 +337,11 @@ def _sidebar() -> str:
         ("calendar-obligations", "Calendar"),
         ("known-blockers", "Blockers"),
         ("evaluation", "Evaluation"),
+        ("week-timeline", "Week Timeline"),
         ("tasks", "Tasks"),
         ("recent-messages", "Messages"),
         ("visible-docs", "Docs"),
-        ("timeline", "Timeline"),
-        ("action-log", "Action Log"),
-        ("event-queue", "Event Queue"),
+        ("debug-logs", "Debug Logs"),
     ]
     nav = "".join(f'<a href="#{section_id}">{_h(label)}</a>' for section_id, label in links)
     return (
@@ -303,13 +354,15 @@ def _sidebar() -> str:
 
 def _summary_cards(evaluation: dict[str, Any], final_outcome: dict[str, Any]) -> str:
     status = _score_status(evaluation)
+    outcome_title = _human_outcome(final_outcome)
     return (
         '<div class="stat-grid">'
         + _card("Score", f"{evaluation.get('score')} / {evaluation.get('max_score')}", "good" if status == "passed" else "warn")
         + _card("Evidence Rows", str(evaluation.get("evidence_count", 0)))
-        + _card("Outcome", final_outcome.get("outcome") or "pending")
+        + _card("Friday Result", outcome_title)
         + _card("Status", status, "good" if status == "passed" else "warn")
         + "</div>"
+        + _outcome_summary(final_outcome)
     )
 
 
@@ -353,7 +406,7 @@ def _projects(projects: list[dict[str, Any]]) -> str:
                 _badge(project.get("risk_level"), _tone(project.get("risk_level"))),
                 project.get("deadline"),
                 project.get("stakeholder_pressure"),
-                metadata.get("final_outcome") or metadata.get("decision") or "",
+                _human_project_state(metadata),
             ]
         )
     return _table(
@@ -401,6 +454,111 @@ def _evaluation(evaluation: dict[str, Any]) -> str:
             ]
         )
     return _table(["Component", "Score", "Status", "Note"], rows, raw_columns={2})
+
+
+def _week_calendar(entries: list[dict[str, Any]]) -> str:
+    days = ["2026-06-22", "2026-06-23", "2026-06-24", "2026-06-25", "2026-06-26"]
+    labels = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+    grouped = {day: [] for day in days}
+    for entry in entries:
+        card = _calendar_card(entry)
+        if card is None:
+            continue
+        day = str(entry.get("time", ""))[:10]
+        if day in grouped:
+            grouped[day].append(card)
+
+    columns = []
+    for day, label in zip(days, labels):
+        cards = "".join(grouped[day]) or '<p class="empty">No visible activity</p>'
+        columns.append(
+            '<div class="day-column">'
+            f'<div class="day-header"><strong>{label}</strong><span>{_h(day)}</span></div>'
+            f"{cards}"
+            "</div>"
+        )
+    return '<div class="week-grid">' + "".join(columns) + "</div>"
+
+
+def _calendar_card(entry: dict[str, Any]) -> str | None:
+    kind = entry.get("kind")
+    if kind not in {"action", "event_delivered"}:
+        return None
+
+    title = _calendar_title(entry)
+    detail = _calendar_detail(entry)
+    if not title:
+        return None
+
+    card_kind = "event" if kind == "event_delivered" else str(kind or "action")
+    return (
+        f'<div class="calendar-card {_h(card_kind)}">'
+        f'<div class="calendar-time">{_h(_time_only(entry.get("time")))}</div>'
+        f'<div class="calendar-title">{title}</div>'
+        f'<div class="calendar-detail">{detail}</div>'
+        "</div>"
+    )
+
+
+def _calendar_title(entry: dict[str, Any]) -> str:
+    kind = entry.get("kind")
+    if kind == "action":
+        action_type = entry.get("action_type")
+        payload = entry.get("payload", {})
+        if action_type == "send_chat":
+            return f"Chat to {_person_name(payload.get('person_id'))}"
+        if action_type == "send_email":
+            return f"Email to {_person_name(payload.get('person_id'))}"
+        if action_type == "read_doc":
+            return "Read document"
+        if action_type == "update_doc":
+            return "Updated document"
+        if action_type == "update_task":
+            return "Updated task"
+        if action_type == "schedule_meeting":
+            return "Scheduled meeting"
+        if action_type == "advance_time":
+            return "Waited"
+        if action_type == "reset":
+            return ""
+        return _human_label(action_type)
+    if kind == "event_delivered":
+        return _human_event(entry.get("event_type"))
+    if kind == "evidence":
+        return "Evidence recorded"
+    if kind == "message":
+        return f"{_person_name(entry.get('sender_id'))} sent {entry.get('channel')}"
+    return _human_label(entry.get("title"))
+
+
+def _calendar_detail(entry: dict[str, Any]) -> str:
+    kind = entry.get("kind")
+    if kind == "action":
+        payload = entry.get("payload", {})
+        result = entry.get("result", {})
+        action_type = entry.get("action_type")
+        if action_type in {"send_chat", "send_email"}:
+            text = payload.get("body") or payload.get("subject") or ""
+            return _h(_short_text(text, 120))
+        if action_type == "read_doc":
+            return _h(_doc_name(payload.get("doc_id")))
+        if action_type == "update_doc":
+            return _h(_doc_name(payload.get("doc_id")))
+        if action_type == "update_task":
+            return _h(_task_name(payload.get("task_id")))
+        if action_type == "advance_time":
+            delivered = result.get("delivered_event_ids", [])
+            if delivered:
+                return _h(f"Delivered {len(delivered)} queued event(s)")
+            return _h(str(payload.get("target") or "wait"))
+        return _h(_human_label(action_type))
+    if kind == "event_delivered":
+        return _h(_human_event_detail(entry))
+    if kind == "evidence":
+        return _h(f"{_human_label(entry.get('evidence_key'))}: {entry.get('note', '')}")
+    if kind == "message":
+        return _h(_short_text(entry.get("body", ""), 120))
+    return _h(entry.get("title", ""))
 
 
 def _tasks(tasks: list[dict[str, Any]]) -> str:
@@ -454,6 +612,25 @@ def _timeline(entries: list[dict[str, Any]]) -> str:
     return _table(["Time", "Kind", "Title", "ID"], rows, raw_columns={1})
 
 
+def _debug_logs(data: dict[str, Any]) -> str:
+    timeline_html = _timeline(data.get("timeline", []))
+    actions_html = _actions(data.get("actions", []))
+    events_html = _events(data.get("events", []))
+    return (
+        '<div class="debug-stack">'
+        "<details open><summary>Timeline</summary>"
+        f"{timeline_html}"
+        "</details>"
+        "<details><summary>Action Log</summary>"
+        f"{actions_html}"
+        "</details>"
+        "<details><summary>Event Queue</summary>"
+        f"{events_html}"
+        "</details>"
+        "</div>"
+    )
+
+
 def _actions(actions: list[dict[str, Any]]) -> str:
     rows = [
         [item.get("created_at"), item.get("actor"), _badge(item.get("action_type"), "blue"), item.get("id")]
@@ -499,7 +676,7 @@ def _table(headers: list[str], rows: list[list[Any]], raw_columns: set[int] | No
 
 
 def _badge(value: Any, tone: str = "neutral") -> str:
-    return f'<span class="badge {_h(tone)}">{_h(value)}</span>'
+    return f'<span class="badge {_h(tone)}">{_h(_human_label(value))}</span>'
 
 
 def _tone(value: Any) -> str:
@@ -515,6 +692,144 @@ def _tone(value: Any) -> str:
 
 def _section_id(title: str) -> str:
     return title.lower().replace(" ", "-")
+
+
+def _human_outcome(final_outcome: dict[str, Any]) -> str:
+    outcome = final_outcome.get("outcome")
+    mapping = {
+        "draft_mode_beta_shipped": "Draft-mode beta shipped",
+        "late_draft_mode": "Draft mode landed late",
+        "risky_auto_commenting": "Risky auto-commenting shipped",
+        "missed_due_to_blockers": "Launch blocked",
+        "no_approved_friday_plan": "No approved Friday plan",
+        "koopa_audit_update_ready": "Koopa update ready",
+        "koopa_audit_scope_unresolved": "Koopa scope unresolved",
+    }
+    return mapping.get(str(outcome), _human_label(outcome or "Pending"))
+
+
+def _outcome_summary(final_outcome: dict[str, Any]) -> str:
+    summary = final_outcome.get("summary")
+    if not summary:
+        return ""
+    return f'<div class="outcome-summary">{_h(summary)}</div>'
+
+
+def _human_project_state(metadata: dict[str, Any]) -> str:
+    if metadata.get("final_outcome"):
+        return _human_outcome({"outcome": metadata.get("final_outcome")})
+    decision = metadata.get("decision")
+    if decision:
+        return _human_label(decision)
+    return ""
+
+
+def _human_event(event_type: Any) -> str:
+    mapping = {
+        "coworker_reply": "Coworker replied",
+        "meeting_occurs": "Meeting ended",
+        "project_deadline": "Project deadline",
+        "mario_auto_comment_push": "Mario pushed auto-commenting",
+        "peach_design_blocked_escalation": "Peach escalated blocker",
+        "daisy_confidence_check": "Daisy asked for confidence update",
+        "daisy_private_repo_security_question": "Daisy asked security question",
+        "nimbus_launch_mode_question": "Nimbus asked launch-mode question",
+        "luigi_proactive_repo_risk": "Luigi resurfaced repo risk",
+        "koopa_audit_export_request": "Koopa audit request arrived",
+        "thursday_final_readiness_check": "Thursday readiness check",
+    }
+    return mapping.get(str(event_type), _human_label(event_type))
+
+
+def _human_event_detail(entry: dict[str, Any]) -> str:
+    descriptions = {
+        "coworker_reply": "A coworker response became visible.",
+        "meeting_occurs": "The meeting ended and a transcript was created.",
+        "project_deadline": "A project deadline was reached and the outcome was settled.",
+        "mario_auto_comment_push": "Mario pushed for the flashier auto-commenting launch path.",
+        "peach_design_blocked_escalation": "Peach flagged that onboarding was still blocked by unclear launch scope.",
+        "daisy_confidence_check": "Daisy asked whether the Nimbus beta was still on track.",
+        "daisy_private_repo_security_question": "Daisy brought in a same-day customer security question.",
+        "nimbus_launch_mode_question": "Nimbus asked for clear launch-mode wording.",
+        "luigi_proactive_repo_risk": "Luigi resurfaced repo-sync risk before launch.",
+        "koopa_audit_export_request": "Koopa's audit-log export request became visible.",
+        "thursday_final_readiness_check": "Daisy asked for the final go/no-go before Friday.",
+    }
+    event_type = str(entry.get("event_type") or "")
+    if event_type in descriptions:
+        return descriptions[event_type]
+
+    result = entry.get("result", {})
+    if isinstance(result, dict):
+        body = result.get("body") or result.get("summary")
+        if body:
+            return _short_text(body, 130)
+        effects = result.get("applied_effects", [])
+        if effects:
+            return f"Applied {len(effects)} state change(s)"
+    return _human_label(entry.get("event_type"))
+
+
+def _human_label(value: Any) -> str:
+    text = str(value or "")
+    if not text:
+        return ""
+    return text.replace("_", " ").replace("-", " ").strip().capitalize()
+
+
+def _doc_name(value: Any) -> str:
+    names = {
+        "doc_project_brief": "PR Review Agent beta brief",
+        "doc_monday_standup": "Monday standup notes",
+        "doc_launch_decision_record": "Friday launch decision record",
+        "doc_beta_rollout_template": "Nimbus rollout template",
+        "doc_private_repo_security_baseline": "Private repo security baseline",
+        "doc_koopa_audit_export_note": "Koopa audit export note",
+        "doc_friday_outcome": "Friday outcome",
+        "doc_koopa_audit_export_outcome": "Koopa audit export outcome",
+    }
+    return names.get(str(value), _human_label(value or "document"))
+
+
+def _task_name(value: Any) -> str:
+    names = {
+        "task_launch_decision": "Launch-mode decision",
+        "task_draft_mode_docs": "Draft-mode onboarding",
+        "task_customer_talk_track": "Customer talk track",
+        "task_beta_rollout_notes": "Beta rollout notes",
+        "task_repo_sync": "Repo sync",
+        "task_review_context_pipeline": "Review context pipeline",
+        "task_audit_export_feasibility": "Audit export feasibility",
+        "task_audit_export_scope": "Audit export scope",
+        "task_koopa_status_update": "Koopa status update",
+    }
+    return names.get(str(value), _human_label(value or "task"))
+
+
+def _person_name(value: Any) -> str:
+    names = {
+        "agent": "Agent",
+        "mario": "Mario",
+        "luigi": "Luigi",
+        "peach": "Peach",
+        "daisy": "Daisy",
+        "toad": "Toad",
+    }
+    return names.get(str(value), _human_label(value))
+
+
+def _time_only(value: Any) -> str:
+    try:
+        return datetime.fromisoformat(str(value)).strftime("%I:%M %p").lstrip("0")
+    except ValueError:
+        return str(value or "")
+
+
+def _short_text(value: Any, limit: int) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "..."
 
 
 def _h(value: Any) -> str:

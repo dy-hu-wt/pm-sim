@@ -2586,7 +2586,9 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertIn(str(output_path), output)
         self.assertIn("Score:    120 / 120", output)
         self.assertIn("PM Sim Operator Report", html)
-        self.assertIn("draft_mode_beta_shipped", html)
+        self.assertIn("Draft-mode beta shipped", html)
+        self.assertIn("Week Timeline", html)
+        self.assertIn("Debug Logs", html)
 
     def test_scripted_agent_uses_public_tool_actions(self) -> None:
         run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
