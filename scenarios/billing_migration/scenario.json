@@ -1,0 +1,12 @@
+{
+  "id": "billing_migration",
+  "name": "Billing Migration Readiness",
+  "company": "Fireflower",
+  "start_time": "2026-06-22T09:00:00",
+  "timezone": "America/New_York",
+  "summary": "Fireflower is preparing a billing-platform migration for Atlas Retail while handling a same-week invoice export interruption.",
+  "include": [
+    "world.json",
+    "rules.json"
+  ]
+}

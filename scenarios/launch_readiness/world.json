@@ -87,7 +87,16 @@
       "response_delay_minutes": 60,
       "private_knowledge": {},
       "behavior": {
-        "rule": "mario"
+        "rule": "mario",
+        "current_focus": "customer-visible PR Review Agent beta scope",
+        "needs_from_pm": [
+          "clear risk callout before cutting auto-commenting",
+          "alignment that draft mode is still a credible product story"
+        ],
+        "known_constraints": [
+          "Nimbus expects a Friday beta",
+          "auto-commenting is attractive but risky if repo sync is stale"
+        ]
       },
       "private_fact_ids": []
     },
@@ -138,7 +147,16 @@
         ]
       },
       "behavior": {
-        "rule": "luigi"
+        "rule": "luigi",
+        "current_focus": "repo sync hardening and private-repo security details",
+        "needs_from_pm": [
+          "ask specifically about repo-sync stale-commit risk",
+          "do not push auto-commenting until latest-commit reliability is proven"
+        ],
+        "known_constraints": [
+          "webhook ordering can make repo sync review an older commit",
+          "private repo source handling must use approved security wording"
+        ]
       },
       "private_fact_ids": [
         "fact_repo_sync_stale",
@@ -191,7 +209,17 @@
         ]
       },
       "behavior": {
-        "rule": "peach"
+        "rule": "peach",
+        "current_focus": "draft-mode onboarding and review-flow documentation",
+        "needs_from_pm": [
+          "explicit Friday launch mode",
+          "human-approval requirement",
+          "auto-commenting limitation"
+        ],
+        "known_constraints": [
+          "onboarding stays blocked while scope is unclear",
+          "draft-mode docs can proceed once auto-commenting is out of Friday scope"
+        ]
       },
       "private_fact_ids": [
         "fact_design_blocked_by_scope"
@@ -243,7 +271,17 @@
         ]
       },
       "behavior": {
-        "rule": "daisy"
+        "rule": "daisy",
+        "current_focus": "customer-safe Nimbus and Koopa messaging",
+        "needs_from_pm": [
+          "email-ready Nimbus beta wording",
+          "private repo security answer",
+          "scoped Koopa audit export update"
+        ],
+        "known_constraints": [
+          "Nimbus values reliability more than flashy automation",
+          "customer-ready wording should be sent by email"
+        ]
       },
       "private_fact_ids": [
         "fact_nimbus_values_reliability"
@@ -291,7 +329,17 @@
       "response_delay_minutes": 90,
       "private_knowledge": {},
       "behavior": {
-        "rule": "toad"
+        "rule": "toad",
+        "current_focus": "defensible launch approval and engineering focus",
+        "needs_from_pm": [
+          "concrete technical risk",
+          "customer impact",
+          "recommended safer Friday scope"
+        ],
+        "known_constraints": [
+          "draft mode can be approved when risk and customer impact are clear",
+          "Koopa should not expand into full self-serve export during launch week"
+        ]
       },
       "private_fact_ids": []
     }

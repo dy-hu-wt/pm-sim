@@ -2,11 +2,11 @@
 
 `pm-sim` is a local project-manager simulation environment. The current backend models a simulated SaaS launch week with persistent SQLite state, scheduled events, coworker rules, internal tool surfaces, and an inspectable action/event log.
 
-The first scenario is Fireflower launching a PR Review Agent beta for Nimbus Labs while also fielding a smaller Koopa Bank audit-log request. The main launch has stakeholder pressure, task dependencies, hidden repo-sync risk, and an auto-commenting versus draft-mode tradeoff.
+The repository includes two authored scenarios. The first is Fireflower launching a PR Review Agent beta for Nimbus Labs while also fielding a smaller Koopa Bank audit-log request. The second is an Atlas billing migration week with a data-backfill blocker and a Meridian invoice-export interruption. Both use the same engine, tool surfaces, event delivery, coworker state, grading templates, and scripted runner.
 
 ## Scenario
 
-The included scenario is `launch_readiness`.
+The primary scenario is `launch_readiness`.
 
 Fireflower is a B2B SaaS company preparing a PR Review Agent beta for Nimbus Labs. The full beta would auto-post review comments on pull requests, but that depends on repo sync always using the latest commit. A safer draft mode prepares suggestions for human approval before comments are posted. During the week, Nimbus asks whether comments will auto-post, Daisy needs rollout language before she updates them, and Koopa Bank asks for a scoped admin audit-log export answer before a Thursday security review.
 
@@ -137,6 +137,31 @@ pm-sim run-agent --policy scripted --reset
 ```
 
 The scripted policy steps are authored in `scenarios/launch_readiness/rules.json` under `scripted_policy`; the runner only dispatches those steps through normal tool functions. It does not mutate database state directly.
+
+## Second Scenario
+
+The second scenario is `billing_migration`. It demonstrates the same architecture in a different domain: Atlas Retail wants Friday billing migration readiness, Luigi discovers a backfill checksum risk, Daisy needs customer-safe wording, Toad must approve staged shadow mode instead of full cutover, and Meridian Health interrupts with a same-week invoice export request.
+
+Run the no-op baseline:
+
+```bash
+pm-sim reset --scenario scenarios/billing_migration
+pm-sim advance-time to:2026-06-26T15:00:00
+pm-sim evaluate --scenario scenarios/billing_migration --explain
+pm-sim read-doc doc_billing_migration_outcome
+```
+
+Expected baseline result: `15 / 100`.
+
+Run the deterministic success path:
+
+```bash
+pm-sim run-agent --policy scripted --reset --scenario scenarios/billing_migration
+```
+
+Expected scripted result: `100 / 100`.
+
+For authoring details, see [`docs/scenario_authoring.md`](docs/scenario_authoring.md). For grading invariants and anti-cheat behavior, see [`docs/evaluator_semantics.md`](docs/evaluator_semantics.md).
 
 ## Meeting-Based Path
 

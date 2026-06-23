@@ -296,12 +296,12 @@ Scenario-specific v1 data:
   outcome rules
 
 Remaining boundary:
-  meeting behavior still has some PR Review Agent-specific Python.
-  The next scaling step is making meeting effects use the same declarative
-  rule style before adding a second scenario.
+  two scenarios now use the same engine surface. The next scaling step is
+  making calendar/meeting modeling richer across scenarios, including attendee
+  conflicts and more reusable meeting transcript authoring.
 ```
 
-The next scaling step is not a giant prompt. It is reducing the remaining meeting special cases so a second scenario can reuse the same engine without custom Python branches for every project.
+The next scaling step is not a giant prompt. It is adding reusable authoring affordances and richer calendar semantics so more scenarios can be added without custom Python branches for every project.
 
 ### Operator Workflow
 

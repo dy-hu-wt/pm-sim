@@ -64,7 +64,7 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
             "people": rows_to_dicts(
                 conn.execute(
                     """
-                    SELECT id, name, role
+                    SELECT id, name, role, behavior_json
                     FROM people
                     ORDER BY id
                     """
