@@ -12,7 +12,7 @@ Fireflower is a B2B SaaS company preparing a PR Review Agent beta for Nimbus Lab
 
 The agent's job is to discover the stale-code risk, align Mario, Luigi, Peach, Daisy, and Toad, clarify scope, protect the main launch, and handle the smaller Koopa interruption without overpromising.
 
-The launch scenario is authored as four JSON files:
+The launch scenario is authored as four YAML files:
 
 ```text
 scenarios/launch_readiness/scenario.yaml      # manifest: id, start time, includes
