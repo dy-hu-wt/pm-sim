@@ -216,7 +216,7 @@ def _effects_for_project_deadline(
             "title": payload.get("outcome_doc_title", "Project Outcome"),
             "kind": "outcome_report",
             "visible_at": get_current_time(conn),
-            "body": outcome["summary"],
+            "body": outcome["summary"] or _human_label(outcome["final_outcome"]),
             "metadata": {"final_outcome": outcome["final_outcome"]},
         },
     ]
@@ -232,9 +232,13 @@ def _classify_project_outcome(conn: sqlite3.Connection, project_id: str) -> dict
             "status": result["status"],
             "risk_level": result["risk_level"],
             "final_outcome": result.get("final_outcome", rule["id"]),
-            "summary": result["summary"],
+            "summary": result.get("summary", ""),
         }
     raise RuntimeError("No Friday outcome rule matched current scenario state.")
+
+
+def _human_label(value: str) -> str:
+    return value.replace("_", " ").replace("-", " ").strip().capitalize()
 
 
 def _discovered_fact_ids(conn: sqlite3.Connection) -> set[str]:

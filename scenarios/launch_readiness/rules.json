@@ -2194,8 +2194,7 @@
       "result": {
         "status": "shipped",
         "risk_level": "low",
-        "final_outcome": "draft_mode_beta_shipped",
-        "summary": "The team shipped the reliable draft-mode beta for Nimbus Labs. Customer messaging was aligned, onboarding was unblocked, and auto-commenting remained follow-up work."
+        "final_outcome": "draft_mode_beta_shipped"
       }
     },
     {

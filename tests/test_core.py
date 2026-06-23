@@ -424,7 +424,7 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(project["status"], "shipped")
         self.assertEqual(project["risk_level"], "low")
         self.assertEqual(metadata["final_outcome"], "draft_mode_beta_shipped")
-        self.assertIn("shipped the reliable draft-mode beta", outcome_doc["body"])
+        self.assertEqual(outcome_doc["body"], "Draft mode beta shipped")
 
     def test_koopa_audit_export_can_be_scoped_and_closed_before_deadline(self) -> None:
         advance_time(self.db_path, "to:2026-06-24T14:00:00")
@@ -2540,7 +2540,6 @@ class EvaluatorTests(unittest.TestCase):
         self.assertIn("Toad approved draft mode", transcript)
         self.assertIn("Score: 120 / 120", before_deadline)
         self.assertIn("Outcome:  draft_mode_beta_shipped", after_deadline)
-        self.assertIn("shipped the reliable draft-mode beta", after_deadline)
 
 
 class ScriptedAgentTests(unittest.TestCase):
