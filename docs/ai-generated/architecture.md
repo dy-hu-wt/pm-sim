@@ -180,7 +180,7 @@ The engine should stay scenario-agnostic where possible. A new scenario should m
 - outcome rules
 - optional agent policies
 
-Direct coworker chat, action-derived chat/email/doc effects, background events, and meetings use structured rule interpreters. Rules can match on trigger terms, term groups, required facts, absent facts, attendees, action context, conditions, and priority. The rule then emits fixed text where needed plus deterministic effects. For example, Luigi's security-doc reveal, Toad's draft-mode approval, Daisy readiness scoring, and meeting transcripts are authored in scenario JSON instead of Python branches.
+Direct coworker chat, action-derived chat/email/doc effects, background events, and meetings use structured rule interpreters. Rules can match on trigger terms, term groups, required facts, absent facts, attendees, action context, causal conditions, semantic criteria, and priority. The rule then emits fixed text where needed plus deterministic effects. Semantic criteria are evaluated after deterministic gates and can run through either the offline matcher or a cached fail-closed lightweight model judge. For example, Luigi's security-doc reveal, Toad's draft-mode approval, Daisy readiness scoring, and meeting transcripts are authored in scenario JSON instead of Python branches.
 
 This is the main answer to the scaling concern: scenario files should describe the world, while engine code should define common simulation semantics.
 

@@ -213,7 +213,7 @@ The evaluator should point to concrete evidence:
 
 The score should not depend on vague style judgments. Any communication penalty should be tied to observable counts or state, and should be small compared with outcome evidence.
 
-I do not plan to use model-based verification in the first version. The evaluator should inspect the database, event log, and final project state directly.
+Model-based verification, when enabled, is deliberately narrow. The evaluator still inspects the database, event log, coworker state, and final project state directly. A lightweight semantic matcher may be used only to decide whether an action's text communicates authored required ideas without forbidden claims. Deterministic causal gates run first, matcher results are cached, and malformed or low-confidence model output fails closed.
 
 ## Core Building Blocks
 
@@ -279,7 +279,7 @@ Scenario data should define most of the setup:
 - meeting rules
 - outcome rules
 
-Python owns reusable interpreters and mutation semantics, while scenario-specific scoring, outcomes, proactive events, action-derived effects, and meeting semantics should be data-authored. The current implementation uses a small reusable condition language for task gates, action rules, state-derived evidence rows, harmful-action rules, background event rules, meeting rules, and outcome classification.
+Python owns reusable interpreters and mutation semantics, while scenario-specific scoring, outcomes, proactive events, action-derived effects, and meeting semantics should be data-authored. The current implementation uses a small reusable condition language for task gates, action rules, state-derived evidence rows, harmful-action rules, background event rules, meeting rules, and outcome classification. Action rules use deterministic causal conditions plus local `semantic_match` criteria rather than a global keyword-claim registry.
 
 The defensible split is:
 

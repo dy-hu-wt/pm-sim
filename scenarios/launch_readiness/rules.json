@@ -1,202 +1,4 @@
 {
-  "action_claims": [
-    {
-      "id": "repo_sync_risk",
-      "term_groups_all": [
-        [
-          "repo sync",
-          "repo-sync",
-          "webhook",
-          "stale",
-          "stale-code",
-          "stale commit",
-          "older commit"
-        ],
-        [
-          "risk",
-          "blocker",
-          "stale",
-          "commit",
-          "webhook",
-          "older diff",
-          "older commit"
-        ]
-      ]
-    },
-    {
-      "id": "draft_mode",
-      "terms_any": [
-        "draft mode",
-        "draft-mode",
-        "draft suggestions",
-        "queue draft",
-        "queues draft"
-      ]
-    },
-    {
-      "id": "human_approval",
-      "terms_any": [
-        "human approval",
-        "approval before posting",
-        "approve before posting",
-        "review before posting",
-        "human approves",
-        "human must review",
-        "human review",
-        "human-in-the-loop",
-        "human in the loop",
-        "before posting"
-      ]
-    },
-    {
-      "id": "nimbus_beta",
-      "terms_any": [
-        "nimbus",
-        "friday",
-        "beta",
-        "pilot"
-      ]
-    },
-    {
-      "id": "auto_commenting_deferred",
-      "terms_any": [
-        "auto-commenting out",
-        "auto commenting out",
-        "auto-commenting is out",
-        "auto commenting is out",
-        "auto-commenting follow-up",
-        "auto commenting follow-up",
-        "auto-commenting remains follow-up",
-        "auto commenting remains follow-up",
-        "auto-commenting not in friday",
-        "auto commenting not in friday",
-        "no auto-commenting",
-        "no auto commenting",
-        "not post comments automatically",
-        "not automatically post",
-        "will not automatically post",
-        "must not post comments automatically",
-        "automatic pr commenting is not part",
-        "automatic posting"
-      ]
-    },
-    {
-      "id": "toad_approval",
-      "term_groups_all": [
-        [
-          "toad"
-        ],
-        [
-          "approved",
-          "approval",
-          "sign-off",
-          "signed off"
-        ]
-      ]
-    },
-    {
-      "id": "private_repo_security",
-      "terms_any": [
-        "security",
-        "private repo",
-        "private repos",
-        "source code",
-        "raw source"
-      ]
-    },
-    {
-      "id": "transient_source_processing",
-      "term_groups_all": [
-        [
-          "transient",
-          "transiently",
-          "not stored",
-          "not retained",
-          "no long-term",
-          "not store"
-        ],
-        [
-          "source",
-          "source code",
-          "raw source",
-          "private repo",
-          "private-repo"
-        ]
-      ]
-    },
-    {
-      "id": "beta_audit_retention",
-      "term_groups_all": [
-        [
-          "metadata",
-          "draft suggestions",
-          "generated suggestions",
-          "audit"
-        ],
-        [
-          "30 days",
-          "thirty days",
-          "beta audit",
-          "audit window",
-          "retained"
-        ]
-      ]
-    },
-    {
-      "id": "koopa_audit",
-      "term_groups_all": [
-        [
-          "koopa"
-        ],
-        [
-          "audit",
-          "admin log",
-          "admin logs",
-          "audit log",
-          "audit logs",
-          "security review"
-        ]
-      ]
-    },
-    {
-      "id": "one_time_csv",
-      "term_groups_all": [
-        [
-          "csv",
-          "export"
-        ],
-        [
-          "one-time",
-          "one time",
-          "for the review",
-          "security review"
-        ]
-      ]
-    },
-    {
-      "id": "self_serve_followup",
-      "terms_any": [
-        "follow-up",
-        "follow up",
-        "self-serve",
-        "self serve",
-        "later",
-        "after launch"
-      ]
-    },
-    {
-      "id": "final_readiness",
-      "terms_any": [
-        "go/no-go",
-        "go no-go",
-        "go for friday",
-        "final readiness",
-        "readiness",
-        "ready",
-        "on track"
-      ]
-    }
-  ],
   "grading_rules": [
     {
       "id": "customer_message_ready",
@@ -226,12 +28,88 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "claims_all": [
-          "repo_sync_risk",
-          "draft_mode",
-          "nimbus_beta",
-          "human_approval"
-        ]
+        "semantic_match": {
+          "required": [
+            {
+              "id": "repo_sync_risk",
+              "description": "Repo sync or webhook ordering can make the agent review a stale or older commit.",
+              "signal_groups_all": [
+                [
+                  "repo sync",
+                  "repo-sync",
+                  "webhook",
+                  "stale",
+                  "older commit",
+                  "older diff"
+                ],
+                [
+                  "risk",
+                  "stale",
+                  "older commit",
+                  "older diff",
+                  "commit"
+                ]
+              ]
+            },
+            {
+              "id": "draft_mode",
+              "description": "Friday launch mode is draft mode or queued draft suggestions.",
+              "signals_any": [
+                "draft mode",
+                "draft-mode",
+                "draft suggestions",
+                "queue draft",
+                "queues draft",
+                "queued draft"
+              ]
+            },
+            {
+              "id": "nimbus_beta",
+              "description": "The message is about the Nimbus Friday beta or pilot.",
+              "signals_any": [
+                "nimbus",
+                "friday beta",
+                "nimbus beta",
+                "friday pilot",
+                "pilot"
+              ]
+            },
+            {
+              "id": "human_approval",
+              "description": "A human or reviewer must approve before anything is posted.",
+              "signals_any": [
+                "human approval",
+                "approval before posting",
+                "approve before posting",
+                "review before posting",
+                "reviewer approves",
+                "human approves",
+                "human review",
+                "human-in-the-loop",
+                "human in the loop",
+                "before posting"
+              ],
+              "signal_groups_all": [
+                [
+                  "human",
+                  "reviewer"
+                ],
+                [
+                  "approve",
+                  "approval",
+                  "review"
+                ],
+                [
+                  "posted",
+                  "posting",
+                  "post",
+                  "comments",
+                  "suggestions"
+                ]
+              ]
+            }
+          ]
+        }
       },
       "state": {
         "person_id": "daisy",
@@ -266,12 +144,73 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "claims_all": [
-          "nimbus_beta",
-          "private_repo_security",
-          "transient_source_processing",
-          "beta_audit_retention"
-        ]
+        "semantic_match": {
+          "required": [
+            {
+              "id": "nimbus_beta",
+              "description": "The message is about the Nimbus Friday beta or pilot.",
+              "signals_any": [
+                "nimbus",
+                "friday beta",
+                "nimbus beta",
+                "friday pilot",
+                "pilot"
+              ]
+            },
+            {
+              "id": "private_repo_security",
+              "description": "The message addresses private repo source-code security handling.",
+              "signals_any": [
+                "private repo",
+                "private repos",
+                "source code",
+                "raw source",
+                "private-repo security",
+                "security wording"
+              ]
+            },
+            {
+              "id": "transient_source_processing",
+              "description": "Private repo source is processed transiently and raw source is not retained long term.",
+              "signal_groups_all": [
+                [
+                  "transient",
+                  "transiently",
+                  "not stored",
+                  "not retained",
+                  "no long-term",
+                  "not store"
+                ],
+                [
+                  "source",
+                  "source code",
+                  "raw source",
+                  "private repo",
+                  "private-repo"
+                ]
+              ]
+            },
+            {
+              "id": "beta_audit_retention",
+              "description": "Generated suggestions or metadata are retained for the beta audit window.",
+              "signal_groups_all": [
+                [
+                  "metadata",
+                  "draft suggestions",
+                  "generated suggestions",
+                  "audit"
+                ],
+                [
+                  "30 days",
+                  "thirty days",
+                  "beta audit",
+                  "audit window",
+                  "retained"
+                ]
+              ]
+            }
+          ]
+        }
       },
       "state": {
         "person_id": "daisy",
@@ -308,11 +247,56 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "claims_all": [
-          "koopa_audit",
-          "one_time_csv",
-          "self_serve_followup"
-        ]
+        "semantic_match": {
+          "required": [
+            {
+              "id": "koopa_audit",
+              "description": "The message addresses Koopa audit-log or security-review needs.",
+              "signal_groups_all": [
+                [
+                  "koopa"
+                ],
+                [
+                  "audit",
+                  "admin log",
+                  "admin logs",
+                  "audit log",
+                  "audit logs",
+                  "security review"
+                ]
+              ]
+            },
+            {
+              "id": "one_time_csv",
+              "description": "Koopa can receive a one-time CSV export for the security review.",
+              "signal_groups_all": [
+                [
+                  "csv",
+                  "export"
+                ],
+                [
+                  "one-time",
+                  "one time",
+                  "for the review",
+                  "security review"
+                ]
+              ]
+            },
+            {
+              "id": "self_serve_followup",
+              "description": "Full self-serve export is deferred as follow-up after launch.",
+              "signals_any": [
+                "follow-up",
+                "follow up",
+                "self-serve",
+                "self serve",
+                "later",
+                "after launch",
+                "after nimbus launch"
+              ]
+            }
+          ]
+        }
       },
       "state": {
         "person_id": "daisy",
@@ -383,15 +367,126 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "claims_all": [
-          "final_readiness",
-          "draft_mode",
-          "human_approval",
-          "private_repo_security",
-          "koopa_audit",
-          "one_time_csv",
-          "nimbus_beta"
-        ]
+        "semantic_match": {
+          "required": [
+            {
+              "id": "final_readiness",
+              "description": "The message gives a final readiness or go/no-go confirmation.",
+              "signals_any": [
+                "go/no-go",
+                "go no-go",
+                "go for friday",
+                "final readiness",
+                "readiness is go",
+                "ready",
+                "on track",
+                "final readiness is go"
+              ]
+            },
+            {
+              "id": "draft_mode",
+              "description": "Friday launch mode is draft mode or queued draft suggestions.",
+              "signals_any": [
+                "draft mode",
+                "draft-mode",
+                "draft suggestions",
+                "queue draft",
+                "queues draft",
+                "queued draft"
+              ]
+            },
+            {
+              "id": "human_approval",
+              "description": "A human or reviewer must approve before anything is posted.",
+              "signals_any": [
+                "human approval",
+                "approval before posting",
+                "approve before posting",
+                "review before posting",
+                "reviewer approves",
+                "human approves",
+                "human review",
+                "human-in-the-loop",
+                "human in the loop",
+                "before posting"
+              ],
+              "signal_groups_all": [
+                [
+                  "human",
+                  "reviewer"
+                ],
+                [
+                  "approve",
+                  "approval",
+                  "review"
+                ],
+                [
+                  "posted",
+                  "posting",
+                  "post",
+                  "comments",
+                  "suggestions"
+                ]
+              ]
+            },
+            {
+              "id": "private_repo_security",
+              "description": "The message addresses private repo source-code security handling.",
+              "signals_any": [
+                "private repo",
+                "private repos",
+                "source code",
+                "raw source",
+                "private-repo security",
+                "security wording"
+              ]
+            },
+            {
+              "id": "koopa_audit",
+              "description": "The message addresses Koopa audit-log or security-review needs.",
+              "signal_groups_all": [
+                [
+                  "koopa"
+                ],
+                [
+                  "audit",
+                  "admin log",
+                  "admin logs",
+                  "audit log",
+                  "audit logs",
+                  "security review"
+                ]
+              ]
+            },
+            {
+              "id": "one_time_csv",
+              "description": "Koopa can receive a one-time CSV export for the security review.",
+              "signal_groups_all": [
+                [
+                  "csv",
+                  "export"
+                ],
+                [
+                  "one-time",
+                  "one time",
+                  "for the review",
+                  "security review"
+                ]
+              ]
+            },
+            {
+              "id": "nimbus_beta",
+              "description": "The message is about the Nimbus Friday beta or pilot.",
+              "signals_any": [
+                "nimbus",
+                "friday beta",
+                "nimbus beta",
+                "friday pilot",
+                "pilot"
+              ]
+            }
+          ]
+        }
       },
       "state": {
         "person_id": "daisy",
@@ -448,15 +543,126 @@
       "action": {
         "type": "send_chat",
         "recipient_id": "daisy",
-        "claims_all": [
-          "final_readiness",
-          "draft_mode",
-          "human_approval",
-          "private_repo_security",
-          "koopa_audit",
-          "one_time_csv",
-          "nimbus_beta"
-        ]
+        "semantic_match": {
+          "required": [
+            {
+              "id": "final_readiness",
+              "description": "The message gives a final readiness or go/no-go confirmation.",
+              "signals_any": [
+                "go/no-go",
+                "go no-go",
+                "go for friday",
+                "final readiness",
+                "readiness is go",
+                "ready",
+                "on track",
+                "final readiness is go"
+              ]
+            },
+            {
+              "id": "draft_mode",
+              "description": "Friday launch mode is draft mode or queued draft suggestions.",
+              "signals_any": [
+                "draft mode",
+                "draft-mode",
+                "draft suggestions",
+                "queue draft",
+                "queues draft",
+                "queued draft"
+              ]
+            },
+            {
+              "id": "human_approval",
+              "description": "A human or reviewer must approve before anything is posted.",
+              "signals_any": [
+                "human approval",
+                "approval before posting",
+                "approve before posting",
+                "review before posting",
+                "reviewer approves",
+                "human approves",
+                "human review",
+                "human-in-the-loop",
+                "human in the loop",
+                "before posting"
+              ],
+              "signal_groups_all": [
+                [
+                  "human",
+                  "reviewer"
+                ],
+                [
+                  "approve",
+                  "approval",
+                  "review"
+                ],
+                [
+                  "posted",
+                  "posting",
+                  "post",
+                  "comments",
+                  "suggestions"
+                ]
+              ]
+            },
+            {
+              "id": "private_repo_security",
+              "description": "The message addresses private repo source-code security handling.",
+              "signals_any": [
+                "private repo",
+                "private repos",
+                "source code",
+                "raw source",
+                "private-repo security",
+                "security wording"
+              ]
+            },
+            {
+              "id": "koopa_audit",
+              "description": "The message addresses Koopa audit-log or security-review needs.",
+              "signal_groups_all": [
+                [
+                  "koopa"
+                ],
+                [
+                  "audit",
+                  "admin log",
+                  "admin logs",
+                  "audit log",
+                  "audit logs",
+                  "security review"
+                ]
+              ]
+            },
+            {
+              "id": "one_time_csv",
+              "description": "Koopa can receive a one-time CSV export for the security review.",
+              "signal_groups_all": [
+                [
+                  "csv",
+                  "export"
+                ],
+                [
+                  "one-time",
+                  "one time",
+                  "for the review",
+                  "security review"
+                ]
+              ]
+            },
+            {
+              "id": "nimbus_beta",
+              "description": "The message is about the Nimbus Friday beta or pilot.",
+              "signals_any": [
+                "nimbus",
+                "friday beta",
+                "nimbus beta",
+                "friday pilot",
+                "pilot"
+              ]
+            }
+          ]
+        }
       },
       "state": {
         "person_id": "daisy",
@@ -1942,11 +2148,6 @@
       "action_type": "send_email",
       "priority": 100,
       "recipient_id": "daisy",
-      "claims_all": [
-        "repo_sync_risk",
-        "draft_mode",
-        "nimbus_beta"
-      ],
       "when": [
         {
           "fact_discovered": "fact_repo_sync_stale"
@@ -1979,20 +2180,61 @@
             "draft_mode_message_aligned": true
           }
         }
-      ]
+      ],
+      "semantic_match": {
+        "required": [
+          {
+            "id": "repo_sync_risk",
+            "description": "Repo sync or webhook ordering can make the agent review a stale or older commit.",
+            "signal_groups_all": [
+              [
+                "repo sync",
+                "repo-sync",
+                "webhook",
+                "stale",
+                "older commit",
+                "older diff"
+              ],
+              [
+                "risk",
+                "stale",
+                "older commit",
+                "older diff",
+                "commit"
+              ]
+            ]
+          },
+          {
+            "id": "draft_mode",
+            "description": "Friday launch mode is draft mode or queued draft suggestions.",
+            "signals_any": [
+              "draft mode",
+              "draft-mode",
+              "draft suggestions",
+              "queue draft",
+              "queues draft",
+              "queued draft"
+            ]
+          },
+          {
+            "id": "nimbus_beta",
+            "description": "The message is about the Nimbus Friday beta or pilot.",
+            "signals_any": [
+              "nimbus",
+              "friday beta",
+              "nimbus beta",
+              "friday pilot",
+              "pilot"
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "doc_launch_decision_record_written",
       "action_type": "update_doc",
       "priority": 100,
       "doc_id": "doc_launch_decision_record",
-      "claims_all": [
-        "draft_mode",
-        "human_approval",
-        "auto_commenting_deferred",
-        "repo_sync_risk",
-        "toad_approval"
-      ],
       "when": [
         {
           "any": [
@@ -2014,7 +2256,116 @@
           "key": "decision_record_written",
           "note": "Agent documented the Friday draft-mode decision with Toad approval, repo-sync risk rationale, human approval, and auto-commenting as follow-up."
         }
-      ]
+      ],
+      "semantic_match": {
+        "required": [
+          {
+            "id": "draft_mode",
+            "description": "Friday launch mode is draft mode or queued draft suggestions.",
+            "signals_any": [
+              "draft mode",
+              "draft-mode",
+              "draft suggestions",
+              "queue draft",
+              "queues draft",
+              "queued draft"
+            ]
+          },
+          {
+            "id": "human_approval",
+            "description": "A human or reviewer must approve before anything is posted.",
+            "signals_any": [
+              "human approval",
+              "approval before posting",
+              "approve before posting",
+              "review before posting",
+              "reviewer approves",
+              "human approves",
+              "human review",
+              "human-in-the-loop",
+              "human in the loop",
+              "before posting"
+            ],
+            "signal_groups_all": [
+              [
+                "human",
+                "reviewer"
+              ],
+              [
+                "approve",
+                "approval",
+                "review"
+              ],
+              [
+                "posted",
+                "posting",
+                "post",
+                "comments",
+                "suggestions"
+              ]
+            ]
+          },
+          {
+            "id": "auto_commenting_deferred",
+            "description": "Auto-commenting is out of Friday scope or deferred to follow-up.",
+            "signal_groups_all": [
+              [
+                "auto-commenting",
+                "auto commenting",
+                "automatic comments",
+                "automatically post",
+                "post comments automatically"
+              ],
+              [
+                "out",
+                "deferred",
+                "follow-up",
+                "follow up",
+                "not in friday",
+                "no",
+                "will not",
+                "must not"
+              ]
+            ]
+          },
+          {
+            "id": "repo_sync_risk",
+            "description": "Repo sync or webhook ordering can make the agent review a stale or older commit.",
+            "signal_groups_all": [
+              [
+                "repo sync",
+                "repo-sync",
+                "webhook",
+                "stale",
+                "older commit",
+                "older diff"
+              ],
+              [
+                "risk",
+                "stale",
+                "older commit",
+                "older diff",
+                "commit"
+              ]
+            ]
+          },
+          {
+            "id": "toad_approval",
+            "description": "Toad approved or signed off on the decision.",
+            "signal_groups_all": [
+              [
+                "toad"
+              ],
+              [
+                "approved",
+                "approval",
+                "sign-off",
+                "signed off"
+              ]
+            ]
+          }
+        ]
+      }
     }
   ],
   "state_evidence_rules": [

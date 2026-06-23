@@ -102,9 +102,9 @@ class ScenarioValidationTests(unittest.TestCase):
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
-    def test_unknown_action_claim_reference_raises_scenario_error(self) -> None:
+    def test_invalid_action_semantic_match_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.base)
-        scenario["action_rules"][0]["claims_all"] = ["missing_claim"]
+        scenario["action_rules"][0]["semantic_match"] = {"required": [{"id": "missing_description"}]}
 
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))

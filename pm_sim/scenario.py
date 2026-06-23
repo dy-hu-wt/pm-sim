@@ -116,8 +116,7 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
                 "action_type": action_type,
                 "priority": int(rule.get("priority", 60)),
                 "recipient_id": recipient_id,
-                "claims_all": action.get("claims_all", []),
-                "claims_any": action.get("claims_any", []),
+                "semantic_match": _semantic_match_for_grading_action(action),
                 "when": rule.get("requires", []),
                 "effects": [
                     {
@@ -159,6 +158,15 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
 
 def copy_json_object(data: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(data))
+
+
+def _semantic_match_for_grading_action(action: dict[str, Any]) -> dict[str, Any]:
+    semantic_match = action.get("semantic_match")
+    if isinstance(semantic_match, dict):
+        return semantic_match
+    required = action.get("required_semantics", [])
+    forbidden = action.get("forbidden_semantics", [])
+    return {"required": required, "forbidden": forbidden}
 
 
 def _required_object(row: dict[str, Any], key: str, label: str) -> dict[str, Any]:
@@ -338,7 +346,6 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         tasks,
         valid_actors,
     )
-    action_claims = _validate_action_claims(data.get("action_claims", []))
     _validate_action_rules(
         data.get("action_rules", []),
         people,
@@ -348,7 +355,6 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         blockers,
         tasks,
         valid_actors,
-        action_claims,
     )
     _validate_scripted_policy(data.get("scripted_policy", []), people, docs, tasks)
 
@@ -542,7 +548,6 @@ def _validate_action_rules(
     blockers: set[str],
     tasks: set[str],
     valid_actors: set[str],
-    action_claims: set[str],
 ) -> None:
     seen = set()
     for rule in rules:
@@ -571,13 +576,8 @@ def _validate_action_rules(
             _validate_string_list(rule.get(key, []), f"Action rule {rule_id} {key}")
         for group in rule.get("term_groups_all", []):
             _validate_string_list(group, f"Action rule {rule_id} term group")
-        for key in ("claims_any", "claims_all"):
-            _validate_string_list(rule.get(key, []), f"Action rule {rule_id} {key}")
-            unknown_claims = sorted(set(rule.get(key, [])) - action_claims)
-            if unknown_claims:
-                raise ScenarioError(
-                    f"Action rule {rule_id} references unknown {key}: {', '.join(unknown_claims)}"
-                )
+        if "semantic_match" in rule:
+            _validate_semantic_match(rule["semantic_match"], f"Action rule {rule_id}")
 
         _validate_conditions(
             rule.get("when", []),
@@ -601,25 +601,27 @@ def _validate_action_rules(
         )
 
 
-def _validate_action_claims(claims: list[dict[str, Any]]) -> set[str]:
-    if not isinstance(claims, list):
-        raise ScenarioError("action_claims must be a list.")
-
-    seen = set()
-    for claim in claims:
-        claim_id = claim.get("id") if isinstance(claim, dict) else None
-        if not isinstance(claim_id, str) or not claim_id:
-            raise ScenarioError("Action claim must have a string id.")
-        if claim_id in seen:
-            raise ScenarioError(f"Action claims have duplicate id: {claim_id}")
-        seen.add(claim_id)
-
-        for key in ("terms_any", "terms_all"):
-            _validate_string_list(claim.get(key, []), f"Action claim {claim_id} {key}")
-        for group in claim.get("term_groups_all", []):
-            _validate_string_list(group, f"Action claim {claim_id} term group")
-
-    return seen
+def _validate_semantic_match(spec: Any, label: str) -> None:
+    if not isinstance(spec, dict):
+        raise ScenarioError(f"{label} semantic_match must be an object.")
+    for key in ("required", "forbidden"):
+        items = spec.get(key, [])
+        if not isinstance(items, list):
+            raise ScenarioError(f"{label} semantic_match {key} must be a list.")
+        for index, item in enumerate(items, start=1):
+            item_label = f"{label} semantic_match {key} item {index}"
+            if isinstance(item, str):
+                if not item:
+                    raise ScenarioError(f"{item_label} must be non-empty.")
+                continue
+            if not isinstance(item, dict):
+                raise ScenarioError(f"{item_label} must be a string or object.")
+            if not isinstance(item.get("description"), str) or not item.get("description"):
+                raise ScenarioError(f"{item_label} must include description.")
+            for list_key in ("signals_any", "signals_all"):
+                _validate_string_list(item.get(list_key, []), f"{item_label} {list_key}")
+            for group in item.get("signal_groups_all", []):
+                _validate_string_list(group, f"{item_label} signal group")
 
 
 def _validate_scripted_policy(
