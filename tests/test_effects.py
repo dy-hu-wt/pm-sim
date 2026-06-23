@@ -357,7 +357,7 @@ class EffectApplicationTests(unittest.TestCase):
         try:
             with unittest.mock.patch.dict(
                 "os.environ",
-                {"OPENAI_API_KEY": "test-key"},
+                {"OPENAI_API_KEY": "test-key", "PM_SIM_CONCEPT_MODE": "llm"},
                 clear=False,
             ):
                 result = concept_match_module.concept_match(
@@ -396,20 +396,21 @@ class EffectApplicationTests(unittest.TestCase):
         conn = connect(self.db_path)
         try:
             with unittest.mock.patch.object(concept_match_module, "_load_dotenv", lambda: None):
-                result = concept_match_module.concept_match(
-                    conn,
-                    text="Use use draft mode with human approval.",
-                    criteria={
-                        "required": [
-                            {
-                                "id": "draft_mode_approval",
-                                "description": "Use use draft mode with human approval.",
-                                "exemplars": ["use draft mode with human approval"],
-                            }
-                        ]
-                    },
-                    rule_id="test_missing_key",
-                )
+                with unittest.mock.patch.dict("os.environ", {"PM_SIM_CONCEPT_MODE": "llm"}, clear=False):
+                    result = concept_match_module.concept_match(
+                        conn,
+                        text="Use use draft mode with human approval.",
+                        criteria={
+                            "required": [
+                                {
+                                    "id": "draft_mode_approval",
+                                    "description": "Use use draft mode with human approval.",
+                                    "exemplars": ["use draft mode with human approval"],
+                                }
+                            ]
+                        },
+                        rule_id="test_missing_key",
+                    )
 
             self.assertFalse(result["matches"])
             self.assertEqual(result["matcher"], "llm")
@@ -430,7 +431,11 @@ class EffectApplicationTests(unittest.TestCase):
                 "required": [{"id": "draft_mode_approval", "matched": True, "rationale": "ok"}],
                 "forbidden": [],
             }
-            with unittest.mock.patch.dict("os.environ", {"PM_SIM_CONCEPT_MODEL": "model-a"}, clear=False):
+            with unittest.mock.patch.dict(
+                "os.environ",
+                {"PM_SIM_CONCEPT_MODE": "llm", "PM_SIM_CONCEPT_MODEL": "model-a"},
+                clear=False,
+            ):
                 first = concept_match_module.concept_match(
                     conn,
                     text="Use draft mode with human approval.",
@@ -444,7 +449,11 @@ class EffectApplicationTests(unittest.TestCase):
                     },
                     rule_id="test_cache_key",
                 )
-            with unittest.mock.patch.dict("os.environ", {"PM_SIM_CONCEPT_MODEL": "model-b"}, clear=False):
+            with unittest.mock.patch.dict(
+                "os.environ",
+                {"PM_SIM_CONCEPT_MODE": "llm", "PM_SIM_CONCEPT_MODEL": "model-b"},
+                clear=False,
+            ):
                 second = concept_match_module.concept_match(
                     conn,
                     text="Use draft mode with human approval.",
