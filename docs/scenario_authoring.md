@@ -10,17 +10,18 @@ Each scenario lives in its own directory:
 
 ```text
 scenarios/<scenario_id>/
+  scenario.md
   scenario.yaml
   world.yaml
   interactions.yaml
   evaluation.yaml
 ```
 
-`scenario.yaml` is only the manifest. Keep it short.
+`scenario.md` is the human scenario guide: story, cast, guaranteed events, task/blocker relationships, possible solution paths, scoring, and outcomes. `scenario.yaml` is only the executable manifest. Keep it short.
 
 ```yaml
-id: billing_migration
-name: Billing Migration Readiness
+id: launch_readiness
+name: PR Review Agent Beta Launch Readiness
 company: Fireflower
 start_time: "2026-06-22T09:00:00"
 timezone: America/New_York

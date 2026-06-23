@@ -456,16 +456,14 @@ class LlmAgentTests(unittest.TestCase):
         self.assertIn("Call finish only when", instructions)
 
     def test_llm_instructions_use_scenario_brief(self) -> None:
-        billing = load_scenario(Path("scenarios/billing_migration"))
-        instructions = _instructions(billing)
-        tool_specs = _tool_specs(billing)
+        scenario = load_scenario(Path("scenarios/launch_readiness"))
+        instructions = _instructions(scenario)
+        tool_specs = _tool_specs(scenario)
         update_doc_spec = next(tool for tool in tool_specs if tool["name"] == "update_doc")
 
-        self.assertIn("Atlas migration wording", instructions)
-        self.assertIn("Meridian needs scoped invoice-export wording", instructions)
-        self.assertNotIn("Nimbus", instructions)
-        self.assertIn("doc_migration_decision_record", update_doc_spec["description"])
-        self.assertNotIn("doc_launch_decision_record", update_doc_spec["description"])
+        self.assertIn("customer-ready Nimbus wording", instructions)
+        self.assertIn("Koopa needs scoped wording", instructions)
+        self.assertIn("doc_launch_decision_record", update_doc_spec["description"])
 
 
 if __name__ == "__main__":
