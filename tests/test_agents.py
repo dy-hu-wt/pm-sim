@@ -417,6 +417,8 @@ class LlmAgentTests(unittest.TestCase):
         self.assertIn("smallest useful set of people", instructions)
         self.assertIn("You do not need to simulate every empty hour", instructions)
         self.assertIn("visible calendar obligations", instructions)
+        self.assertIn("written update required by the scenario brief or finish criteria", instructions)
+        self.assertIn("through the channel implied by the brief", instructions)
         self.assertIn("customer-ready Nimbus wording early enough for her Thursday account update", instructions)
         self.assertIn("Koopa needs scoped wording before Thursday's security review", instructions)
         self.assertIn("Thursday final-readiness requests need an answer", instructions)
