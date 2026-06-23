@@ -765,18 +765,16 @@ section { margin:14px 0; overflow:hidden; }
 .agent-tool-wait, .agent-message.good { color:#67e09c; }
 .agent-person { color:#f3f7ff; font-weight:800; }
 .helper { color:var(--muted); font-size:12px; margin:8px 14px 0; }
-.columns { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px; }
+.workstream-grid { padding:14px; display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px; }
+.workstream-card { border:1px solid var(--line); border-radius:10px; padding:12px; background:#fff; display:grid; gap:8px; }
+.workstream-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.workstream-title { font-size:15px; font-weight:850; }
+.workstream-meta { display:flex; flex-wrap:wrap; gap:6px; }
+.workstream-pressure { color:var(--muted); font-size:13px; }
 .list { padding:14px; display:grid; gap:8px; }
 .row { border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }
 .row.scheduled { border-left:4px solid var(--purple); }
-.project-card { border:1px solid var(--line); border-radius:10px; padding:12px; background:#fff; display:grid; gap:8px; }
-.project-head { display:grid; gap:4px; }
-.project-title { font-size:15px; font-weight:800; }
-.project-state { display:flex; flex-wrap:wrap; gap:8px; color:var(--muted); font-size:12px; font-weight:800; }
-.project-state strong { color:var(--ink); }
 .meta-chip { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; background:#f1f4f8; color:var(--muted); }
-.project-copy { font-size:13px; color:var(--muted); }
-.project-footer { display:flex; flex-wrap:wrap; gap:6px; }
 .runtime-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
 .blocker-groups { padding:14px; display:grid; gap:12px; }
 .blocker-group { display:grid; gap:8px; }
@@ -856,6 +854,11 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
     </div>
     <div class="brief-card" id="agent-brief"></div>
   </header>
+  <section>
+    <div class="section-head"><h2>Visible Workstreams</h2></div>
+    <p class="helper">What the agent can currently see: active projects, deadlines, and live pressure. Hidden facts and future events are not listed here.</p>
+    <div class="workstream-grid" id="workstreams"></div>
+  </section>
   <section id="playback-section">
     <div class="section-head"><h2>Live Playback</h2></div>
     <p class="helper">Play runs the selected backend policy one step at a time. The calendar shows when things happen; the log shows the actual streamed tool/event flow.</p>
@@ -870,10 +873,7 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
       <div class="log-console" id="playback"></div>
     </div>
   </section>
-  <div class="columns">
-    <section><div class="section-head"><h2>Visible Projects</h2></div><p class="helper">Current project state from SQLite. It changes only when delivered events or actions mutate state.</p><div class="list" id="projects"></div></section>
-    <section><div class="section-head"><h2>Known Blockers</h2></div><p class="helper">Only blockers already visible in the run. This is the PM-facing view, not the hidden authored truth.</p><div class="list" id="blockers"></div></section>
-  </div>
+  <section><div class="section-head"><h2>Known Blockers</h2></div><p class="helper">Only blockers already visible in the run. This is the PM-facing view, not the hidden authored truth.</p><div class="list" id="blockers"></div></section>
   <details class="operator">
     <summary>Operator inspector: current evaluation</summary>
     <p class="helper">This is for debugging and grading. It is computed from current visible state and milestones, and is not shown as part of the agent-facing playback.</p>
@@ -981,24 +981,27 @@ function row(title, detail, meta = "") {
   return `<div class="row"><strong>${esc(title)}</strong>${meta ? ` <span class="badge ${statusClass(meta)}">${esc(label(meta))}</span>` : ""}<div>${esc(detail)}</div></div>`;
 }
 
-function projectCard(project) {
+function workstreamCard(project, pressures) {
   const status = project.status || "";
   const risk = project.risk_level || project.risk || "";
   const outcome = project.final_outcome || project.decision || project.outcome_summary || "";
+  const projectPressures = (pressures || []).filter(pressure => pressure.project_id === project.id);
+  const strongestPressure = projectPressures[0];
+  const pressureText = strongestPressure
+    ? `${label(strongestPressure.kind)} ${strongestPressure.intensity}/${strongestPressure.max_intensity || 10}: ${strongestPressure.reason || ""}`
+    : project.stakeholder_pressure || "";
   return `
-    <div class="project-card">
-      <div class="project-head">
-        <div class="project-title">${esc(project.name || "Project")}</div>
-        <div class="project-state">
-          ${status ? `<span>Project status: <strong class="${statusClass(status)}">${esc(label(status))}</strong></span>` : ""}
-          ${risk ? `<span>Risk: <strong class="${statusClass(risk)}">${esc(label(risk))}</strong></span>` : ""}
-        </div>
+    <div class="workstream-card">
+      <div class="workstream-top">
+        <div class="workstream-title">${esc(project.name || "Project")}</div>
+        ${project.deadline ? `<span class="meta-chip">${esc(pretty(project.deadline))}</span>` : ""}
       </div>
-      ${project.stakeholder_pressure ? `<div class="project-copy">${esc(project.stakeholder_pressure)}</div>` : ""}
-      <div class="project-footer">
-        ${project.deadline ? `<span class="meta-chip">Deadline ${esc(pretty(project.deadline))}</span>` : ""}
+      <div class="workstream-meta">
+        ${status ? `<span class="meta-chip">Status ${esc(label(status))}</span>` : ""}
+        ${risk ? `<span class="meta-chip">Risk ${esc(label(risk))}</span>` : ""}
         ${outcome ? `<span class="meta-chip">${esc(label(outcome))}</span>` : ""}
       </div>
+      ${pressureText ? `<div class="workstream-pressure">${esc(pressureText)}</div>` : ""}
     </div>
   `;
 }
@@ -1225,7 +1228,7 @@ function render(state) {
     logEl.scrollTop = logEl.scrollHeight;
   }
 
-  $("projects").innerHTML = (obs.projects || []).map(projectCard).join("") || `<div class="empty">No projects.</div>`;
+  $("workstreams").innerHTML = (obs.projects || []).map(project => workstreamCard(project, obs.pressures || [])).join("") || `<div class="empty">No visible workstreams.</div>`;
   $("blockers").innerHTML = blockerGroups(obs.known_blockers || []);
   $("schedule").innerHTML = (state.authored_schedule || []).map(scheduleCard).join("") || `<div class="empty">No authored events.</div>`;
   $("evaluation").innerHTML = (evaluation.components || []).map(evaluationCard).join("") || `<div class="empty">No evaluation yet.</div>`;

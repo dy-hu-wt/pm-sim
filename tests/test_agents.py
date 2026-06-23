@@ -419,9 +419,11 @@ class LlmAgentTests(unittest.TestCase):
         self.assertIn("visible calendar obligations", instructions)
         self.assertIn("written update required by the scenario brief or finish criteria", instructions)
         self.assertIn("through the channel implied by the brief", instructions)
-        self.assertIn("customer-ready Nimbus wording early enough for her Thursday account update", instructions)
-        self.assertIn("Koopa needs scoped wording before Thursday's security review", instructions)
-        self.assertIn("Thursday final-readiness requests need an answer", instructions)
+        self.assertIn("Start by reading visible docs, recent messages, and current project state", instructions)
+        self.assertIn("Ground customer-facing answers in discovered facts, owner replies, or visible docs", instructions)
+        self.assertNotIn("customer-ready Nimbus wording early enough for her Thursday account update", instructions)
+        self.assertNotIn("Koopa needs scoped wording before Thursday's security review", instructions)
+        self.assertNotIn("Thursday final-readiness requests need an answer", instructions)
         self.assertIn("Call finish only when", instructions)
 
     def test_llm_instructions_use_scenario_brief(self) -> None:
@@ -430,9 +432,12 @@ class LlmAgentTests(unittest.TestCase):
         tool_specs = _tool_specs(scenario)
         update_doc_spec = next(tool for tool in tool_specs if tool["name"] == "update_doc")
 
-        self.assertIn("customer-ready Nimbus wording", instructions)
-        self.assertIn("Koopa needs scoped wording", instructions)
-        self.assertIn("doc_launch_decision_record", update_doc_spec["description"])
+        self.assertIn("Drive launch readiness for the PR Review Agent beta", instructions)
+        self.assertIn("Resolve ambiguous scope by finding the source of truth", instructions)
+        self.assertNotIn("customer-ready Nimbus wording", instructions)
+        self.assertNotIn("Koopa needs scoped wording", instructions)
+        self.assertIn("durable decisions", update_doc_spec["description"])
+        self.assertNotIn("doc_launch_decision_record", update_doc_spec["description"])
 
 
 if __name__ == "__main__":

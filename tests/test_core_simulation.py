@@ -1033,8 +1033,9 @@ class CoreSimulationTests(unittest.TestCase):
         html = _html()
 
         self.assertIn("Task State", html)
-        self.assertIn("Project status:", html)
-        self.assertIn("Risk:", html)
+        self.assertIn("Visible Workstreams", html)
+        self.assertIn("Status ${esc(label(status))}", html)
+        self.assertIn("Risk ${esc(label(risk))}", html)
         self.assertNotIn("<section><div class=\"section-head\"><h2>Tasks</h2>", html)
 
     def test_live_ui_disables_page_scroll_anchoring_during_playback(self) -> None:
