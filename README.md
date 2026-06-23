@@ -93,14 +93,16 @@ pm-sim ui --policy llm --max-turns 80
 Run the scripted reference path:
 
 ```bash
+PM_SIM_CONCEPT_MODE=local pm-sim run-agent --policy scripted --reset
+```
+
+Run the scripted reference path with LLM concept matching:
+
+```bash
 pm-sim run-agent --policy scripted --reset
 ```
 
-Run the scripted reference path in deterministic local-review mode:
-
-```bash
-PM_SIM_CONCEPT_MODE=local pm-sim run-agent --policy scripted --reset
-```
+That command uses the default `PM_SIM_CONCEPT_MODE=llm`, so it requires `OPENAI_API_KEY`.
 
 Run the second scenario:
 
@@ -127,6 +129,8 @@ pm-sim evaluate --explain
 The launch scripted reference path should reach `120 / 120`. The support-inbox scripted reference path should reach `100 / 100`.
 
 The LLM path is not guaranteed to get full score. That is expected. The environment is meant to expose tradeoffs, missed sequencing, and late communication, not guarantee a perfect run.
+
+Use `PM_SIM_CONCEPT_MODE=local` for reproducible no-key scripted review. The local matcher is deterministic and useful for smoke tests, but it is exemplar/token based; robust semantic grading should use the LLM matcher plus deterministic causal gates.
 
 ## Main Commands
 

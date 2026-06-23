@@ -296,7 +296,7 @@ scripted_policy:
     target: to:2026-06-26T15:00:00
 baseline:
   description: No-op baseline waits for Tuesday reminders and reaches Friday without the move plan or owner updates.
-  expected_score: 50
+  expected_score: 30
   expected_outcome: The two risks may become visible, but the move is not ready because the PM never writes the plan or sends final updates.
 milestone_rules:
 - id: saved_reply_risk_discovered

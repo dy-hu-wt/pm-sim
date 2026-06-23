@@ -102,6 +102,8 @@ Runtime modes:
 - `PM_SIM_CONCEPT_MODE=local`:
   deterministic local matcher for reproducible review and CI
 
+The local matcher is a review aid, not the quality bar for nuanced language. Keep causal gates deterministic, keep concepts small, and use LLM matching when the wording itself needs semantic judgment.
+
 The safe pattern is:
 
 ```text

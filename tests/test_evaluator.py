@@ -557,6 +557,17 @@ class EvaluatorTests(unittest.TestCase):
         self.assertGreaterEqual(critical_path["blocked_count"], 1)
         self.assertGreaterEqual(critical_path["dependency_count"], 1)
 
+    def test_support_scenario_noop_baseline_matches_documented_score(self) -> None:
+        scenario_path = Path("scenarios/support_inbox_move")
+        reset(self.db_path, scenario_path)
+        advance_time(self.db_path, "to:2026-06-26T15:00:00")
+
+        result = evaluate(self.db_path, scenario_path)
+
+        self.assertEqual(result["score"], 30)
+        self.assertEqual(result["outcome_comparison"]["baseline_expected_score"], 30)
+        self.assertEqual(result["final_outcome"]["outcome"], "inbox_move_not_ready")
+
     def test_scored_milestone_trace_points_to_action_log(self) -> None:
         self._drive_happy_path()
         result = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
