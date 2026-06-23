@@ -80,6 +80,19 @@ class ToolActionTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertIn("human approval", result["doc"]["body"])
 
+    def test_ui_timeline_shows_read_doc_contents_in_modal_detail(self) -> None:
+        read_doc(self.db_path, "doc_project_brief")
+
+        state = _state_payload(self.db_path, DEFAULT_SCENARIO_PATH, timeline_limit=20)
+        read_cards = [
+            item
+            for item in state["display_timeline"]
+            if item["kind"] == "action" and item["badge"] == "READ DOC"
+        ]
+
+        self.assertTrue(read_cards)
+        self.assertIn("review pull requests faster", read_cards[0]["detail"])
+
     def test_read_doc_blocks_invisible_doc(self) -> None:
         result = read_doc(self.db_path, "doc_repo_sync_notes")
 
@@ -256,6 +269,15 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
             "Nimbus asked if we store source code from private repos. Is there a security doc?",
         )
         advance_time(self.db_path, "until_next_event")
+        still_hidden = read_doc(self.db_path, "doc_private_repo_security_baseline")
+
+        advance_time(self.db_path, "to:2026-06-24T14:00:00")
+        send_chat(
+            self.db_path,
+            "luigi",
+            "Nimbus asked if we store source code from private repos. Is there a security doc?",
+        )
+        advance_time(self.db_path, "to:2026-06-24T16:00:00")
         revealed = read_doc(self.db_path, "doc_private_repo_security_baseline")
         conn = connect(self.db_path)
         try:
@@ -271,6 +293,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
             conn.close()
 
         self.assertFalse(hidden["ok"])
+        self.assertFalse(still_hidden["ok"])
         self.assertTrue(revealed["ok"])
         self.assertIn("Raw source code is not stored long term", revealed["doc"]["body"])
         self.assertTrue(loads(state["value_json"]))

@@ -80,6 +80,10 @@ event_behaviors:
     pressure_id: nimbus_security_review_pressure
     by: 1
     reason: Nimbus raised a private-repo security question before the beta call.
+  - type: update_coworker_state
+    person_id: daisy
+    key: security_question_asked
+    value: true
 - id: nimbus_launch_mode_question
   event_type: nimbus_launch_mode_question
   when:
@@ -451,7 +455,11 @@ reply_behaviors:
       require_all:
       - routing_signal_1
       mode: deterministic
-    when: []
+    when:
+    - coworker_state:
+        person_id: daisy
+        key: security_question_asked
+        equals: true
     reply:
       delay_minutes: 120
       body: 'Use the private repo security baseline doc before answering Daisy. Short version: we process source snippets transiently for review generation, do not store raw source long term, and retain generated draft suggestions plus metadata for the beta audit window.'
