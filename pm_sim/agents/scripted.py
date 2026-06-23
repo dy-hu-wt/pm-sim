@@ -24,8 +24,8 @@ def run_scripted_agent(
         steps.append(_step("reset", reset(db_path, scenario_path)))
 
     scenario = load_scenario(scenario_path)
-    for step in scenario.get("scripted_policy", []):
-        steps.append(_step(step["name"], _run_scripted_step(db_path, step)))
+    for step in scripted_policy_steps(scenario_path):
+        steps.append(_step(step["name"], run_scripted_step(db_path, step)))
 
     finalization = finalize_to_deadline(db_path, scenario_path)
     evaluation = evaluate(db_path, scenario_path)
@@ -38,7 +38,11 @@ def run_scripted_agent(
     }
 
 
-def _run_scripted_step(db_path: Path | str, step: dict[str, Any]) -> dict[str, Any]:
+def scripted_policy_steps(scenario_path: Path | str = DEFAULT_SCENARIO_PATH) -> list[dict[str, Any]]:
+    return list(load_scenario(scenario_path).get("scripted_policy", []))
+
+
+def run_scripted_step(db_path: Path | str, step: dict[str, Any]) -> dict[str, Any]:
     tool = step["tool"]
     args = step.get("args", {})
     if tool == "read_doc":

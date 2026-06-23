@@ -9,11 +9,13 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .actions import list_tasks
+from .agents.finalize import finalize_to_deadline
+from .agents.scripted import run_scripted_step, scripted_policy_steps
+from .db import connect
 from .evaluator import evaluate
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .scenario import load_scenario
-from .state import observe, reset
-from .time import advance_time
+from .state import get_state_value, observe, reset, set_state_value
 from .timeline import timeline
 
 
@@ -94,11 +96,10 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_json(_state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit))
             return
         if path == "/api/advance-next":
-            before = observe(self.server.db_path).get("current_time")
-            advanced = advance_time(self.server.db_path, "until_next_event")
+            step_result = _run_next_ui_step(self.server.db_path, self.server.scenario_path)
             payload = _state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit)
-            payload["advance"] = advanced
-            payload["done"] = before == advanced.get("to") and not advanced.get("delivered_events")
+            payload["step_result"] = step_result
+            payload["done"] = bool(step_result.get("done"))
             self._send_json(payload)
             return
         self.send_error(404)
@@ -151,6 +152,81 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
         "timeline": entries,
         "display_timeline": display_timeline,
         "authored_schedule": _authored_schedule(scenario),
+        "scripted_demo": _scripted_demo_state(db_path, scenario_path),
+    }
+
+
+def _run_next_ui_step(db_path: Path, scenario_path: Path) -> dict[str, Any]:
+    steps = scripted_policy_steps(scenario_path)
+    conn = connect(db_path)
+    try:
+        index = int(get_state_value(conn, "ui_scripted_step_index") or "0")
+        finalized = get_state_value(conn, "ui_scripted_finalized") == "1"
+    finally:
+        conn.close()
+
+    if index < len(steps):
+        step = steps[index]
+        result = run_scripted_step(db_path, step)
+        if result.get("ok", True):
+            conn = connect(db_path)
+            try:
+                set_state_value(conn, "ui_scripted_step_index", str(index + 1))
+                conn.commit()
+            finally:
+                conn.close()
+        return {
+            "ok": result.get("ok", True),
+            "done": False,
+            "index": index + 1,
+            "total": len(steps),
+            "name": step.get("name"),
+            "tool": step.get("tool"),
+            "result": result,
+        }
+
+    if not finalized:
+        result = finalize_to_deadline(db_path, scenario_path)
+        conn = connect(db_path)
+        try:
+            set_state_value(conn, "ui_scripted_finalized", "1")
+            conn.commit()
+        finally:
+            conn.close()
+        return {
+            "ok": result.get("ok", True),
+            "done": True,
+            "index": len(steps),
+            "total": len(steps),
+            "name": "finalize_to_deadline",
+            "tool": "finalize_to_deadline",
+            "result": result,
+        }
+
+    return {
+        "ok": True,
+        "done": True,
+        "index": len(steps),
+        "total": len(steps),
+        "name": "complete",
+        "tool": "complete",
+        "result": {"ok": True},
+    }
+
+
+def _scripted_demo_state(db_path: Path, scenario_path: Path) -> dict[str, Any]:
+    steps = scripted_policy_steps(scenario_path)
+    conn = connect(db_path)
+    try:
+        index = int(get_state_value(conn, "ui_scripted_step_index") or "0")
+        finalized = get_state_value(conn, "ui_scripted_finalized") == "1"
+    finally:
+        conn.close()
+    return {
+        "index": min(index, len(steps)),
+        "total": len(steps),
+        "finalized": finalized,
+        "done": index >= len(steps) and finalized,
     }
 
 
@@ -180,7 +256,7 @@ def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
     kind = entry.get("kind")
     if kind not in {"action", "event_delivered"}:
         return None
-    if kind == "action" and entry.get("action_type") in {"advance_time", "reset", "finalize_to_deadline"}:
+    if kind == "action" and entry.get("action_type") in {"reset", "finalize_to_deadline"}:
         return None
     if kind == "event_delivered" and entry.get("event_type") == "coworker_reply":
         return None
@@ -217,6 +293,8 @@ def _action_title(action_type: str, payload: dict[str, Any]) -> str:
         return "Updated task"
     if action_type == "schedule_meeting":
         return "Scheduled meeting"
+    if action_type == "advance_time":
+        return "Waited"
     return _label(action_type)
 
 
@@ -229,6 +307,8 @@ def _action_detail(action_type: str, payload: dict[str, Any]) -> str:
         return _label(payload.get("task_id"))
     if action_type == "schedule_meeting":
         return str(payload.get("title") or "Meeting")
+    if action_type == "advance_time":
+        return str(payload.get("target") or "Advanced simulated time")
     return _label(action_type)
 
 
@@ -323,7 +403,7 @@ details.operator[open] summary { border-bottom:1px solid var(--line); }
   </header>
   <section id="playback-section">
     <div class="section-head"><h2>Live Playback</h2></div>
-    <p class="helper">These cards are streamed from the SQLite state as simulated time advances. They are not the hidden scenario answer key.</p>
+    <p class="helper">Play runs the deterministic scripted PM demo one workplace action at a time. The cards stream from SQLite as actions and events mutate state.</p>
     <div class="playback-controls">
       <button class="primary" id="play">Play</button>
       <button id="step">Step</button>
@@ -449,7 +529,8 @@ function render(state) {
   $("title").textContent = scenario.name || obs.scenario_id || "PM Sim";
   $("subtitle").textContent = scenario.company || "";
   $("sim-time").textContent = pretty(obs.current_time);
-  $("meter").textContent = `${state.display_timeline.length} visible item(s)`;
+  const demo = state.scripted_demo || {};
+  $("meter").textContent = `step ${demo.index ?? 0} / ${demo.total ?? 0} · ${state.display_timeline.length} visible item(s)`;
 
   $("summary").innerHTML = [
     card("Evidence found", evaluation.evidence_count ?? 0),

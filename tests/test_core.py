@@ -35,6 +35,7 @@ from pm_sim.scenario import ScenarioError, load_scenario
 from pm_sim.state import action_log, event_log, observe, reset
 from pm_sim.time import advance_time
 from pm_sim.timeline import timeline
+from pm_sim.ui import _run_next_ui_step, _scripted_demo_state
 
 
 class ScenarioValidationTests(unittest.TestCase):
@@ -804,6 +805,26 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertIn("Timeline", html)
         self.assertIn("Action Log", html)
         self.assertIn("blocker_discovered", html)
+
+    def test_live_ui_play_steps_run_scripted_pm_path(self) -> None:
+        initial = _scripted_demo_state(self.db_path, DEFAULT_SCENARIO_PATH)
+        self.assertEqual(initial["index"], 0)
+        self.assertFalse(initial["done"])
+
+        result = {"done": False}
+        guard = 0
+        while not result["done"]:
+            result = _run_next_ui_step(self.db_path, DEFAULT_SCENARIO_PATH)
+            guard += 1
+            self.assertLess(guard, 100)
+
+        final = _scripted_demo_state(self.db_path, DEFAULT_SCENARIO_PATH)
+        evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
+
+        self.assertTrue(final["done"])
+        self.assertEqual(final["index"], final["total"])
+        self.assertEqual(evaluation["score"], 120)
+        self.assertEqual(evaluation["score"], evaluation["max_score"])
 
 
 class CoworkerRuleTests(unittest.TestCase):
