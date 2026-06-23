@@ -311,14 +311,21 @@ def _schedule_detail(event: dict[str, Any]) -> str:
 
 def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
     kind = entry.get("kind")
-    if kind not in {"action", "event_delivered"}:
+    if kind not in {"action", "event_delivered", "message"}:
         return None
     if kind == "action" and entry.get("action_type") in {"reset", "finalize_to_deadline"}:
         return None
     if kind == "event_delivered" and entry.get("event_type") == "coworker_reply":
         return None
 
-    if kind == "event_delivered":
+    if kind == "message":
+        channel = str(entry.get("channel") or "").lower()
+        sender = _label(entry.get("sender_id"))
+        recipient = _label(entry.get("recipient_id") or "all")
+        title = f"{channel.capitalize()} {sender} -> {recipient}".strip()
+        detail = str(entry.get("subject") or entry.get("body") or "Message")
+        card_kind = "message"
+    elif kind == "event_delivered":
         title = _label(entry.get("event_type"))
         detail = "Event delivered"
         card_kind = "event"
@@ -358,6 +365,14 @@ def _log_lines(entries: list[dict[str, Any]], llm_state: dict[str, Any]) -> list
                 continue
             lines.append(
                 f"[{_pretty_time(entry.get('time'))}] EVENT - {_label(entry.get('event_type'))}"
+            )
+        elif kind == "message":
+            channel = str(entry.get("channel") or "").upper()
+            sender = _label(entry.get("sender_id"))
+            recipient = _label(entry.get("recipient_id") or "all")
+            text = str(entry.get("subject") or entry.get("body") or "Message")
+            lines.append(
+                f"[{_pretty_time(entry.get('time'))}] {channel} {sender} -> {recipient} - {text}"
             )
     return lines[-80:]
 
@@ -458,6 +473,7 @@ section { margin:14px 0; overflow:hidden; }
 .day-head span { color:var(--muted); font-size:12px; }
 .calendar-event { margin:8px; padding:8px; border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:8px; background:#fff; }
 .calendar-event.event { border-left-color:var(--purple); }
+.calendar-event.message { border-left-color:#1a8f6a; }
 .calendar-event.current { outline:2px solid rgba(37,92,153,.24); background:#f2f7ff; }
 .log-console { max-height:360px; overflow:auto; padding:14px; border:1px solid var(--line); border-radius:10px; background:#101722; color:#d9e7ff; font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
 .log-line { white-space:pre-wrap; border-bottom:1px solid rgba(255,255,255,.06); padding:6px 0; }
