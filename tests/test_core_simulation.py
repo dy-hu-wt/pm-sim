@@ -849,6 +849,13 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertIn("window.scrollTo(pageX, pageY)", html)
         self.assertIn("overscroll-behavior:contain", html)
 
+    def test_live_ui_meter_displays_llm_model(self) -> None:
+        html = _html()
+
+        self.assertIn("modelLabel", html)
+        self.assertIn("llm turn ${llm.turns", html)
+        self.assertIn("model ${llm.model}", html)
+
     def test_live_ui_can_step_llm_policy(self) -> None:
         client = FakeResponsesClient(
             [

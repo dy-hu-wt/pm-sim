@@ -1022,8 +1022,9 @@ function render(state) {
   $("sim-time").textContent = pretty(obs.current_time);
   const demo = state.scripted_demo || {};
   const llm = state.llm_session || {};
+  const modelLabel = llm.model ? ` · model ${llm.model}` : "";
   $("meter").textContent = llm.active
-    ? `llm turn ${llm.turns ?? 0} · ${llm.steps ?? 0} tool step(s) · ${state.display_timeline.length} visible item(s)`
+    ? `llm turn ${llm.turns ?? 0}${modelLabel} · ${llm.steps ?? 0} tool step(s) · ${state.display_timeline.length} visible item(s)`
     : `step ${demo.index ?? 0} / ${demo.total ?? 0} · ${state.display_timeline.length} visible item(s)`;
 
   $("summary").innerHTML = [
