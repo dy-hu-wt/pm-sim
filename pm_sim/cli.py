@@ -197,10 +197,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Do not open the browser automatically.",
     )
     ui_parser.add_argument(
+        "--resume",
+        action="store_false",
+        dest="reset_first",
+        default=True,
+        help="Open the current DB state instead of resetting before the live UI starts.",
+    )
+    ui_parser.add_argument(
         "--reset",
         action="store_true",
         dest="reset_first",
-        help="Reset the DB before starting the UI.",
+        help="Reset the DB before starting the UI. This is the default for the live UI.",
     )
     ui_parser.set_defaults(func=_ui_command)
 

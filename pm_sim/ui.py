@@ -28,7 +28,7 @@ def serve_ui(
     host: str = DEFAULT_UI_HOST,
     port: int = DEFAULT_UI_PORT,
     open_browser: bool = True,
-    reset_first: bool = False,
+    reset_first: bool = True,
     timeline_limit: int = 120,
 ) -> dict[str, Any]:
     if reset_first:
@@ -150,7 +150,30 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
         "tasks": list_tasks(db_path),
         "timeline": entries,
         "display_timeline": display_timeline,
+        "authored_schedule": _authored_schedule(scenario),
     }
+
+
+def _authored_schedule(scenario: dict[str, Any]) -> list[dict[str, str]]:
+    rows = []
+    for event in scenario.get("events", []):
+        rows.append(
+            {
+                "time": str(event.get("scheduled_at") or ""),
+                "kind": "scheduled",
+                "title": _label(event.get("event_type")),
+                "detail": _schedule_detail(event),
+            }
+        )
+    return sorted(rows, key=lambda item: (item["time"], item["title"]))
+
+
+def _schedule_detail(event: dict[str, Any]) -> str:
+    payload = event.get("payload") or {}
+    project_id = payload.get("project_id")
+    if project_id:
+        return f"Authored scenario event for {_label(project_id)}"
+    return "Authored scenario event"
 
 
 def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
@@ -268,9 +291,11 @@ section { margin:14px 0; overflow:hidden; }
 .item .time { color:var(--muted); font-size:12px; font-weight:850; }
 .item .title { font-weight:850; margin-top:2px; }
 .item .detail { color:var(--muted); margin-top:2px; }
+.helper { color:var(--muted); font-size:12px; margin:8px 14px 0; }
 .columns { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px; }
 .list { padding:14px; display:grid; gap:8px; }
 .row { border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }
+.row.scheduled { border-left:4px solid var(--purple); }
 .badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:800; background:#eef2f7; }
 .good { color:var(--good); } .warn { color:var(--warn); } .bad { color:var(--bad); }
 .empty { color:var(--muted); font-style:italic; padding:14px; }
@@ -295,7 +320,8 @@ section { margin:14px 0; overflow:hidden; }
     <div class="score"><span id="score">-</span><span>score</span></div>
   </header>
   <section id="playback-section">
-    <div class="section-head"><h2>Calendar Playback</h2></div>
+    <div class="section-head"><h2>Live Playback</h2></div>
+    <p class="helper">These cards are streamed from the SQLite state as simulated time advances. They are not the hidden scenario answer key.</p>
     <div class="playback-controls">
       <button class="primary" id="play">Play</button>
       <button id="step">Step</button>
@@ -310,10 +336,10 @@ section { margin:14px 0; overflow:hidden; }
   <div class="grid" id="summary"></div>
   <div class="columns">
     <section><div class="section-head"><h2>Projects</h2></div><div class="list" id="projects"></div></section>
-    <section><div class="section-head"><h2>Calendar Obligations</h2></div><div class="list" id="calendar"></div></section>
+    <section><div class="section-head"><h2>Authored Schedule</h2></div><p class="helper">Reference schedule seeded by the scenario. These events have not necessarily been delivered yet.</p><div class="list" id="schedule"></div></section>
   </div>
   <div class="columns">
-    <section><div class="section-head"><h2>Evaluation</h2></div><div class="list" id="evaluation"></div></section>
+    <section><div class="section-head"><h2>Current Evaluation</h2></div><p class="helper">This is the current score from visible state and recorded evidence, not a preview of future ground truth.</p><div class="list" id="evaluation"></div></section>
     <section><div class="section-head"><h2>Tasks</h2></div><div class="list" id="tasks"></div></section>
   </div>
 </main>
@@ -429,7 +455,7 @@ function render(state) {
   renderReplay(state.display_timeline || [], scenario);
 
   $("projects").innerHTML = (obs.projects || []).map(project => row(project.name, `${project.stakeholder_pressure || ""} Deadline: ${pretty(project.deadline)}`, project.status)).join("") || `<div class="empty">No projects.</div>`;
-  $("calendar").innerHTML = (obs.calendar_obligations || []).map(item => row(item.title, pretty(item.start_at), item.kind)).join("") || `<div class="empty">No visible obligations.</div>`;
+  $("schedule").innerHTML = (state.authored_schedule || []).map(item => `<div class="row scheduled"><strong>${esc(item.title)}</strong> <span class="badge">${esc(timeOnly(item.time))}</span><div>${esc(pretty(item.time))}</div><div>${esc(item.detail)}</div></div>`).join("") || `<div class="empty">No authored events.</div>`;
   $("evaluation").innerHTML = (evaluation.components || []).map(component => row(label(component.key), component.note || "", `${component.earned} / ${component.points}`)).join("") || `<div class="empty">No evaluation yet.</div>`;
   $("tasks").innerHTML = (state.tasks || []).slice(0, 12).map(task => row(task.title, `Owner: ${task.owner_id || "unowned"} · Due: ${pretty(task.due_at)}`, task.status)).join("") || `<div class="empty">No tasks.</div>`;
 }
