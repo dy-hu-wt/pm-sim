@@ -889,23 +889,27 @@ def _format_run_agent(value: dict[str, Any]) -> str:
             lines.append(f"           {final_outcome.get('summary')}")
     missing = _agent_missing_components(evaluation)
     if missing:
-        lines.extend(["", "Missing Evaluation"])
+        lines.extend(["", "Evaluation Detail"])
         for component in missing:
-            evidence = component.get("missing_milestones") or []
-            if evidence:
-                lines.append(f"  {component['key']}: {', '.join(evidence)}")
-            else:
-                lines.append(f"  {component['key']}: {component.get('note', 'not passed')}")
+            lines.append(
+                f"  {component['key']}: {component.get('earned')} / "
+                f"{component.get('points')} — {component.get('note', 'not passed')}"
+            )
+            missing_milestones = component.get("missing_milestones") or []
+            if missing_milestones:
+                lines.append(f"    Missing: {', '.join(missing_milestones)}")
+            late_milestones = component.get("late_milestones") or []
+            if late_milestones:
+                lines.append(f"    Late: {', '.join(late_milestones)}")
+            failed_gates = component.get("failed_gates") or []
+            for gate in failed_gates:
+                lines.append(f"    Failed gate for {gate.get('milestone')}:")
+                for failed in gate.get("failed", []):
+                    lines.append(f"      - {failed}")
     if len(steps) > 25:
         lines.extend(["", "Step Counts"])
         for name, count in _step_counts(steps).items():
             lines.append(f"  {name}: {count}")
-
-        lines.extend(["", "Recent Steps"])
-        start = max(1, len(steps) - 9)
-        for index, step in enumerate(steps[-10:], start=start):
-            status = "ok" if step.get("ok") else "failed"
-            lines.append(f"  {index}. {step.get('name')} [{status}]")
     else:
         lines.extend(["", "Steps"])
         for index, step in enumerate(steps, start=1):

@@ -133,8 +133,9 @@ class ScriptedAgentTests(unittest.TestCase):
 
         self.assertIn("Stop:   max turns reached", output)
         self.assertIn("Finish: not called", output)
-        self.assertIn("Missing Evaluation", output)
-        self.assertIn("security_interruption: security_doc_found, security_question_answered", output)
+        self.assertIn("Evaluation Detail", output)
+        self.assertIn("security_interruption: 0 / 10", output)
+        self.assertIn("Missing: security_doc_found, security_question_answered", output)
 
     def test_concept_progress_line_is_compact_and_highlighted(self) -> None:
         line = format_concept_progress(
@@ -191,7 +192,7 @@ class ScriptedAgentTests(unittest.TestCase):
 
         self.assertIn("Step Counts", output)
         self.assertIn("send_chat: 30", output)
-        self.assertIn("Recent Steps", output)
+        self.assertNotIn("Recent Steps", output)
         self.assertNotIn("  1. send_chat", output)
 
 

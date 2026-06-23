@@ -5,6 +5,8 @@ agent_brief:
   - Daisy needs customer-ready Nimbus wording early enough for her Thursday account update.
   - Koopa needs scoped wording before Thursday's security review.
   - Thursday final-readiness requests need an answer before the final agenda.
+  - After draft mode is approved and recorded, send Daisy customer-ready Nimbus wording by email before her Thursday account update.
+  - If Daisy asks for final go/no-go, a single concise email can tie together launch mode, security wording, and Koopa scope, but it must be grounded in already discovered facts and sent before the readiness window closes.
   - When writing the launch decision record, include the approved launch mode, Toad's approval, human approval before posting, auto-commenting out of Friday scope or left as follow-up, and the repo-sync stale-commit rationale.
   - When a customer-facing security or compliance question appears, ask the source-of-truth owner, wait for the reply, read the referenced doc, then answer the customer owner directly.
   - Do not schedule a meeting for a security wording question unless the needed document or owner answer is unavailable.
@@ -252,18 +254,21 @@ grading_rules:
       person_id: toad
       key: decision_record_written
       equals: true
+  - any:
+    - fact_discovered: draft_mode_approved
+    - project_decision:
+        project_id: pr_review_agent
+        equals: draft_mode_approved
   - coworker_state:
-      person_id: daisy
-      key: customer_message_ready
+      person_id: luigi
+      key: security_doc_shared
       equals: true
-  - coworker_state:
-      person_id: daisy
-      key: security_answer_received
-      equals: true
-  - coworker_state:
-      person_id: daisy
-      key: koopa_update_received
-      equals: true
+  - fact_discovered: audit_log_one_time_export_feasible
+  - any:
+    - fact_discovered: audit_export_scope_confirmed
+    - project_decision:
+        project_id: audit_log_export
+        equals: one_time_csv_for_review
   action:
     type: send_email
     recipient_id: daisy
@@ -361,18 +366,21 @@ grading_rules:
       person_id: toad
       key: decision_record_written
       equals: true
+  - any:
+    - fact_discovered: draft_mode_approved
+    - project_decision:
+        project_id: pr_review_agent
+        equals: draft_mode_approved
   - coworker_state:
-      person_id: daisy
-      key: customer_message_ready
+      person_id: luigi
+      key: security_doc_shared
       equals: true
-  - coworker_state:
-      person_id: daisy
-      key: security_answer_received
-      equals: true
-  - coworker_state:
-      person_id: daisy
-      key: koopa_update_received
-      equals: true
+  - fact_discovered: audit_log_one_time_export_feasible
+  - any:
+    - fact_discovered: audit_export_scope_confirmed
+    - project_decision:
+        project_id: audit_log_export
+        equals: one_time_csv_for_review
   action:
     type: send_chat
     recipient_id: daisy

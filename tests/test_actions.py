@@ -738,6 +738,40 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertTrue(result["ok"])
         self.assertFalse(self._coworker_state_value("daisy", "final_readiness_confirmed"))
 
+    def test_consolidated_final_readiness_can_score_from_grounded_state(self) -> None:
+        self._seed_final_readiness_prerequisites()
+
+        conn = connect(self.db_path)
+        try:
+            conn.execute(
+                """
+                DELETE FROM coworker_state
+                WHERE person_id = 'daisy'
+                  AND key IN (
+                    'customer_message_ready',
+                    'security_answer_received',
+                    'koopa_update_received'
+                  )
+                """
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Thursday final readiness",
+            (
+                "Final readiness is go for the Nimbus Friday beta. Launch mode is draft mode "
+                "with human approval before posting. Private repo security wording is covered, "
+                "and Koopa stays scoped to a one-time audit CSV export."
+            ),
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(self._coworker_state_value("daisy", "final_readiness_confirmed"))
+
     def test_schedule_meeting_creates_future_meeting_event(self) -> None:
         result = schedule_meeting(
             self.db_path,
@@ -1078,6 +1112,34 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
                         "person_id": "toad",
                         "key": "decision_record_written",
                         "value": True,
+                    },
+                    {
+                        "type": "discover_fact",
+                        "fact_id": "fact_draft_mode_approved",
+                    },
+                    {
+                        "type": "update_project",
+                        "project_id": "project_pr_review_agent",
+                        "decision": "draft_mode_approved",
+                    },
+                    {
+                        "type": "update_coworker_state",
+                        "person_id": "luigi",
+                        "key": "security_doc_shared",
+                        "value": True,
+                    },
+                    {
+                        "type": "discover_fact",
+                        "fact_id": "fact_audit_log_one_time_export_feasible",
+                    },
+                    {
+                        "type": "discover_fact",
+                        "fact_id": "fact_audit_export_scope_confirmed",
+                    },
+                    {
+                        "type": "update_project",
+                        "project_id": "project_audit_log_export",
+                        "decision": "one_time_csv_for_review",
                     },
                     {
                         "type": "update_coworker_state",

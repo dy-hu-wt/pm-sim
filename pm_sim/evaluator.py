@@ -177,7 +177,7 @@ def _score_milestone_component(
     points = float(target.get("points", 0))
     expected_keys = target.get("milestones", [])
     if not expected_keys:
-        return _component(key, points, 0, "No milestones configured.", [], [], [])
+        return _component(key, points, 0, "No milestones configured.", [], [], [], [])
 
     per_key_points = points / len(expected_keys)
     preferred_before = target.get("preferred_before")
@@ -212,7 +212,7 @@ def _score_milestone_component(
         notes.append("Required milestones are present.")
 
     failed_gates = _failed_gates_for_missing_milestones(conn, scenario, missing)
-    return _component(key, points, earned, " ".join(notes), used_milestones, missing, failed_gates)
+    return _component(key, points, earned, " ".join(notes), used_milestones, missing, late, failed_gates)
 
 
 def _score_harmful_actions(conn, key: str, target: dict[str, Any]) -> dict[str, Any]:
@@ -233,7 +233,7 @@ def _score_harmful_actions(conn, key: str, target: dict[str, Any]) -> dict[str, 
         )
     note = " ".join(notes)
 
-    component = _component(key, points, earned, note, [], [], [])
+    component = _component(key, points, earned, note, [], [], [], [])
     component["harmful_patterns"] = target.get("harmful_patterns", [])
     component["detected_harms"] = harms
     component["coordination_penalty"] = _clean_number(coordination_penalty)
@@ -595,6 +595,7 @@ def _component(
     note: str,
     milestones: list[dict[str, Any]],
     missing: list[str],
+    late: list[str],
     failed_gates: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
@@ -605,6 +606,7 @@ def _component(
         "note": note,
         "milestones": milestones,
         "missing_milestones": missing,
+        "late_milestones": late,
         "failed_gates": failed_gates,
     }
 
