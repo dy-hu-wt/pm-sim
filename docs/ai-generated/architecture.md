@@ -4,7 +4,7 @@ This generated note is kept in `docs/ai-generated/` as reviewer-facing scaffoldi
 
 ## Core Shape
 
-`pm-sim` is a single-node simulation backend. A scenario manifest includes `world.json` and `rules.json`, SQLite stores the mutable state, CLI commands expose the tools, scheduled events advance background activity, deterministic coworker rules emit effects, and the evaluator scores the resulting state.
+`pm-sim` is a single-node simulation backend. A scenario manifest includes `world.json`, `interactions.json`, and `evaluation.json`; SQLite stores the mutable state, CLI commands expose the tools, scheduled events advance background activity, deterministic coworker rules emit effects, and the evaluator scores the resulting state.
 
 The main backend flow is:
 
@@ -12,12 +12,13 @@ The main backend flow is:
 scenario JSON -> SQLite state -> CLI tools -> actions -> event queue -> effects -> evaluator
 ```
 
-The authored launch scenario lives in three files:
+The authored launch scenario lives in four files:
 
 ```text
-scenarios/launch_readiness/scenario.json  # id, start time, include list
-scenarios/launch_readiness/world.json     # starting world state and coworker memory
-scenarios/launch_readiness/rules.json     # behavior, scoring, and outcome rules
+scenarios/launch_readiness/scenario.json      # id, start time, include list
+scenarios/launch_readiness/world.json         # starting world state and coworker memory
+scenarios/launch_readiness/interactions.json  # coworker, event, meeting, and action behavior
+scenarios/launch_readiness/evaluation.json    # scoring, gates, outcomes, baseline, scripted path
 ```
 
 Agent policies add one harness step after the action loop:

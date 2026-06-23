@@ -265,7 +265,8 @@ Scenario data should define most of the setup:
 
 - a `scenario.json` manifest with `include` entries
 - a `world.json` starting-state file
-- a `rules.json` behavior/grading file
+- an `interactions.json` behavior file
+- an `evaluation.json` grading/outcome file
 - people
 - coworker state
 - projects

@@ -12,12 +12,13 @@ Fireflower is a B2B SaaS company preparing a PR Review Agent beta for Nimbus Lab
 
 The agent's job is to discover the stale-code risk, align Mario, Luigi, Peach, Daisy, and Toad, clarify scope, protect the main launch, and handle the smaller Koopa interruption without overpromising.
 
-The scenario is authored as three JSON files:
+The launch scenario is authored as four JSON files:
 
 ```text
-scenarios/launch_readiness/scenario.json  # manifest: id, start time, includes
-scenarios/launch_readiness/world.json     # people, coworker state, projects, facts, tasks, docs, events
-scenarios/launch_readiness/rules.json     # coworker/event behavior, gates, scoring, outcomes
+scenarios/launch_readiness/scenario.json      # manifest: id, start time, includes
+scenarios/launch_readiness/world.json         # people, coworker state, projects, facts, tasks, docs, events
+scenarios/launch_readiness/interactions.json  # coworker, event, meeting, and action behavior
+scenarios/launch_readiness/evaluation.json    # grading, gates, outcomes, baseline, scripted path
 ```
 
 `pm-sim reset` loads the manifest, merges included files, validates the scenario, and writes the active run into SQLite.
@@ -136,7 +137,7 @@ The same path can be run by the deterministic scripted agent:
 pm-sim run-agent --policy scripted --reset
 ```
 
-The scripted policy steps are authored in `scenarios/launch_readiness/rules.json` under `scripted_policy`; the runner only dispatches those steps through normal tool functions. It does not mutate database state directly.
+The scripted policy steps are authored in `scenarios/launch_readiness/evaluation.json` under `scripted_policy`; the runner only dispatches those steps through normal tool functions. It does not mutate database state directly.
 
 ## Second Scenario
 
@@ -309,13 +310,13 @@ pm-sim evaluate --explain
 pm-sim --json evaluate
 ```
 
-The score comes from the rubric in `scenarios/launch_readiness/rules.json`. It rewards outcomes and state improvements, not raw tool usage or activity volume. Evidence must show that the agent improved the project: discovering blockers, aligning stakeholders, unblocking real work, approving a defensible draft-mode launch, and avoiding harmful state. `avoid_harmful_actions` includes a light, capped penalty for excessive direct outreach, calibrated for a week with two active project threads.
+The score comes from the rubric in `scenarios/launch_readiness/evaluation.json`. It rewards outcomes and state improvements, not raw tool usage or activity volume. Evidence must show that the agent improved the project: discovering blockers, aligning stakeholders, unblocking real work, approving a defensible draft-mode launch, and avoiding harmful state. `avoid_harmful_actions` includes a light, capped penalty for excessive direct outreach, calibrated for a week with two active project threads.
 
 Task updates are checked against the surrounding world state to resist reward hacking. For example, marking repo sync complete while the stale-code blocker is unresolved is penalized, and draft-mode onboarding progress only counts when draft-mode scope is confirmed and the scope blocker is resolved.
 
 After the Friday deadline event is delivered, `evaluate` also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
-The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, and `rules.json`. Most scenario semantics now live in data: task gates, coworker memory, autonomous coworker policies, chat/email/doc-derived effects, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger terms, transcript lines, semantic criteria, and effects. Action-derived scoring first checks causal `when` conditions, then uses `semantic_match` criteria to decide whether the message/doc actually communicated the required ideas. The engine default is a deterministic offline matcher; setting `PM_SIM_SEMANTIC_MATCHER=llm` uses a cached fail-closed model judge for the fuzzy semantic equivalence step. The included `.env.example` opts into that LLM matcher for demo runs; set `PM_SIM_SEMANTIC_MATCHER=deterministic` for fully offline/reproducible runs. The `ui` command is an operator surface over the same SQLite state; its live playback advances time through the same backend event queue rather than replaying separate UI state.
+The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, `interactions.json`, and `evaluation.json`. Most scenario semantics now live in data: task gates, coworker memory, autonomous coworker policies, chat/email/doc-derived effects, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger terms, transcript lines, semantic criteria, and effects. Action-derived scoring first checks causal `when` conditions, then uses `semantic_match` criteria to decide whether the message/doc actually communicated the required ideas. The engine default is a deterministic offline matcher; setting `PM_SIM_SEMANTIC_MATCHER=llm` uses a cached fail-closed model judge for the fuzzy semantic equivalence step. The included `.env.example` opts into that LLM matcher for demo runs; set `PM_SIM_SEMANTIC_MATCHER=deterministic` for fully offline/reproducible runs. The `ui` command is an operator surface over the same SQLite state; its live playback advances time through the same backend event queue rather than replaying separate UI state.
 
 Coworkers are deterministic autonomous actors, not freeform LLM NPCs. Their distinct roles come from authored personas, agenda fields (`current_focus`, `needs_from_pm`, `known_constraints`), private facts, mutable `coworker_state`, response-delay/availability windows, proactive scheduled events, autonomous policies, and prioritized reply rules. Coworker rules and policies use the shared condition language through `when`, so behavior can depend on actor memory, project decisions, blocker status, evidence, or time. This keeps grading reproducible while still modeling PM-relevant behavior such as delayed answers, private owner knowledge, stakeholder pressure, escalation, and different responses after someone has already answered or approved something.
 

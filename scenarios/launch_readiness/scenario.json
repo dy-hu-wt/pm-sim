@@ -7,6 +7,7 @@
   "summary": "Fireflower is trying to launch a PR Review Agent beta for Nimbus Labs by Friday.",
   "include": [
     "world.json",
-    "rules.json"
+    "interactions.json",
+    "evaluation.json"
   ]
 }

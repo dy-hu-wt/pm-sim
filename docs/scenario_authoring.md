@@ -8,9 +8,10 @@ Each scenario directory has this shape:
 
 ```text
 scenarios/<scenario_id>/
-  scenario.json   # manifest and includes
-  world.json      # seeded company/project state
-  rules.json      # behavior, grading, outcomes, scripted path
+  scenario.json      # manifest and includes
+  world.json         # seeded company/project state
+  interactions.json  # coworker, event, meeting, and action behavior
+  evaluation.json    # grading, gates, outcomes, baseline, scripted path
 ```
 
 `scenario.json` is intentionally small:
@@ -22,7 +23,7 @@ scenarios/<scenario_id>/
   "company": "Fireflower",
   "start_time": "2026-06-22T09:00:00",
   "timezone": "America/New_York",
-  "include": ["world.json", "rules.json"]
+  "include": ["world.json", "interactions.json", "evaluation.json"]
 }
 ```
 
@@ -44,18 +45,27 @@ Use `pm-sim reset --scenario scenarios/<scenario_id>` to validate and load it.
 
 Visibility is standardized with nullable `visible_at`: if it is `null`, the item exists in the world but is not visible to the agent yet.
 
-## Rules
+## Interactions
 
-`rules.json` defines how the world changes:
+`interactions.json` defines how coworkers and background dynamics change the world:
 
 - `coworker_rules`: deterministic replies by person and channel. Rules can depend on hidden facts, visible facts, and coworker state.
+- `coworker_policies`: autonomous deterministic coworker behavior that fires from time and state.
 - `event_rules`: effects applied when scheduled events are delivered.
+- `meeting_rules`: transcript lines and effects applied when a meeting resolves.
 - `action_rules`: effects applied when an agent action matches causal conditions and optional semantic criteria.
+
+## Evaluation
+
+`evaluation.json` defines grading and reviewer/demo behavior:
+
 - `grading_rules`: reusable templates that compile into action rules plus state-derived evidence.
 - `state_evidence_rules`: how evaluator evidence is derived from coworker/world state.
 - `task_gate_rules`: prevents task completion before required state exists.
+- `harmful_action_rules`: harmful or suspicious world states the evaluator should penalize.
 - `outcome_rules`: classifies project outcome at deadline.
 - `evaluation_targets`: point allocation and evidence requirements.
+- `baseline`: no-op reference path.
 - `scripted_policy`: deterministic demo path using normal tools.
 
 Effects are reusable state mutations:
@@ -148,7 +158,7 @@ Not allowed for scored keys:
 
 ## Adding A Scenario Without Python
 
-1. Create `scenarios/<id>/scenario.json`, `world.json`, and `rules.json`.
+1. Create `scenarios/<id>/scenario.json`, `world.json`, `interactions.json`, and `evaluation.json`.
 2. Seed at least one project, several coworkers, hidden facts, blockers, tasks, docs, messages, and deadline events.
 3. Add coworker rules that reveal private facts and mutate coworker state.
 4. Add `grading_rules` or `state_evidence_rules` so score comes from state.
