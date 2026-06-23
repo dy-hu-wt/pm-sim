@@ -1182,7 +1182,8 @@
       "result": {
         "status": "shipped",
         "risk_level": "low",
-        "final_outcome": "draft_mode_beta_shipped"
+        "final_outcome": "draft_mode_beta_shipped",
+        "summary": "Nimbus received a Friday PR Review Agent beta in draft mode: human approval is required before posting, repo-sync stale-code risk is contained, onboarding is ready, and customer messaging is aligned."
       }
     },
     {

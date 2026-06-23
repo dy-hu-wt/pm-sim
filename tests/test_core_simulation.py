@@ -323,7 +323,8 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(project["status"], "shipped")
         self.assertEqual(project["risk_level"], "low")
         self.assertEqual(metadata["final_outcome"], "draft_mode_beta_shipped")
-        self.assertEqual(outcome_doc["body"], "")
+        self.assertIn("draft mode", outcome_doc["body"])
+        self.assertIn("customer messaging is aligned", outcome_doc["body"])
 
     def test_koopa_audit_export_can_be_scoped_and_closed_before_deadline(self) -> None:
         advance_time(self.db_path, "to:2026-06-24T14:00:00")

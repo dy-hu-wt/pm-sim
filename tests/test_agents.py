@@ -4,6 +4,7 @@ import copy
 import contextlib
 import io
 import json
+import os
 import tempfile
 import unittest
 import unittest.mock
@@ -71,6 +72,17 @@ class ScriptedAgentTests(unittest.TestCase):
                 ("doc_friday_outcome",),
             ).fetchone()
         self.assertEqual(json.loads(row["metadata_json"])["final_outcome"], "draft_mode_beta_shipped")
+
+    def test_scripted_agent_forces_deterministic_semantic_matching(self) -> None:
+        with unittest.mock.patch.dict(
+            os.environ,
+            {"PM_SIM_SEMANTIC_MATCHER": "llm", "OPENAI_API_KEY": "test-key"},
+        ):
+            result = run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["evaluation"]["score"], result["evaluation"]["max_score"])
+            self.assertEqual(os.environ["PM_SIM_SEMANTIC_MATCHER"], "llm")
 
     def test_cli_ui_static_writes_html_summary(self) -> None:
         run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
