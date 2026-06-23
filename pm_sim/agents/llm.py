@@ -16,9 +16,11 @@ from ..actions import (
     update_task,
 )
 from ..calendar import validate_finish
+from ..db import connect
 from ..evaluator import evaluate
+from ..jsonutil import dumps, loads
 from ..paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH, REPO_ROOT
-from ..state import observe, reset
+from ..state import get_state_value, observe, reset, set_state_value
 from ..time import advance_time
 from .finalize import finalize_to_deadline
 
@@ -28,10 +30,166 @@ ToolFn = Callable[[dict[str, Any]], ToolResult]
 ProgressFn = Callable[[str], None]
 
 DEFAULT_MODEL = "gpt-5.5"
+LLM_SESSION_STATE_KEY = "llm_agent_session_json"
 
 
 class LlmAgentError(RuntimeError):
     pass
+
+
+def start_llm_session(
+    db_path: Path | str = DEFAULT_DB_PATH,
+    scenario_path: Path | str = DEFAULT_SCENARIO_PATH,
+    *,
+    reset_first: bool = False,
+    model: str | None = None,
+) -> dict[str, Any]:
+    _load_dotenv()
+    model = model or os.environ.get("OPENAI_MODEL") or DEFAULT_MODEL
+    steps: list[dict[str, Any]] = []
+    if reset_first:
+        steps.append(_step("reset", reset(db_path, scenario_path)))
+
+    state = {
+        "model": model,
+        "turns": 0,
+        "finished": False,
+        "done": False,
+        "stop_reason": None,
+        "final_message": "",
+        "steps": steps,
+        "input_items": [
+            {
+                "role": "user",
+                "content": _initial_prompt(observe(db_path)),
+            }
+        ],
+    }
+    _save_llm_session(db_path, state)
+    return llm_session_state(db_path)
+
+
+def llm_session_state(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
+    state = _load_llm_session(db_path)
+    if state is None:
+        return {
+            "active": False,
+            "policy": "llm",
+            "model": None,
+            "turns": 0,
+            "finished": False,
+            "done": False,
+            "stop_reason": None,
+            "steps": 0,
+        }
+    return {
+        "active": True,
+        "policy": "llm",
+        "model": state.get("model"),
+        "turns": state.get("turns", 0),
+        "finished": bool(state.get("finished")),
+        "done": bool(state.get("done")),
+        "stop_reason": state.get("stop_reason"),
+        "steps": len(state.get("steps", [])),
+    }
+
+
+def step_llm_session(
+    db_path: Path | str = DEFAULT_DB_PATH,
+    scenario_path: Path | str = DEFAULT_SCENARIO_PATH,
+    *,
+    model: str | None = None,
+    max_turns: int = 40,
+    client: Any | None = None,
+    progress: ProgressFn | None = None,
+) -> dict[str, Any]:
+    _load_dotenv()
+    state = _load_llm_session(db_path)
+    if state is None:
+        start_llm_session(db_path, scenario_path, model=model)
+        state = _load_llm_session(db_path) or {}
+
+    if state.get("done"):
+        return _llm_step_payload(db_path, scenario_path, state, [], None)
+
+    model = model or state.get("model") or os.environ.get("OPENAI_MODEL") or DEFAULT_MODEL
+    state["model"] = model
+    turn = int(state.get("turns", 0)) + 1
+    if turn > max_turns:
+        state["stop_reason"] = "max_turns"
+        state["done"] = True
+        finalization = finalize_to_deadline(db_path, scenario_path, progress=progress)
+        _save_llm_session(db_path, state)
+        return _llm_step_payload(db_path, scenario_path, state, [], finalization)
+
+    if client is None:
+        client = _openai_client()
+
+    input_items = list(state.get("input_items", []))
+    _progress(progress, f"{_sim_time_label(db_path)} turn {turn}/{max_turns}: waiting for model")
+    response = client.responses.create(
+        model=model,
+        instructions=_instructions(),
+        input=input_items,
+        tools=_tool_specs(),
+        tool_choice="auto",
+    )
+    output = list(getattr(response, "output", []) or [])
+    serial_output = [_serialize_response_item(item) for item in output]
+    input_items.extend(serial_output)
+    state["final_message"] = getattr(response, "output_text", "") or state.get("final_message", "")
+    tool_calls = [item for item in output if _response_item_type(item) == "function_call"]
+    if tool_calls:
+        _progress(
+            progress,
+            f"{_sim_time_label(db_path)} turn {turn}/{max_turns}: "
+            f"{_tool_call_summary(tool_calls)}",
+        )
+
+    steps_this_turn = []
+    if not tool_calls:
+        state["stop_reason"] = "no_tool_calls"
+        state["done"] = True
+    else:
+        handlers = _tool_handlers(db_path, scenario_path)
+        for call in tool_calls:
+            name = _response_item_attr(call, "name", "")
+            args = _parse_arguments(_response_item_attr(call, "arguments", "{}"))
+            if name == "finish":
+                result = validate_finish(db_path)
+                result["reason"] = args.get("reason", "")
+                if result.get("ok"):
+                    state["finished"] = True
+                    state["stop_reason"] = "agent_finish"
+                    state["done"] = True
+            else:
+                handler = handlers.get(name)
+                result = {"ok": False, "error": f"Unknown tool: {name}"} if handler is None else handler(args)
+
+            step = _step(name, result)
+            state.setdefault("steps", []).append(step)
+            steps_this_turn.append(step)
+            _progress(progress, f"{_sim_time_label(db_path)} {_tool_progress_line(name, args, result)}")
+            input_items.append(
+                {
+                    "type": "function_call_output",
+                    "call_id": _response_item_attr(call, "call_id"),
+                    "output": json.dumps(result, default=str),
+                }
+            )
+
+    state["input_items"] = input_items
+    state["turns"] = turn
+    finalization = None
+    if state.get("done"):
+        finalization = finalize_to_deadline(db_path, scenario_path, progress=progress)
+    elif turn >= max_turns:
+        state["stop_reason"] = "max_turns"
+        state["done"] = True
+        finalization = finalize_to_deadline(db_path, scenario_path, progress=progress)
+
+    _save_llm_session(db_path, state)
+    return _llm_step_payload(db_path, scenario_path, state, steps_this_turn, finalization)
 
 
 def run_llm_agent(
@@ -469,3 +627,69 @@ def _short(value: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     return f"{text[: limit - 3]}..."
+
+
+def _load_llm_session(db_path: Path | str) -> dict[str, Any] | None:
+    conn = connect(db_path)
+    try:
+        return loads(get_state_value(conn, LLM_SESSION_STATE_KEY), None)
+    finally:
+        conn.close()
+
+
+def _save_llm_session(db_path: Path | str, state: dict[str, Any]) -> None:
+    conn = connect(db_path)
+    try:
+        set_state_value(conn, LLM_SESSION_STATE_KEY, dumps(state))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _llm_step_payload(
+    db_path: Path | str,
+    scenario_path: Path | str,
+    state: dict[str, Any],
+    steps_this_turn: list[dict[str, Any]],
+    finalization: dict[str, Any] | None,
+) -> dict[str, Any]:
+    evaluation = evaluate(db_path, scenario_path)
+    return {
+        "ok": evaluation.get("score") == evaluation.get("max_score"),
+        "policy": "llm",
+        "model": state.get("model"),
+        "turns": state.get("turns", 0),
+        "finished": bool(state.get("finished")),
+        "done": bool(state.get("done")),
+        "stop_reason": state.get("stop_reason"),
+        "steps": steps_this_turn,
+        "total_steps": len(state.get("steps", [])),
+        "finalization": finalization,
+        "evaluation": evaluation,
+    }
+
+
+def _serialize_response_item(item: Any) -> Any:
+    if isinstance(item, dict):
+        return item
+    if hasattr(item, "model_dump"):
+        return item.model_dump(exclude_none=True)
+    if hasattr(item, "dict"):
+        return item.dict(exclude_none=True)
+    if hasattr(item, "__dict__"):
+        return {
+            key: value
+            for key, value in vars(item).items()
+            if not key.startswith("_")
+        }
+    return item
+
+
+def _response_item_type(item: Any) -> str | None:
+    return _response_item_attr(item, "type")
+
+
+def _response_item_attr(item: Any, key: str, default: Any = None) -> Any:
+    if isinstance(item, dict):
+        return item.get(key, default)
+    return getattr(item, key, default)

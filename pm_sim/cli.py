@@ -209,6 +209,19 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="reset_first",
         help="Reset the DB before starting the UI. This is the default for the live UI.",
     )
+    ui_parser.add_argument(
+        "--policy",
+        choices=["scripted", "llm"],
+        default="scripted",
+        help="Playback policy for the live UI. Default: scripted.",
+    )
+    ui_parser.add_argument("--model", help="Model for --policy llm. Defaults to OPENAI_MODEL.")
+    ui_parser.add_argument(
+        "--max-turns",
+        type=int,
+        default=40,
+        help="Maximum model turns for --policy llm. Default: 40.",
+    )
     ui_parser.set_defaults(func=_ui_command)
 
     advance_parser = subparsers.add_parser("advance-time", help="Advance simulated time.")
@@ -279,6 +292,9 @@ def _ui_command(args: argparse.Namespace) -> dict[str, Any]:
         open_browser=not args.no_open,
         reset_first=args.reset_first,
         timeline_limit=args.timeline_limit,
+        policy=args.policy,
+        model=args.model,
+        max_turns=args.max_turns,
     )
 
 

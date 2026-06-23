@@ -19,7 +19,7 @@ from pm_sim.actions import (
     update_doc,
     update_task,
 )
-from pm_sim.agents.llm import _instructions, run_llm_agent
+from pm_sim.agents.llm import _instructions, llm_session_state, start_llm_session, step_llm_session, run_llm_agent
 from pm_sim.agents.scripted import run_scripted_agent
 from pm_sim.cli import main as cli_main
 from pm_sim.conditions import condition_matches
@@ -825,6 +825,30 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual(final["index"], final["total"])
         self.assertEqual(evaluation["score"], 120)
         self.assertEqual(evaluation["score"], evaluation["max_score"])
+
+    def test_live_ui_can_step_llm_policy(self) -> None:
+        client = _FakeResponsesClient(
+            [
+                [_function_call("call_1", "observe", {})],
+            ]
+        )
+        start_llm_session(self.db_path, DEFAULT_SCENARIO_PATH, model="test-model")
+
+        result = _run_next_ui_step(
+            self.db_path,
+            DEFAULT_SCENARIO_PATH,
+            policy="llm",
+            model="test-model",
+            max_turns=3,
+            client=client,
+        )
+
+        session = llm_session_state(self.db_path)
+        self.assertEqual(result["policy"], "llm")
+        self.assertEqual(result["turns"], 1)
+        self.assertEqual([step["name"] for step in result["steps"]], ["observe"])
+        self.assertEqual(session["turns"], 1)
+        self.assertEqual(session["steps"], 1)
 
 
 class CoworkerRuleTests(unittest.TestCase):
@@ -2844,6 +2868,40 @@ class LlmAgentTests(unittest.TestCase):
 
         self.assertFalse(result["finished"])
         self.assertEqual(result["stop_reason"], "max_turns")
+
+    def test_llm_session_persists_model_context_between_steps(self) -> None:
+        client = _FakeResponsesClient(
+            [
+                [_function_call("call_1", "observe", {})],
+                [_function_call("call_2", "finish", {"reason": "observed"})],
+            ]
+        )
+        start_llm_session(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True, model="test-model")
+
+        first = step_llm_session(
+            self.db_path,
+            DEFAULT_SCENARIO_PATH,
+            model="test-model",
+            client=client,
+            max_turns=3,
+        )
+        second = step_llm_session(
+            self.db_path,
+            DEFAULT_SCENARIO_PATH,
+            model="test-model",
+            client=client,
+            max_turns=3,
+        )
+
+        second_input = client.calls[1]["input"]
+        function_outputs = [
+            item for item in second_input if isinstance(item, dict) and item.get("type") == "function_call_output"
+        ]
+
+        self.assertEqual(first["turns"], 1)
+        self.assertEqual(second["turns"], 2)
+        self.assertEqual(function_outputs[0]["call_id"], "call_1")
+        self.assertEqual(llm_session_state(self.db_path)["steps"], 3)
 
     def test_llm_instructions_discourage_chatty_busywork(self) -> None:
         instructions = _instructions()

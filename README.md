@@ -228,6 +228,14 @@ pm-sim ui
 
 This resets the scenario, starts a local UI, and opens it in your browser. The Play button runs the deterministic scripted PM demo one workplace action at a time, using the same backend tools and event queue as the CLI. Use `pm-sim ui --resume` only when you intentionally want to inspect the current DB instead of starting fresh. To write a static HTML snapshot of the current DB, use `pm-sim ui --static --output tmp/demo_ui.html`; that file is a report-style snapshot, not a live run.
 
+To watch the model-driven agent in the same UI, install the LLM extra, set `OPENAI_API_KEY`, and run:
+
+```bash
+pm-sim ui --policy llm --max-turns 80
+```
+
+In LLM mode, each Play tick runs one model turn and then renders the tool calls/events that landed in SQLite. The scripted UI mode remains the default because it is deterministic and does not require network access.
+
 Advance simulated time without using wall-clock time:
 
 ```bash

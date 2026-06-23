@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 from .actions import list_tasks
 from .agents.finalize import finalize_to_deadline
+from .agents.llm import llm_session_state, start_llm_session, step_llm_session
 from .agents.scripted import run_scripted_step, scripted_policy_steps
 from .db import connect
 from .evaluator import evaluate
@@ -32,9 +33,14 @@ def serve_ui(
     open_browser: bool = True,
     reset_first: bool = True,
     timeline_limit: int = 120,
+    policy: str = "scripted",
+    model: str | None = None,
+    max_turns: int = 40,
 ) -> dict[str, Any]:
     if reset_first:
         reset(db_path, scenario_path)
+        if policy == "llm":
+            start_llm_session(db_path, scenario_path, model=model)
 
     server = _UiServer(
         (host, port),
@@ -42,6 +48,9 @@ def serve_ui(
         db_path=Path(db_path),
         scenario_path=Path(scenario_path),
         timeline_limit=timeline_limit,
+        policy=policy,
+        model=model,
+        max_turns=max_turns,
     )
     url = f"http://{host}:{server.server_address[1]}/"
 
@@ -69,11 +78,17 @@ class _UiServer(ThreadingHTTPServer):
         db_path: Path,
         scenario_path: Path,
         timeline_limit: int,
+        policy: str,
+        model: str | None,
+        max_turns: int,
     ):
         super().__init__(server_address, RequestHandlerClass)
         self.db_path = db_path
         self.scenario_path = scenario_path
         self.timeline_limit = timeline_limit
+        self.policy = policy
+        self.model = model
+        self.max_turns = max_turns
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -93,10 +108,18 @@ class _Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/api/reset":
             reset(self.server.db_path, self.server.scenario_path)
+            if self.server.policy == "llm":
+                start_llm_session(self.server.db_path, self.server.scenario_path, model=self.server.model)
             self._send_json(_state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit))
             return
         if path == "/api/advance-next":
-            step_result = _run_next_ui_step(self.server.db_path, self.server.scenario_path)
+            step_result = _run_next_ui_step(
+                self.server.db_path,
+                self.server.scenario_path,
+                policy=self.server.policy,
+                model=self.server.model,
+                max_turns=self.server.max_turns,
+            )
             payload = _state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit)
             payload["step_result"] = step_result
             payload["done"] = bool(step_result.get("done"))
@@ -153,10 +176,28 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
         "display_timeline": display_timeline,
         "authored_schedule": _authored_schedule(scenario),
         "scripted_demo": _scripted_demo_state(db_path, scenario_path),
+        "llm_session": llm_session_state(db_path),
     }
 
 
-def _run_next_ui_step(db_path: Path, scenario_path: Path) -> dict[str, Any]:
+def _run_next_ui_step(
+    db_path: Path,
+    scenario_path: Path,
+    *,
+    policy: str = "scripted",
+    model: str | None = None,
+    max_turns: int = 40,
+    client: Any | None = None,
+) -> dict[str, Any]:
+    if policy == "llm":
+        return step_llm_session(
+            db_path,
+            scenario_path,
+            model=model,
+            max_turns=max_turns,
+            client=client,
+        )
+
     steps = scripted_policy_steps(scenario_path)
     conn = connect(db_path)
     try:
@@ -530,7 +571,10 @@ function render(state) {
   $("subtitle").textContent = scenario.company || "";
   $("sim-time").textContent = pretty(obs.current_time);
   const demo = state.scripted_demo || {};
-  $("meter").textContent = `step ${demo.index ?? 0} / ${demo.total ?? 0} · ${state.display_timeline.length} visible item(s)`;
+  const llm = state.llm_session || {};
+  $("meter").textContent = llm.active
+    ? `llm turn ${llm.turns ?? 0} · ${llm.steps ?? 0} tool step(s) · ${state.display_timeline.length} visible item(s)`
+    : `step ${demo.index ?? 0} / ${demo.total ?? 0} · ${state.display_timeline.length} visible item(s)`;
 
   $("summary").innerHTML = [
     card("Evidence found", evaluation.evidence_count ?? 0),
