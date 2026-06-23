@@ -24,7 +24,7 @@ from pm_sim.agents.llm import _instructions, llm_session_state, start_llm_sessio
 from pm_sim.agents.scripted import run_scripted_agent
 from pm_sim.cli import main as cli_main
 from pm_sim.conditions import condition_matches
-from pm_sim.coworkers import effects_for_event, replies_for_chat
+from pm_sim.coworkers import effects_for_event, replies_for_chat, replies_for_email
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
 from pm_sim.effects import apply_effects
@@ -925,9 +925,17 @@ class CoworkerRuleTests(unittest.TestCase):
     def setUp(self) -> None:
         scenario = load_scenario(DEFAULT_SCENARIO_PATH)
         self.rules = scenario.get("coworker_rules", [])
+        self.response_delays = {
+            person["id"]: person["response_delay_minutes"]
+            for person in scenario.get("people", [])
+        }
 
     def _state(self, facts: list[str] | None = None) -> dict[str, Any]:
-        return {"discovered_facts": facts or [], "coworker_rules": self.rules}
+        return {
+            "discovered_facts": facts or [],
+            "coworker_rules": self.rules,
+            "response_delays": self.response_delays,
+        }
 
     def test_luigi_reveals_repo_sync_risk_when_asked_about_blockers(self) -> None:
         replies = replies_for_chat(
@@ -946,6 +954,20 @@ class CoworkerRuleTests(unittest.TestCase):
         }
         self.assertIn("fact_repo_sync_stale", discovered_facts)
         self.assertIn("fact_draft_mode_limits_customer_visible_risk", discovered_facts)
+
+    def test_email_rules_return_email_channel_reply(self) -> None:
+        replies = replies_for_email(
+            "daisy",
+            "Nimbus customer wording",
+            "Please confirm you received the customer-ready wording.",
+            self._state(),
+        )
+
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(replies[0].channel, "email")
+        self.assertEqual(replies[0].subject, "Re: received")
+        self.assertIn("email as the source of truth", replies[0].body)
+        self.assertEqual(replies[0].effects, ())
 
     def test_luigi_repeat_risk_reply_does_not_duplicate_discovery_effects(self) -> None:
         replies = replies_for_chat(
@@ -971,7 +993,8 @@ class CoworkerRuleTests(unittest.TestCase):
 
     def test_rule_without_delay_uses_scenario_person_delay(self) -> None:
         rules = copy.deepcopy(self.rules)
-        del rules[0]["reply"]["delay_minutes"]
+        rule = next(rule for rule in rules if rule["id"] == "luigi_private_repo_security_doc")
+        del rule["reply"]["delay_minutes"]
 
         replies = replies_for_chat(
             "luigi",
@@ -1431,6 +1454,25 @@ class EffectApplicationTests(unittest.TestCase):
         self.assertTrue(result["delivered_events"][0]["result"]["handled"])
         self.assertEqual(state["recent_messages"][0]["sender_id"], "luigi")
         self.assertIn("fact_repo_sync_stale", {fact["id"] for fact in state["discovered_facts"]})
+
+    def test_email_coworker_reply_event_creates_email_message(self) -> None:
+        send_email(
+            self.db_path,
+            "daisy",
+            "Friday confidence",
+            "I am checking the launch risk and will follow up.",
+        )
+
+        result = advance_time(self.db_path, "until_next_event")
+        state = observe(self.db_path)
+        reply = state["recent_messages"][0]
+
+        self.assertEqual(result["delivered_events"][0]["event_type"], "coworker_reply")
+        self.assertTrue(result["delivered_events"][0]["result"]["handled"])
+        self.assertEqual(reply["channel"], "email")
+        self.assertEqual(reply["sender_id"], "daisy")
+        self.assertEqual(reply["recipient_id"], "agent")
+        self.assertEqual(reply["subject"], "Re: received")
 
     def test_meeting_event_creates_transcript_and_applies_coordination_effects(self) -> None:
         meeting = schedule_meeting(
@@ -1913,7 +1955,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
 
         self.assertEqual(reply_events[0]["scheduled_at"], "2026-06-24T09:15:00")
 
-    def test_send_email_records_message_without_scheduling_reply(self) -> None:
+    def test_send_email_records_message_and_schedules_coworker_reply(self) -> None:
         result = send_email(
             self.db_path,
             "daisy",
@@ -1921,6 +1963,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
             "I am checking the launch risk and will follow up.",
         )
         state = observe(self.db_path)
+        events = event_log(self.db_path, limit=20)
         conn = connect(self.db_path)
         try:
             evidence_count = conn.execute(
@@ -1939,6 +1982,13 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertEqual(observe(self.db_path)["current_time"], "2026-06-22T09:10:00")
         self.assertEqual(result["applied_effects"], [])
         self.assertEqual(evidence_count, 0)
+        self.assertEqual(len(result["scheduled_reply_ids"]), 1)
+        reply_events = [event for event in events if event["event_type"] == "coworker_reply"]
+        self.assertEqual(len(reply_events), 1)
+        self.assertEqual(reply_events[0]["scheduled_at"], "2026-06-22T09:45:00")
+        reply_payload = loads(reply_events[0]["payload_json"])
+        self.assertEqual(reply_payload["channel"], "email")
+        self.assertEqual(reply_payload["subject"], "Re: received")
         message = next(
             message for message in state["recent_messages"] if message["id"] == result["message_id"]
         )
@@ -3064,7 +3114,7 @@ class ScriptedAgentTests(unittest.TestCase):
         self.assertIn("Policy: scripted", output)
         self.assertIn("Score:  120 / 120", output)
         self.assertIn("Deadline: advanced to Fri 2026-06-26 15:00", output)
-        self.assertIn("events: project_deadline", output)
+        self.assertIn("project_deadline", output)
         self.assertIn("outcome: draft_mode_beta_shipped", output)
         self.assertIn("send_security_answer", output)
         self.assertIn("send_final_readiness_note", output)

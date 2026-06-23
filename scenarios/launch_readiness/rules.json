@@ -988,6 +988,54 @@
   ],
   "coworker_rules": [
     {
+      "id": "luigi_email_acknowledgement",
+      "person_id": "luigi",
+      "channel": "email",
+      "priority": 0,
+      "match": {},
+      "reply": {
+        "subject": "Re: received",
+        "body": "Received. If you need a technical decision, chat is faster; I will respond here when I have source-of-truth detail."
+      },
+      "effects": []
+    },
+    {
+      "id": "toad_email_acknowledgement",
+      "person_id": "toad",
+      "channel": "email",
+      "priority": 0,
+      "match": {},
+      "reply": {
+        "subject": "Re: received",
+        "body": "Received. For approvals, make sure the risk, customer impact, and recommended scope are explicit."
+      },
+      "effects": []
+    },
+    {
+      "id": "daisy_email_acknowledgement",
+      "person_id": "daisy",
+      "channel": "email",
+      "priority": 0,
+      "match": {},
+      "reply": {
+        "subject": "Re: received",
+        "body": "Received. I will use email as the source of truth for customer-ready wording."
+      },
+      "effects": []
+    },
+    {
+      "id": "peach_email_acknowledgement",
+      "person_id": "peach",
+      "channel": "email",
+      "priority": 0,
+      "match": {},
+      "reply": {
+        "subject": "Re: received",
+        "body": "Received. I still need launch scope to be explicit before I treat onboarding as unblocked."
+      },
+      "effects": []
+    },
+    {
       "id": "luigi_audit_export_feasibility",
       "person_id": "luigi",
       "channel": "chat",

@@ -5,7 +5,7 @@ from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 
-from .coworkers import CoworkerReply, replies_for_chat
+from .coworkers import CoworkerReply, replies_for_chat, replies_for_email
 from .db import connect, row_to_dict, rows_to_dicts
 from .effects import apply_effects
 from .conditions import all_conditions_match
@@ -279,6 +279,10 @@ def send_email(
             """,
             (message_id, AGENT_ID, person_id, subject, body, current_time),
         )
+        replies = replies_for_email(person_id, subject, body, _behavior_state(conn), conn=conn)
+        scheduled_reply_ids = [
+            _schedule_coworker_reply(conn, reply, current_time) for reply in replies
+        ]
         action_context = {
             "recipient_id": person_id,
             "person_id": person_id,
@@ -312,6 +316,7 @@ def send_email(
             },
             result={
                 "message_id": message_id,
+                "scheduled_reply_ids": scheduled_reply_ids,
                 "applied_effects": applied_effects,
                 "semantic_matches": action_context.get("semantic_matches", []),
                 "time_cost": time_cost,
@@ -322,6 +327,7 @@ def send_email(
         return {
             "ok": True,
             "message_id": message_id,
+            "scheduled_reply_ids": scheduled_reply_ids,
             "applied_effects": applied_effects,
             "semantic_matches": action_context.get("semantic_matches", []),
             "time_cost": time_cost,
@@ -521,6 +527,8 @@ def _schedule_coworker_reply(
             dumps(
                 {
                     "person_id": reply.person_id,
+                    "channel": reply.channel,
+                    "subject": reply.subject,
                     "body": reply.body,
                     "effects": list(reply.effects),
                 }

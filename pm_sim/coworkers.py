@@ -16,6 +16,8 @@ class CoworkerReply:
     person_id: str
     delay_minutes: int
     body: str
+    channel: str = "chat"
+    subject: str | None = None
     effects: tuple[Effect, ...] = ()
 
 
@@ -25,15 +27,44 @@ def replies_for_chat(
     state: dict[str, Any] | None = None,
     conn: sqlite3.Connection | None = None,
 ) -> list[CoworkerReply]:
+    return replies_for_message(person_id, "chat", None, body, state, conn)
+
+
+def replies_for_email(
+    person_id: str,
+    subject: str,
+    body: str,
+    state: dict[str, Any] | None = None,
+    conn: sqlite3.Connection | None = None,
+) -> list[CoworkerReply]:
+    return replies_for_message(person_id, "email", subject, body, state, conn)
+
+
+def replies_for_message(
+    person_id: str,
+    channel: str,
+    subject: str | None,
+    body: str,
+    state: dict[str, Any] | None = None,
+    conn: sqlite3.Connection | None = None,
+) -> list[CoworkerReply]:
     person_id = person_id.lower()
-    normalized = _normalize(body)
+    channel = channel.lower()
+    normalized = _normalize(f"{subject or ''} {body}")
     state = state or {}
-    structured_replies = _structured_replies_for_chat(person_id, normalized, state, conn)
+    structured_replies = _structured_replies_for_channel(
+        person_id,
+        channel,
+        normalized,
+        state,
+        conn,
+    )
     return structured_replies[:1]
 
 
-def _structured_replies_for_chat(
+def _structured_replies_for_channel(
     person_id: str,
+    channel: str,
     normalized: str,
     state: dict[str, Any],
     conn: sqlite3.Connection | None = None,
@@ -45,7 +76,7 @@ def _structured_replies_for_chat(
         reverse=True,
     )
     for rule in rules:
-        if rule.get("channel", "chat") != "chat":
+        if rule.get("channel", "chat") != channel:
             continue
         if rule.get("person_id", "").lower() != person_id:
             continue
@@ -62,6 +93,8 @@ def _structured_replies_for_chat(
                 person_id=person_id,
                 delay_minutes=_reply_delay_minutes(person_id, reply, state),
                 body=reply.get("body", ""),
+                channel=channel,
+                subject=reply.get("subject"),
                 effects=tuple(dict(effect) for effect in rule.get("effects", [])),
             )
         )
