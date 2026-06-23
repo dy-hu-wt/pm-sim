@@ -84,7 +84,7 @@ def semantic_match(
 
     mode = os.environ.get("PM_SIM_SEMANTIC_MATCHER", "deterministic").lower()
     if mode == "llm":
-        result = _llm_match(text, criteria)
+        result = _safe_llm_match(text, criteria)
     else:
         result = _deterministic_match(text, criteria)
 
@@ -139,6 +139,7 @@ def _llm_match(text: str, criteria: dict[str, Any]) -> dict[str, Any]:
             {"role": "user", "content": json.dumps(prompt, sort_keys=True)},
         ],
         temperature=0,
+        text={"format": {"type": "json_object"}},
     )
     content = getattr(response, "output_text", "")
     parsed = json.loads(content)
@@ -149,6 +150,19 @@ def _llm_match(text: str, criteria: dict[str, Any]) -> dict[str, Any]:
         "required": parsed.get("required", []),
         "forbidden": parsed.get("forbidden", []),
     }
+
+
+def _safe_llm_match(text: str, criteria: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return _llm_match(text, criteria)
+    except Exception as exc:
+        return {
+            "matches": False,
+            "mode": "llm",
+            "error": f"{type(exc).__name__}: {exc}",
+            "required": [],
+            "forbidden": [],
+        }
 
 
 def _criteria_items(items: Any) -> list[dict[str, Any]]:

@@ -6,6 +6,7 @@ import io
 import json
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -32,6 +33,7 @@ from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
 from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
+from pm_sim import semantic_match as semantic_match_module
 from pm_sim.state import action_log, event_log, observe, reset
 from pm_sim.time import advance_time
 from pm_sim.timeline import timeline
@@ -1237,6 +1239,37 @@ class EffectApplicationTests(unittest.TestCase):
                 )
             )
         finally:
+            conn.close()
+
+    def test_llm_semantic_match_failure_fails_closed(self) -> None:
+        original = semantic_match_module._llm_match
+        semantic_match_module._llm_match = lambda text, criteria: (_ for _ in ()).throw(
+            json.JSONDecodeError("Expecting value", "", 0)
+        )
+        conn = connect(self.db_path)
+        try:
+            with unittest.mock.patch.dict(
+                "os.environ",
+                {"PM_SIM_SEMANTIC_MATCHER": "llm", "OPENAI_API_KEY": "test-key"},
+                clear=False,
+            ):
+                result = semantic_match_module.semantic_match(
+                    conn,
+                    text="Draft mode with human approval.",
+                    criteria={"required": ["Draft mode with human approval."]},
+                    rule_id="test_rule",
+                )
+            conn.commit()
+            cached = conn.execute(
+                "SELECT value FROM sim_state WHERE key = 'semantic_match_cache_json'"
+            ).fetchone()
+
+            self.assertFalse(result["matches"])
+            self.assertEqual(result["mode"], "llm")
+            self.assertIn("JSONDecodeError", result["error"])
+            self.assertIsNotNone(cached)
+        finally:
+            semantic_match_module._llm_match = original
             conn.close()
 
     def test_duplicate_evaluation_evidence_is_idempotent(self) -> None:
