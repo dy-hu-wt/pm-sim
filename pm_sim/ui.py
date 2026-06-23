@@ -661,6 +661,13 @@ th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacin
 .score-points { font-size:12px; color:var(--muted); font-weight:800; }
 .score-note { font-size:13px; color:var(--muted); }
 .score-missing { font-size:12px; color:var(--bad); }
+.evidence-list { display:grid; gap:8px; margin-top:2px; }
+.evidence-item { border:1px solid var(--line); border-radius:8px; padding:9px; background:#fbfcfe; display:grid; gap:5px; }
+.evidence-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.evidence-key { font-size:12px; font-weight:850; color:var(--ink); overflow-wrap:anywhere; }
+.evidence-note { font-size:12px; color:var(--ink); }
+.evidence-meta { font-size:11px; color:var(--muted); overflow-wrap:anywhere; }
+.evidence-empty { font-size:12px; color:var(--muted); font-style:italic; }
 .schedule-grid { padding:14px; display:grid; gap:8px; }
 .schedule-card { border:1px solid var(--line); border-left:4px solid var(--purple); border-radius:10px; padding:10px 12px; background:#fff; display:grid; gap:4px; }
 .schedule-top { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
@@ -894,6 +901,7 @@ function blockerGroups(blockers) {
 
 function evaluationCard(component) {
   const missing = component.missing_evidence || [];
+  const evidence = component.evidence || [];
   return `
     <div class="score-card">
       <div class="score-top">
@@ -903,6 +911,22 @@ function evaluationCard(component) {
       <div><span class="badge ${statusClass(component.status)}">${esc(label(component.status || ""))}</span></div>
       <div class="score-note">${esc(component.note || "")}</div>
       ${missing.length ? `<div class="score-missing">Missing: ${esc(missing.join(", "))}</div>` : ""}
+      <div class="evidence-list">
+        ${evidence.length ? evidence.map(evidenceItem).join("") : `<div class="evidence-empty">No causal evidence recorded for this component yet.</div>`}
+      </div>
+    </div>
+  `;
+}
+
+function evidenceItem(item) {
+  return `
+    <div class="evidence-item">
+      <div class="evidence-head">
+        <div class="evidence-key">${esc(item.key || "")}</div>
+        ${item.timing ? `<span class="badge ${statusClass(item.timing)}">${esc(label(item.timing))}</span>` : ""}
+      </div>
+      <div class="evidence-note">${esc(item.note || "")}</div>
+      <div class="evidence-meta">${esc(pretty(item.created_at))} · Source: ${esc(item.source || "")}</div>
     </div>
   `;
 }

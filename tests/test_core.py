@@ -37,7 +37,7 @@ from pm_sim import semantic_match as semantic_match_module
 from pm_sim.state import action_log, event_log, observe, reset
 from pm_sim.time import advance_time
 from pm_sim.timeline import timeline
-from pm_sim.ui import _run_next_ui_step, _scripted_demo_state, _state_payload
+from pm_sim.ui import _html, _run_next_ui_step, _scripted_demo_state, _state_payload
 
 
 class ScenarioValidationTests(unittest.TestCase):
@@ -846,6 +846,27 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertTrue(any("(+15m)" in line for line in log_lines))
         self.assertTrue(any("agent-prefix" in entry["html"] for entry in log_entries))
         self.assertTrue(any("agent-tool-read" in entry["html"] for entry in log_entries))
+
+    def test_live_ui_inspector_renders_causal_evidence_hooks(self) -> None:
+        send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
+        advance_time(self.db_path, "until_next_event")
+
+        payload = _state_payload(self.db_path, DEFAULT_SCENARIO_PATH, timeline_limit=20)
+        blocker_component = next(
+            component
+            for component in payload["evaluation"]["components"]
+            if component["key"] == "blocker_discovery"
+        )
+        evidence = blocker_component["evidence"][0]
+        html = _html()
+
+        self.assertEqual(evidence["key"], "blocker_discovered")
+        self.assertIn("created_at", evidence)
+        self.assertIn("source", evidence)
+        self.assertIn("note", evidence)
+        self.assertIn("evidence-list", html)
+        self.assertIn("evidenceItem", html)
+        self.assertIn("Source:", html)
 
     def test_live_ui_can_step_llm_policy(self) -> None:
         client = _FakeResponsesClient(
