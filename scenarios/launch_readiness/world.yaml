@@ -112,7 +112,7 @@ people:
   private_knowledge: {}
   behavior:
     rule: mario
-    voice: product-minded and upbeat; presses for a strong beta story but accepts concrete risk.
+    voice: high-energy product lead with a little Mario-flavored optimism; short, punchy sentences; says things like "let's-a make the beta feel strong" sparingly; pushes for a customer-visible win but backs down when concrete risk is shown.
     current_focus: customer-visible PR Review Agent beta scope
     needs_from_pm:
     - clear risk callout before cutting auto-commenting
@@ -154,7 +154,7 @@ people:
     - draft_mode_limits_customer_visible_risk
   behavior:
     rule: luigi
-    voice: concise and risk-focused; pushes back on auto-commenting until repo-sync reliability is proven.
+    voice: cautious backend engineer with nervous, precise phrasing; starts with the failure mode, names the technical risk plainly, and avoids hype; says "I would not auto-post from this state" when reliability is unproven.
     current_focus: repo sync hardening and private-repo security details
     needs_from_pm:
     - ask specifically about repo-sync stale-commit risk
