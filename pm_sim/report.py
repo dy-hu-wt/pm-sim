@@ -125,7 +125,7 @@ def _render_html(data: dict[str, Any]) -> str:
             f'<div class="hero-score">{_h(score)}<span>score</span></div>',
             "</header>",
             _summary_cards(evaluation, final_outcome),
-            _section("Playback", _playback(data.get("timeline", []))),
+            _section("Calendar Playback", _calendar_playback(data.get("timeline", []), scenario)),
             '<div id="overview" class="dashboard-grid">',
             _section("Projects", _projects(observation.get("projects", []))),
             _section("Calendar Obligations", _obligations(observation.get("calendar_obligations", []))),
@@ -134,7 +134,6 @@ def _render_html(data: dict[str, Any]) -> str:
             _section("Known Blockers", _blockers(observation.get("known_blockers", []))),
             _section("Evaluation", _evaluation(evaluation)),
             "</div>",
-            _section("Timeline", _week_calendar(data.get("timeline", []), scenario)),
             _section("Tasks", _tasks(data.get("tasks", []))),
             _section("Recent Messages", _messages(observation.get("recent_messages", []))),
             _section("Visible Docs", _docs(data.get("docs", []))),
@@ -249,11 +248,17 @@ p { margin: 0 0 8px; }
   gap: 14px;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
 }
+.replay-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, .9fr);
+  gap: 14px;
+  padding: 14px;
+  align-items: start;
+}
 .week-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
-  padding: 14px;
   overflow-x: auto;
 }
 .day-column {
@@ -277,6 +282,12 @@ p { margin: 0 0 8px; }
   border-left: 4px solid var(--blue);
   border-radius: 8px;
   background: #ffffff;
+}
+.calendar-card.visible { display: block; }
+.calendar-card:not(.visible) { display: none; }
+.calendar-card.current {
+  outline: 2px solid rgba(37, 92, 153, .24);
+  background: #f2f7ff;
 }
 .calendar-card.event { border-left-color: var(--purple); }
 .calendar-card.evidence { border-left-color: var(--good); }
@@ -314,6 +325,10 @@ p { margin: 0 0 8px; }
 }
 .playback-item.visible { display: block; }
 .playback-item.event { border-left-color: var(--purple); }
+.playback-item.current {
+  outline: 2px solid rgba(37, 92, 153, .24);
+  background: #f2f7ff;
+}
 .playback-item .meta { color: var(--muted); font-size: 12px; font-weight: 800; }
 .playback-item .title { font-weight: 850; margin-top: 2px; }
 .playback-item .detail { color: var(--muted); margin-top: 3px; }
@@ -388,6 +403,7 @@ tbody tr:hover { background: #f9fbff; }
   .nav-links { margin-top: 10px; }
   .hero { display: block; }
   .hero-score { text-align: left; margin-top: 14px; }
+  .replay-grid { grid-template-columns: 1fr; }
   .week-grid { grid-template-columns: 1fr; }
 }
 """.strip()
@@ -515,6 +531,15 @@ def _evaluation(evaluation: dict[str, Any]) -> str:
     return _table(["Component", "Score", "Status", "Note"], rows, raw_columns={2})
 
 
+def _calendar_playback(entries: list[dict[str, Any]], scenario: dict[str, Any]) -> str:
+    return (
+        '<div class="replay-grid">'
+        + _week_calendar(entries, scenario)
+        + _playback(entries)
+        + "</div>"
+    )
+
+
 def _playback(entries: list[dict[str, Any]]) -> str:
     playback_entries = _playback_entries(entries)
     if not playback_entries:
@@ -547,13 +572,10 @@ def _playback(entries: list[dict[str, Any]]) -> str:
 def _week_calendar(entries: list[dict[str, Any]], scenario: dict[str, Any]) -> str:
     days = _timeline_days(entries, scenario)
     grouped = {day: [] for day in days}
-    for entry in entries:
-        card = _calendar_card(entry)
-        if card is None:
-            continue
+    for index, entry in enumerate(_playback_entries(entries)):
         day = str(entry.get("time", ""))[:10]
         if day in grouped:
-            grouped[day].append(card)
+            grouped[day].append(_calendar_card(entry, index))
 
     columns = []
     for day in days:
@@ -600,16 +622,12 @@ def _day_label(day: str) -> str:
         return day
 
 
-def _calendar_card(entry: dict[str, Any]) -> str | None:
-    display = _display_timeline_entry(entry)
-    if display is None:
-        return None
-
+def _calendar_card(entry: dict[str, str], index: int) -> str:
     return (
-        f'<div class="calendar-card {_h(display["kind"])}">'
+        f'<div class="calendar-card {_h(entry["kind"])}" data-step="{index}">'
         f'<div class="calendar-time">{_h(_time_only(entry.get("time")))}</div>'
-        f'<div class="calendar-title">{_h(display["title"])}</div>'
-        f'<div class="calendar-detail">{_h(display["detail"])}</div>'
+        f'<div class="calendar-title">{_h(entry["title"])}</div>'
+        f'<div class="calendar-detail">{_h(entry["detail"])}</div>'
         "</div>"
     )
 
@@ -623,6 +641,7 @@ def _playback_entries(entries: list[dict[str, Any]]) -> list[dict[str, str]]:
         rows.append(
             {
                 **display,
+                "time": str(entry.get("time") or ""),
                 "time_label": f"{str(entry.get('time', ''))[:10]} {_time_only(entry.get('time'))}".strip(),
             }
         )
@@ -786,6 +805,12 @@ def _script(entries: list[dict[str, Any]]) -> str:
   function render() {
     items.forEach((item, itemIndex) => {
       item.classList.toggle("visible", itemIndex < index);
+      item.classList.toggle("current", itemIndex === index - 1);
+    });
+    document.querySelectorAll(".calendar-card").forEach((item) => {
+      const itemIndex = Number(item.dataset.step);
+      item.classList.toggle("visible", itemIndex < index);
+      item.classList.toggle("current", itemIndex === index - 1);
     });
     if (meter) meter.textContent = `${index} / ${items.length}`;
     const latest = items[Math.max(0, index - 1)];

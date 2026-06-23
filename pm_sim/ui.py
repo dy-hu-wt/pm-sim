@@ -128,6 +128,11 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
     entries = timeline(db_path, limit=0)
     if timeline_limit > 0:
         entries = entries[-timeline_limit:]
+    display_timeline = []
+    for entry in entries:
+        display = _display_entry(entry)
+        if display:
+            display_timeline.append(display)
     return {
         "scenario": {
             "id": scenario.get("id"),
@@ -139,7 +144,7 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
         "evaluation": evaluate(db_path, scenario_path),
         "tasks": list_tasks(db_path),
         "timeline": entries,
-        "display_timeline": [_display_entry(entry) for entry in entries if _display_entry(entry)],
+        "display_timeline": display_timeline,
     }
 
 
@@ -216,11 +221,11 @@ def _html() -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PM Sim UI</title>
 <style>
-:root { --bg:#f4f6f8; --panel:#fff; --ink:#17202a; --muted:#637083; --line:#d9dee7; --blue:#255c99; --purple:#6f4bb2; --good:#0f7b4f; --warn:#9a5b00; --bad:#aa2f2f; --shadow:0 16px 40px rgba(24,35,52,.08); }
+:root { --bg:#eef2f6; --panel:#fff; --ink:#17202a; --muted:#637083; --line:#d9dee7; --line-strong:#c4cdd9; --blue:#255c99; --purple:#6f4bb2; --good:#0f7b4f; --warn:#9a5b00; --bad:#aa2f2f; --shadow:0 18px 44px rgba(24,35,52,.10); }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
 main { max-width:1280px; margin:0 auto; padding:24px; }
-.top { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; gap:16px; align-items:center; margin-bottom:16px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.95); box-shadow:var(--shadow); }
+.top { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; gap:16px; align-items:center; margin-bottom:16px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.96); box-shadow:var(--shadow); backdrop-filter:blur(10px); }
 .brand strong { display:block; font-size:16px; }
 .brand span { color:var(--muted); font-size:12px; }
 .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
@@ -228,7 +233,7 @@ button { border:1px solid var(--line); border-radius:8px; padding:8px 12px; back
 button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
 .meter { color:var(--muted); font-weight:800; }
 .hero, section, .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); }
-.hero { display:flex; justify-content:space-between; gap:16px; align-items:flex-end; padding:22px; margin-bottom:14px; }
+.hero { display:flex; justify-content:space-between; gap:16px; align-items:flex-end; padding:22px; margin-bottom:14px; background:linear-gradient(135deg,#ffffff 0%,#edf5ff 100%); }
 .eyebrow { color:var(--blue); text-transform:uppercase; font-size:12px; font-weight:800; letter-spacing:.08em; margin:0 0 4px; }
 h1 { margin:0 0 6px; font-size:30px; letter-spacing:0; }
 h2 { margin:0; font-size:17px; }
@@ -241,9 +246,19 @@ p { margin:0 0 8px; }
 .value { font-size:20px; font-weight:850; margin-top:4px; }
 section { margin:14px 0; overflow:hidden; }
 .section-head { padding:13px 15px; border-bottom:1px solid var(--line); background:#fbfcfe; }
-.playback { padding:14px; display:grid; gap:8px; max-height:420px; overflow:auto; }
+.replay { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(320px,.9fr); gap:12px; padding:14px; align-items:start; }
+.calendar-board { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; }
+.day { min-height:180px; border:1px solid var(--line); border-radius:10px; background:#f8fafc; overflow:hidden; }
+.day-head { padding:9px 10px; border-bottom:1px solid var(--line); background:#fff; }
+.day-head strong { display:block; }
+.day-head span { color:var(--muted); font-size:12px; }
+.calendar-event { margin:8px; padding:8px; border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:8px; background:#fff; }
+.calendar-event.event { border-left-color:var(--purple); }
+.calendar-event.current { outline:2px solid rgba(37,92,153,.24); background:#f2f7ff; }
+.playback { display:grid; gap:8px; max-height:520px; overflow:auto; padding-right:4px; }
 .item { border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:8px; background:#fff; padding:10px; }
 .item.event { border-left-color:var(--purple); }
+.item.current { outline:2px solid rgba(37,92,153,.24); background:#f2f7ff; }
 .item .time { color:var(--muted); font-size:12px; font-weight:850; }
 .item .title { font-weight:850; margin-top:2px; }
 .item .detail { color:var(--muted); margin-top:2px; }
@@ -253,6 +268,7 @@ section { margin:14px 0; overflow:hidden; }
 .badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:800; background:#eef2f7; }
 .good { color:var(--good); } .warn { color:var(--warn); } .bad { color:var(--bad); }
 .empty { color:var(--muted); font-style:italic; padding:14px; }
+@media (max-width:900px) { .replay { grid-template-columns:1fr; } }
 @media (max-width:800px) { .top,.hero { display:block; } .controls { margin-top:10px; } .score { text-align:left; margin-top:12px; } }
 </style>
 </head>
@@ -278,13 +294,16 @@ section { margin:14px 0; overflow:hidden; }
     <div class="score"><span id="score">-</span><span>score</span></div>
   </header>
   <section id="playback-section">
-    <div class="section-head"><h2>Live Playback</h2></div>
-    <div class="playback" id="playback"></div>
+    <div class="section-head"><h2>Calendar Playback</h2></div>
+    <div class="replay">
+      <div class="calendar-board" id="calendar-board"></div>
+      <div class="playback" id="playback"></div>
+    </div>
   </section>
   <div class="grid" id="summary"></div>
   <div class="columns">
     <section><div class="section-head"><h2>Projects</h2></div><div class="list" id="projects"></div></section>
-    <section><div class="section-head"><h2>Calendar</h2></div><div class="list" id="calendar"></div></section>
+    <section><div class="section-head"><h2>Calendar Obligations</h2></div><div class="list" id="calendar"></div></section>
   </div>
   <div class="columns">
     <section><div class="section-head"><h2>Evaluation</h2></div><div class="list" id="evaluation"></div></section>
@@ -311,6 +330,18 @@ const statusClass = (value) => {
   return "";
 };
 const label = (value) => String(value ?? "").replace(/^(doc|task|fact|blocker|project|event)_/, "").replaceAll("_", " ").replaceAll("-", " ").replace(/^./, c => c.toUpperCase());
+const dateKey = (value) => String(value || "").slice(0, 10);
+const timeOnly = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
+};
+const dayLabel = (value) => {
+  const d = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString([], { weekday:"short" });
+};
 
 async function api(path, options = {}) {
   const response = await fetch(path, options);
@@ -324,6 +355,26 @@ function card(labelText, value) {
 
 function row(title, detail, meta = "") {
   return `<div class="row"><strong>${esc(title)}</strong>${meta ? ` <span class="badge ${statusClass(meta)}">${esc(label(meta))}</span>` : ""}<div>${esc(detail)}</div></div>`;
+}
+
+function renderReplay(items) {
+  const latest = items.length - 1;
+  $("playback").innerHTML = items.length
+    ? items.map((item, index) => `<div class="item ${esc(item.kind)} ${index === latest ? "current" : ""}"><div class="time">${esc(pretty(item.time))}</div><div class="title">${esc(item.title)}</div><div class="detail">${esc(item.detail)}</div></div>`).join("")
+    : `<div class="empty">No visible activity yet.</div>`;
+  $("playback").lastElementChild?.scrollIntoView({ block: "nearest" });
+
+  const days = [...new Set(items.map(item => dateKey(item.time)).filter(Boolean))];
+  $("calendar-board").innerHTML = days.length
+    ? days.map(day => {
+        const cards = items
+          .map((item, index) => ({ item, index }))
+          .filter(row => dateKey(row.item.time) === day)
+          .map(row => `<div class="calendar-event ${esc(row.item.kind)} ${row.index === latest ? "current" : ""}"><div class="time">${esc(timeOnly(row.item.time))}</div><div class="title">${esc(row.item.title)}</div><div class="detail">${esc(row.item.detail)}</div></div>`)
+          .join("");
+        return `<div class="day"><div class="day-head"><strong>${esc(dayLabel(day))}</strong><span>${esc(day)}</span></div>${cards || `<div class="empty">No visible activity.</div>`}</div>`;
+      }).join("")
+    : `<div class="empty">No calendar activity yet.</div>`;
 }
 
 function render(state) {
@@ -342,10 +393,7 @@ function render(state) {
     card("Status", evaluation.score === evaluation.max_score ? "passed" : "incomplete")
   ].join("");
 
-  $("playback").innerHTML = state.display_timeline.length
-    ? state.display_timeline.map(item => `<div class="item ${esc(item.kind)}"><div class="time">${esc(pretty(item.time))}</div><div class="title">${esc(item.title)}</div><div class="detail">${esc(item.detail)}</div></div>`).join("")
-    : `<div class="empty">No visible activity yet.</div>`;
-  $("playback").lastElementChild?.scrollIntoView({ block: "nearest" });
+  renderReplay(state.display_timeline || []);
 
   $("projects").innerHTML = (obs.projects || []).map(project => row(project.name, `${project.stakeholder_pressure || ""} Deadline: ${pretty(project.deadline)}`, project.status)).join("") || `<div class="empty">No projects.</div>`;
   $("calendar").innerHTML = (obs.calendar_obligations || []).map(item => row(item.title, pretty(item.start_at), item.kind)).join("") || `<div class="empty">No visible obligations.</div>`;
