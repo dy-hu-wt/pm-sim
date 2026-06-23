@@ -48,9 +48,9 @@ def scenario_graph(scenario_path: Path | str = DEFAULT_SCENARIO_PATH) -> dict[st
         nodes.append({"id": blocker["id"], "type": "blocker", "label": blocker["title"]})
         edges.append({"from": blocker["project_id"], "to": blocker["id"], "type": "has_blocker"})
 
-    for rule in scenario.get("grading_rules", []):
-        rule_id = f"grading:{rule['id']}"
-        nodes.append({"id": rule_id, "type": "grading_rule", "label": rule["id"]})
+    for rule in scenario.get("action_checks", []):
+        rule_id = f"action_check:{rule['id']}"
+        nodes.append({"id": rule_id, "type": "action_check", "label": rule["id"]})
         for ref in _condition_refs(rule.get("requires", [])):
             edges.append({"from": ref, "to": rule_id, "type": "requires"})
         state = rule.get("state", {})
@@ -86,7 +86,7 @@ def _scenario_counts(scenario: dict[str, Any]) -> dict[str, int]:
         "docs": len(scenario.get("docs", [])),
         "events": len(scenario.get("events", [])),
         "actor_behaviors": len(scenario.get("actor_behaviors", [])),
-        "grading_rules": len(scenario.get("grading_rules", [])),
+        "action_checks": len(scenario.get("action_checks", [])),
         "score_components": len(scenario.get("score_components", {})),
     }
 
@@ -116,9 +116,9 @@ def _lint_warnings(scenario: dict[str, Any]) -> list[str]:
 
 def _score_links(scenario: dict[str, Any]) -> list[dict[str, Any]]:
     links = []
-    grading_by_milestone = {
+    action_check_by_milestone = {
         (rule.get("milestone") or {}).get("key"): rule.get("id")
-        for rule in scenario.get("grading_rules", [])
+        for rule in scenario.get("action_checks", [])
     }
     for component_id, component in scenario.get("score_components", {}).items():
         for milestone_id in component.get("milestones", []):
@@ -126,7 +126,7 @@ def _score_links(scenario: dict[str, Any]) -> list[dict[str, Any]]:
                 {
                     "component": component_id,
                     "milestone": milestone_id,
-                    "grading_rule": grading_by_milestone.get(milestone_id),
+                    "action_check": action_check_by_milestone.get(milestone_id),
                 }
             )
     return links

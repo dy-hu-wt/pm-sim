@@ -11,9 +11,8 @@ agent_brief:
   - customer-facing asks have grounded answers
   - launch scope and ownership are recorded in durable state
   - no visible calendar obligations remain before the deadline
-grading_rules:
+action_checks:
 - id: customer_message_ready
-  template: grounded_communication
   priority: 90
   requires:
   - fact_discovered: repo_sync_stale
@@ -94,7 +93,6 @@ grading_rules:
     key: customer_message_ready
     note: Daisy has received grounded customer-ready Nimbus beta wording.
 - id: security_question_answered
-  template: grounded_communication
   priority: 80
   requires:
   - message_exists:
@@ -164,7 +162,6 @@ grading_rules:
     key: security_question_answered
     note: Daisy has received a doc-backed answer on private repo source handling and beta retention limits.
 - id: koopa_update_sent
-  template: grounded_communication
   priority: 70
   requires:
   - fact_discovered: audit_log_one_time_export_feasible
@@ -225,7 +222,6 @@ grading_rules:
     key: koopa_update_sent
     note: 'Daisy has received a scoped Koopa update: one-time CSV for review, self-serve export as follow-up.'
 - id: final_readiness_confirmed_email
-  template: grounded_communication
   priority: 65
   requires:
   - message_exists:
@@ -337,7 +333,6 @@ grading_rules:
     key: final_readiness_confirmed
     note: Daisy has received the Thursday final readiness note tying together launch mode, security wording, and Koopa scope.
 - id: final_readiness_confirmed_chat
-  template: grounded_communication
   priority: 65
   requires:
   - message_exists:

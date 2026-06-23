@@ -281,9 +281,9 @@ def _failed_gates_for_missing_milestones(
         for rule in scenario.get("milestone_rules", [])
         if isinstance(rule, dict)
     }
-    grading_rules = {
+    action_checks = {
         (rule.get("milestone") or {}).get("key"): rule
-        for rule in scenario.get("grading_rules", [])
+        for rule in scenario.get("action_checks", [])
         if isinstance(rule, dict)
     }
     for milestone_id in missing_keys:
@@ -298,11 +298,11 @@ def _failed_gates_for_missing_milestones(
                 )
             )
 
-        grading_rule = grading_rules.get(milestone_id)
-        if grading_rule:
+        action_check = action_checks.get(milestone_id)
+        if action_check:
             failed_requires = failed_condition_descriptions(
                 conn,
-                grading_rule.get("requires", []),
+                action_check.get("requires", []),
                 prefix="action prerequisite",
             )
             if failed_requires:

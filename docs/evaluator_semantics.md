@@ -13,7 +13,7 @@ agent action
   -> component score
 ```
 
-This is why a plausible message sent too early does not score. If the PM has not discovered the blocker or secured the approval, the communication rule's `requires` conditions fail and no scoring state changes.
+This is why a plausible message sent too early does not score. If the PM has not discovered the blocker or secured the approval, the matching `action_check.requires` conditions fail and no scoring state changes.
 
 ## Source Of Truth
 
@@ -25,6 +25,8 @@ Scored milestones should be represented as state:
 - task/blocker status when it reflects a real gate
 
 The evaluator derives scored milestones from `milestone_rules`. Direct `record_milestone` effects are rejected for scored keys by scenario validation.
+
+`action_checks` are the authoring shortcut for grounded actions. They compile into action matching, evidence promotion, and milestone derivation rules, so scenario authors do not have to repeat that boilerplate for every scored email or document update.
 
 ## Concept Matching
 

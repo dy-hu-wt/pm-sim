@@ -756,7 +756,7 @@ def _format_lint_scenario(value: dict[str, Any]) -> str:
     links = value.get("score_links") or []
     lines.extend(["", "Score Links"])
     for link in links:
-        suffix = f" via {link['grading_rule']}" if link.get("grading_rule") else ""
+        suffix = f" via {link['action_check']}" if link.get("action_check") else ""
         lines.append(f"  - {link['component']} <- {link['milestone']}{suffix}")
     return "\n".join(lines)
 

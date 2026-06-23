@@ -518,7 +518,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
                 """
                 SELECT key, status
                 FROM action_evidence
-                WHERE key = 'grading_customer_message_ready'
+                WHERE key = 'check_customer_message_ready'
                 """
             ).fetchone()
         finally:
@@ -541,7 +541,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         )
         self.assertTrue(result["concept_matches"])
         self.assertIn(
-            "grading_customer_message_ready_action",
+            "check_customer_message_ready_action",
             {match["rule_id"] for match in result["concept_matches"]},
         )
         self.assertEqual(action_evidence["status"], "promoted")

@@ -111,6 +111,12 @@ Do not award points directly from raw text.
 
 `evaluation.yaml` should describe what good PM work changes in the world.
 
+Use three author-facing primitives:
+
+- `action_checks`: validates a meaningful agent action, usually a message or doc update, after its causal prerequisites are true. If the action wording matches, it records pending action evidence and mutates durable state.
+- `milestone_rules`: derives scored milestones from durable state. These are the bridge from world state to score.
+- `score_components`: assigns points to milestones and penalties.
+
 Prefer scoring these things:
 
 - blocker discovered

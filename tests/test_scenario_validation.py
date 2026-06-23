@@ -150,7 +150,7 @@ class ScenarioValidationTests(unittest.TestCase):
 
     def test_invalid_action_match_intent_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.author_base)
-        scenario["grading_rules"][0]["action"]["match"] = {
+        scenario["action_checks"][0]["action"]["match"] = {
             "mode": "concept_match",
             "intents": [{"id": "missing_description"}],
             "require_all": ["missing_description"],
@@ -161,14 +161,14 @@ class ScenarioValidationTests(unittest.TestCase):
 
     def test_empty_concept_match_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.author_base)
-        scenario["grading_rules"][0]["action"]["match"] = {"mode": "concept_match"}
+        scenario["action_checks"][0]["action"]["match"] = {"mode": "concept_match"}
 
         with self.assertRaisesRegex(ScenarioError, "requires required_concepts or forbidden_concepts"):
             load_scenario(self._write_scenario(scenario))
 
     def test_duplicate_concept_id_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.author_base)
-        concepts = scenario["grading_rules"][0]["action"]["match"]["required_concepts"]
+        concepts = scenario["action_checks"][0]["action"]["match"]["required_concepts"]
         concepts[1]["id"] = concepts[0]["id"]
 
         with self.assertRaisesRegex(ScenarioError, "duplicate concept id"):
@@ -176,7 +176,7 @@ class ScenarioValidationTests(unittest.TestCase):
 
     def test_overlapping_required_and_forbidden_concept_id_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.author_base)
-        match = scenario["grading_rules"][0]["action"]["match"]
+        match = scenario["action_checks"][0]["action"]["match"]
         match["forbidden_concepts"][0]["id"] = match["required_concepts"][0]["id"]
 
         with self.assertRaisesRegex(ScenarioError, "cannot appear in both required and forbidden"):
@@ -184,7 +184,7 @@ class ScenarioValidationTests(unittest.TestCase):
 
     def test_concept_without_description_raises_scenario_error(self) -> None:
         scenario = copy.deepcopy(self.author_base)
-        del scenario["grading_rules"][0]["action"]["match"]["required_concepts"][0]["description"]
+        del scenario["action_checks"][0]["action"]["match"]["required_concepts"][0]["description"]
 
         with self.assertRaisesRegex(ScenarioError, "must include description"):
             load_scenario(self._write_scenario(scenario))

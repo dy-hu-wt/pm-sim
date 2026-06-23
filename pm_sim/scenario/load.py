@@ -57,11 +57,11 @@ def load_scenario(path: Path | str) -> dict[str, Any]:
     if scenario_path.suffix not in {".yaml", ".yml"}:
         raise ScenarioError(f"Scenario files must be YAML: {scenario_path}")
 
-    from .compile import compile_behaviors, compile_grading_rules
+    from .compile import compile_action_checks, compile_behaviors
     from .validate import validate_scenario
 
     data = normalize_author_references(_load_scenario_data(scenario_path))
-    data = compile_grading_rules(data)
+    data = compile_action_checks(data)
     data = compile_behaviors(data)
     data["_scenario_path"] = str(scenario_path.resolve())
     validate_scenario(data, scenario_path)
@@ -98,7 +98,8 @@ def _reject_legacy_behavior_keys(data: dict[str, Any], path: Path) -> None:
         "actor_behaviors": "policy_behaviors or reply_behaviors",
         "event_rules": "event_behaviors",
         "meeting_rules": "meeting_behaviors",
-        "action_rules": "action_behaviors or grading_rules",
+        "action_rules": "action_behaviors or action_checks",
+        "grading_rules": "action_checks",
     }
     for key, replacement in legacy_keys.items():
         if key in data:

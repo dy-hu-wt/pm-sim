@@ -5,26 +5,26 @@ from typing import Any
 from .load import ScenarioError, copy_object, required_object, required_string
 
 
-def compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
-    grading_rules = data.get("grading_rules", [])
-    if not grading_rules:
+def compile_action_checks(data: dict[str, Any]) -> dict[str, Any]:
+    action_checks = data.get("action_checks", [])
+    if not action_checks:
         return data
-    if not isinstance(grading_rules, list):
-        raise ScenarioError("grading_rules must be a list.")
+    if not isinstance(action_checks, list):
+        raise ScenarioError("action_checks must be a list.")
 
     compiled = copy_object(data)
     generated_promotion_ids = {
-        f"grading_{required_string(rule, 'id', 'grading rule')}_promotion"
-        for rule in grading_rules
+        f"check_{required_string(rule, 'id', 'action check')}_promotion"
+        for rule in action_checks
         if isinstance(rule, dict)
     }
     generated_milestone_keys = {
         required_string(
-            required_object(rule, "milestone", f"grading rule {rule.get('id')}"),
+            required_object(rule, "milestone", f"action check {rule.get('id')}"),
             "key",
-            f"grading rule {rule.get('id')} milestone",
+            f"action check {rule.get('id')} milestone",
         )
-        for rule in grading_rules
+        for rule in action_checks
         if isinstance(rule, dict)
     }
     action_rules = []
@@ -38,26 +38,24 @@ def compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
         for rule in compiled.get("evidence_promotion_rules", [])
         if rule.get("id") not in generated_promotion_ids
     ]
-    for rule in grading_rules:
+    for rule in action_checks:
         if not isinstance(rule, dict):
-            raise ScenarioError("grading_rules entries must be objects.")
-        if rule.get("template") != "grounded_communication":
-            raise ScenarioError(f"Unsupported grading rule template: {rule.get('template')}")
+            raise ScenarioError("action_checks entries must be objects.")
 
-        rule_id = required_string(rule, "id", "grading rule")
-        action = required_object(rule, "action", f"grading rule {rule_id}")
-        state = required_object(rule, "state", f"grading rule {rule_id}")
-        milestone = required_object(rule, "milestone", f"grading rule {rule_id}")
+        rule_id = required_string(rule, "id", "action check")
+        action = required_object(rule, "action", f"action check {rule_id}")
+        state = required_object(rule, "state", f"action check {rule_id}")
+        milestone = required_object(rule, "milestone", f"action check {rule_id}")
 
-        action_type = required_string(action, "type", f"grading rule {rule_id} action")
-        recipient_id = required_string(action, "recipient_id", f"grading rule {rule_id} action")
-        person_id = required_string(state, "person_id", f"grading rule {rule_id} state")
-        key = required_string(state, "key", f"grading rule {rule_id} state")
+        action_type = required_string(action, "type", f"action check {rule_id} action")
+        recipient_id = required_string(action, "recipient_id", f"action check {rule_id} action")
+        person_id = required_string(state, "person_id", f"action check {rule_id} state")
+        key = required_string(state, "key", f"action check {rule_id} state")
         if "value" not in state:
-            raise ScenarioError(f"grading rule {rule_id} state must include value.")
-        milestone_key = required_string(milestone, "key", f"grading rule {rule_id} milestone")
-        note = required_string(milestone, "note", f"grading rule {rule_id} milestone")
-        evidence_key = f"grading_{rule_id}"
+            raise ScenarioError(f"action check {rule_id} state must include value.")
+        milestone_key = required_string(milestone, "key", f"action check {rule_id} milestone")
+        note = required_string(milestone, "note", f"action check {rule_id} milestone")
+        evidence_key = f"check_{rule_id}"
 
         action_rules.append(
             {
@@ -65,7 +63,7 @@ def compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
                 "action_type": action_type,
                 "priority": int(rule.get("priority", 60)),
                 "recipient_id": recipient_id,
-                "match": match_for_grading_action(action),
+                "match": match_for_action_check(action),
                 "when": rule.get("requires", []),
                 "effects": [
                     {
@@ -210,8 +208,8 @@ def behavior_group(data: dict[str, Any], key: str) -> list[dict[str, Any]]:
     return [dict(behavior) for behavior in behaviors]
 
 
-def match_for_grading_action(action: dict[str, Any]) -> dict[str, Any]:
+def match_for_action_check(action: dict[str, Any]) -> dict[str, Any]:
     match = action.get("match")
     if isinstance(match, dict):
         return {"mode": "concept_match", **match}
-    raise ScenarioError("grading rule action must include match.")
+    raise ScenarioError("action check action must include match.")

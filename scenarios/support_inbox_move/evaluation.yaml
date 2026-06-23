@@ -12,9 +12,8 @@ agent_brief:
   - Alice and Bob have written updates
   tool_hints:
     update_doc: Include top saved replies moved, VIP forwarding tested, old inbox read-only for one week, Alice owner, and Bob owner.
-grading_rules:
+action_checks:
 - id: saved_reply_update_sent
-  template: grounded_communication
   priority: 90
   requires:
   - fact_discovered: saved_replies_missing
@@ -69,7 +68,6 @@ grading_rules:
     key: saved_reply_update_sent
     note: Alice has the support-team saved-reply wording.
 - id: vip_routing_update_sent
-  template: grounded_communication
   priority: 90
   requires:
   - fact_discovered: vip_email_routing_gap
