@@ -7,7 +7,7 @@ The repository ships two authored scenarios:
 - `scenarios/launch_readiness/`: Fireflower prepares a Friday PR Review Agent beta for Nimbus Labs while handling a smaller Koopa Bank interruption.
 - `scenarios/support_inbox_move/`: Poppy moves support from an old shared inbox to a new help desk, with two equal readiness streams: saved replies and VIP email routing.
 
-## What Is Here
+## Project Structure
 
 Each scenario lives in its own directory.
 
@@ -141,12 +141,12 @@ Inspect:
 ```bash
 pm-sim observe
 pm-sim timeline
-pm-sim read-doc <doc_id>
 ```
 
 Work:
 
 ```bash
+pm-sim read-doc <doc_id>
 pm-sim send-chat <person_id> "<body>"
 pm-sim send-email <person_id> "<subject>" "<body>"
 pm-sim update-doc <doc_id> "<body>"
