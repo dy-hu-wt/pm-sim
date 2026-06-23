@@ -52,45 +52,47 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "required_semantics": [
-          {
-            "description": "Atlas billing migration update",
-            "signals_any": [
-              "atlas",
-              "billing migration",
-              "friday"
-            ]
-          },
-          {
-            "description": "staged shadow mode, not full cutover",
-            "signals_any": [
-              "staged shadow",
-              "shadow mode",
-              "not full cutover",
-              "full cutover deferred"
-            ]
-          },
-          {
-            "description": "invoice correctness/data risk rationale",
-            "signals_any": [
-              "invoice correctness",
-              "checksum",
-              "backfill",
-              "incorrect invoice",
-              "data quality"
-            ]
-          }
-        ],
-        "forbidden_semantics": [
-          {
-            "description": "promises full billing cutover this week",
-            "signals_any": [
-              "full cutover is approved",
-              "fully cut over",
-              "all invoices from the new ledger"
-            ]
-          }
-        ]
+        "semantic_match": {
+          "required": [
+            {
+              "description": "Atlas billing migration update",
+              "signals_any": [
+                "atlas",
+                "billing migration",
+                "friday"
+              ]
+            },
+            {
+              "description": "staged shadow mode, not full cutover",
+              "signals_any": [
+                "staged shadow",
+                "shadow mode",
+                "not full cutover",
+                "full cutover deferred"
+              ]
+            },
+            {
+              "description": "invoice correctness/data risk rationale",
+              "signals_any": [
+                "invoice correctness",
+                "checksum",
+                "backfill",
+                "incorrect invoice",
+                "data quality"
+              ]
+            }
+          ],
+          "forbidden": [
+            {
+              "description": "promises full billing cutover this week",
+              "signals_any": [
+                "full cutover is approved",
+                "fully cut over",
+                "all invoices from the new ledger"
+              ]
+            }
+          ]
+        }
       },
       "state": {
         "person_id": "daisy",
@@ -133,46 +135,48 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "required_semantics": [
-          {
-            "description": "Meridian invoice export answer",
-            "signals_any": [
-              "meridian",
-              "invoice export",
-              "finance review"
-            ]
-          },
-          {
-            "description": "one-time export is feasible",
-            "signals_any": [
-              "one-time export",
-              "one time export",
-              "one-time invoice export",
-              "one time invoice export",
-              "one-time csv",
-              "single export"
-            ]
-          },
-          {
-            "description": "self-serve export remains follow-up",
-            "signals_any": [
-              "self-serve follow-up",
-              "self serve follow-up",
-              "self-serve export is follow-up",
-              "not self-serve this week"
-            ]
-          }
-        ],
-        "forbidden_semantics": [
-          {
-            "description": "commits to self-serve export this week",
-            "signals_any": [
-              "self-serve export this week",
-              "full self-serve export for thursday",
-              "productized export by thursday"
-            ]
-          }
-        ]
+        "semantic_match": {
+          "required": [
+            {
+              "description": "Meridian invoice export answer",
+              "signals_any": [
+                "meridian",
+                "invoice export",
+                "finance review"
+              ]
+            },
+            {
+              "description": "one-time export is feasible",
+              "signals_any": [
+                "one-time export",
+                "one time export",
+                "one-time invoice export",
+                "one time invoice export",
+                "one-time csv",
+                "single export"
+              ]
+            },
+            {
+              "description": "self-serve export remains follow-up",
+              "signals_any": [
+                "self-serve follow-up",
+                "self serve follow-up",
+                "self-serve export is follow-up",
+                "not self-serve this week"
+              ]
+            }
+          ],
+          "forbidden": [
+            {
+              "description": "commits to self-serve export this week",
+              "signals_any": [
+                "self-serve export this week",
+                "full self-serve export for thursday",
+                "productized export by thursday"
+              ]
+            }
+          ]
+        }
       },
       "state": {
         "person_id": "daisy",
@@ -214,34 +218,36 @@
       "action": {
         "type": "send_email",
         "recipient_id": "daisy",
-        "required_semantics": [
-          {
-            "description": "final go/no-go for Atlas Friday",
-            "signals_any": [
-              "go for friday",
-              "final readiness",
-              "go/no-go",
-              "go for the atlas"
-            ]
-          },
-          {
-            "description": "staged shadow mode with full cutover deferred",
-            "signals_any": [
-              "staged shadow mode",
-              "shadow mode",
-              "full cutover deferred",
-              "not full cutover"
-            ]
-          },
-          {
-            "description": "Meridian remains scoped to one-time export",
-            "signals_any": [
-              "meridian",
-              "one-time export",
-              "self-serve follow-up"
-            ]
-          }
-        ]
+        "semantic_match": {
+          "required": [
+            {
+              "description": "final go/no-go for Atlas Friday",
+              "signals_any": [
+                "go for friday",
+                "final readiness",
+                "go/no-go",
+                "go for the atlas"
+              ]
+            },
+            {
+              "description": "staged shadow mode with full cutover deferred",
+              "signals_any": [
+                "staged shadow mode",
+                "shadow mode",
+                "full cutover deferred",
+                "not full cutover"
+              ]
+            },
+            {
+              "description": "Meridian remains scoped to one-time export",
+              "signals_any": [
+                "meridian",
+                "one-time export",
+                "self-serve follow-up"
+              ]
+            }
+          ]
+        }
       },
       "state": {
         "person_id": "daisy",

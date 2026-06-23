@@ -4,8 +4,9 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Any
 
-from .conditions import all_conditions_match
-from .runtime_config import event_rules
+from .engine.conditions import all_conditions_match
+from .engine.runtime_config import event_rules
+from .engine.rules import match_rule, match_text_and_facts, normalize_text, priority_sorted
 
 
 Effect = dict[str, Any]
@@ -50,7 +51,7 @@ def replies_for_message(
 ) -> list[CoworkerReply]:
     person_id = person_id.lower()
     channel = channel.lower()
-    normalized = _normalize(f"{subject or ''} {body}")
+    normalized = normalize_text(f"{subject or ''} {body}")
     state = state or {}
     structured_replies = _structured_replies_for_channel(
         person_id,
@@ -70,21 +71,18 @@ def _structured_replies_for_channel(
     conn: sqlite3.Connection | None = None,
 ) -> list[CoworkerReply]:
     replies = []
-    rules = sorted(
-        _reply_behaviors(state),
-        key=lambda rule: int(rule.get("priority", 0)),
-        reverse=True,
-    )
+    rules = priority_sorted(_reply_behaviors(state))
     for rule in rules:
         if rule.get("channel", "chat").lower() != channel:
             continue
         if rule.get("person_id", "").lower() != person_id:
             continue
-        if not _rule_matches(rule.get("match", rule), normalized, state):
-            continue
-        if conn is not None and not all_conditions_match(conn, rule.get("when", [])):
-            continue
-        if conn is None and not _state_conditions_match(rule.get("when", []), state):
+        if not match_rule(
+            rule,
+            normalized_text=normalized,
+            conn=conn,
+            state=state,
+        ).matches:
             continue
 
         reply = rule.get("reply", {})
@@ -121,64 +119,6 @@ def _reply_delay_minutes(person_id: str, reply: dict[str, Any], state: dict[str,
     raise ValueError(f"No response delay configured for coworker: {person_id}")
 
 
-def _rule_matches(match: dict[str, Any], normalized: str, state: dict[str, Any]) -> bool:
-    terms_any = {_normalize(term) for term in match.get("terms_any", [])}
-    if terms_any and not _mentions_any(normalized, terms_any):
-        return False
-
-    terms_all = {_normalize(term) for term in match.get("terms_all", [])}
-    if terms_all and not all(term in normalized for term in terms_all):
-        return False
-
-    for group in match.get("term_groups_all", []):
-        terms = {_normalize(term) for term in group}
-        if not terms or not _mentions_any(normalized, terms):
-            return False
-
-    discovered = set(state.get("discovered_facts", ()))
-    required_facts = set(match.get("required_facts", []))
-    if required_facts and not required_facts.issubset(discovered):
-        return False
-
-    required_facts_any = set(match.get("required_facts_any", []))
-    if required_facts_any and not discovered.intersection(required_facts_any):
-        return False
-
-    absent_facts = set(match.get("absent_facts", []))
-    if absent_facts and discovered.intersection(absent_facts):
-        return False
-
-    return True
-
-
-def _state_conditions_match(conditions: list[dict[str, Any]], state: dict[str, Any]) -> bool:
-    return all(_state_condition_matches(condition, state) for condition in conditions)
-
-
-def _state_condition_matches(condition: dict[str, Any], state: dict[str, Any]) -> bool:
-    if "not" in condition:
-        return not _state_condition_matches(condition["not"], state)
-    if "all" in condition:
-        return all(_state_condition_matches(item, state) for item in condition["all"])
-    if "any" in condition:
-        return any(_state_condition_matches(item, state) for item in condition["any"])
-    if "coworker_state" in condition:
-        spec = condition["coworker_state"]
-        person_id = spec["person_id"]
-        key = spec["key"]
-        values = state.get("coworker_state", {})
-        value = values.get((person_id, key), values.get(f"{person_id}.{key}", False))
-        if "equals" in spec:
-            return value == spec["equals"]
-        if "not_equals" in spec:
-            return value != spec["not_equals"]
-        if spec.get("truthy"):
-            return bool(value)
-        if spec.get("falsy"):
-            return not bool(value)
-    return False
-
-
 def effects_for_event(
     conn: sqlite3.Connection,
     event_type: str,
@@ -205,15 +145,11 @@ def _event_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
 def effects_for_meeting(payload: dict[str, Any], state: dict[str, Any] | None = None) -> list[Effect]:
     attendees = {attendee.lower() for attendee in payload.get("attendees", [])}
     title = payload.get("title", "Meeting")
-    normalized_topic = _normalize(title)
+    normalized_topic = normalize_text(title)
     state = state or {}
     transcript_doc_id = payload["transcript_doc_id"]
     calendar_event_id = payload["calendar_event_id"]
-    meeting_rules = sorted(
-        state.get("meeting_rules", []),
-        key=lambda rule: int(rule.get("priority", 0)),
-        reverse=True,
-    )
+    meeting_rules = priority_sorted(state.get("meeting_rules", []))
     context = {
         "facts": set(state.get("discovered_facts", ())),
         "evidence_keys": set(state.get("evidence_keys", ())),
@@ -255,14 +191,6 @@ def effects_for_meeting(payload: dict[str, Any], state: dict[str, Any] | None = 
     return effects
 
 
-def _normalize(body: str) -> str:
-    return " ".join(body.lower().split())
-
-
-def _mentions_any(body: str, terms: set[str] | frozenset[str]) -> bool:
-    return any(term in body for term in terms)
-
-
 def _meeting_rule_matches(
     rule: dict[str, Any],
     attendees: set[str],
@@ -277,25 +205,20 @@ def _meeting_rule_matches(
     if attendees_any and not attendees.intersection(attendees_any):
         return False
 
-    topic_terms_any = {_normalize(term) for term in rule.get("topic_terms_any", [])}
-    if topic_terms_any and not _mentions_any(normalized_topic, topic_terms_any):
-        return False
-
-    topic_terms_all = {_normalize(term) for term in rule.get("topic_terms_all", [])}
-    if topic_terms_all and not all(term in normalized_topic for term in topic_terms_all):
+    topic_match = {
+        "terms_any": rule.get("topic_terms_any", []),
+        "terms_all": rule.get("topic_terms_all", []),
+    }
+    if not match_text_and_facts(topic_match, normalized_topic):
         return False
 
     facts = context["facts"]
-    required_facts = set(rule.get("required_facts", []))
-    if required_facts and not required_facts.issubset(facts):
-        return False
-
-    required_facts_any = set(rule.get("required_facts_any", []))
-    if required_facts_any and not facts.intersection(required_facts_any):
-        return False
-
-    absent_facts = set(rule.get("absent_facts", []))
-    if absent_facts and facts.intersection(absent_facts):
+    fact_match = {
+        "required_facts": rule.get("required_facts", []),
+        "required_facts_any": rule.get("required_facts_any", []),
+        "absent_facts": rule.get("absent_facts", []),
+    }
+    if not match_text_and_facts(fact_match, "", state={"discovered_facts": facts}):
         return False
 
     evidence_keys = context["evidence_keys"]

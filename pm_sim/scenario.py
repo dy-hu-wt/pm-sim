@@ -164,9 +164,7 @@ def _semantic_match_for_grading_action(action: dict[str, Any]) -> dict[str, Any]
     semantic_match = action.get("semantic_match")
     if isinstance(semantic_match, dict):
         return semantic_match
-    required = action.get("required_semantics", [])
-    forbidden = action.get("forbidden_semantics", [])
-    return {"required": required, "forbidden": forbidden}
+    raise ScenarioError("grading rule action must include semantic_match.")
 
 
 def _required_object(row: dict[str, Any], key: str, label: str) -> dict[str, Any]:

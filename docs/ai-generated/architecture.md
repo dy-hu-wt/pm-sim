@@ -47,7 +47,7 @@ When time advances, either through `advance-time` or action effort, due events a
 
 SQLite is the source of truth for the active run. The schema defines tables for people, facts, projects, tasks, dependencies, blockers, docs, messages, calendar events, scheduled events, evaluation evidence, action logs, and state values.
 
-The scenario file owns initial authored content. After reset, the database owns the run state. Tool actions and events do not directly edit arbitrary tables. They produce explicit effects, and `effects.py` applies those mutations in one place.
+The scenario file owns initial authored content. After reset, the database owns the run state. Tool actions and events do not directly edit arbitrary tables. They produce explicit effects, and `pm_sim/engine/effects.py` applies those mutations in one place.
 
 This keeps state transitions inspectable. A reviewer can see both the final state and the path that produced it.
 
@@ -185,4 +185,4 @@ Direct coworker chat, action-derived chat/email/doc effects, background events, 
 
 This is the main answer to the scaling concern: scenario files should describe the world, while engine code should define common simulation semantics.
 
-The common engine pieces are storage, tool actions, event delivery, timelines, effect application, condition evaluation, coworker state, actor behavior matching, action rules, background event rules, meeting rules, action logs, task gates, state-derived evidence, harm checks, outcome rules, and evaluator component scoring. A second scenario should primarily add new data files instead of adding custom Python branches for every project.
+The reusable engine code lives under `pm_sim/engine/`: simulated time and event delivery, effect application, condition evaluation, runtime scenario config loading, and shared rule matching. The broader common surface also includes storage, tool actions, timelines, coworker state, action logs, task gates, state-derived evidence, harm checks, outcome rules, and evaluator component scoring. A second scenario should primarily add new data files instead of adding custom Python branches for every project.

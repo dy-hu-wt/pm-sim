@@ -23,7 +23,7 @@ from ..jsonutil import dumps, loads
 from ..paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH, REPO_ROOT
 from ..scenario import load_scenario
 from ..state import get_state_value, observe, reset, set_state_value
-from ..time import advance_time
+from ..engine.time import advance_time
 from .finalize import finalize_to_deadline
 
 

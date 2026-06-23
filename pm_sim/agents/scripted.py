@@ -10,7 +10,7 @@ from ..evaluator import evaluate
 from ..paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from ..scenario import load_scenario
 from ..state import reset
-from ..time import advance_time
+from ..engine.time import advance_time
 from .finalize import finalize_to_deadline
 
 

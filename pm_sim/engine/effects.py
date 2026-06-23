@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
-from .jsonutil import dumps, loads
+from ..jsonutil import dumps, loads
 
 
 def apply_effects(

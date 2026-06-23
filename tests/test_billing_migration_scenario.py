@@ -11,7 +11,7 @@ from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
 from pm_sim.scenario import load_scenario
 from pm_sim.state import observe, reset
-from pm_sim.time import advance_time
+from pm_sim.engine.time import advance_time
 
 
 BILLING_SCENARIO_PATH = Path("scenarios/billing_migration")

@@ -24,7 +24,7 @@ from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
 from .report import DEFAULT_UI_PATH, generate_report
 from .scenario import ScenarioError
 from .state import action_log, event_log, observe, reset
-from .time import advance_time
+from .engine.time import advance_time
 from .timeline import TIMELINE_KINDS, timeline
 from .ui import DEFAULT_UI_HOST, DEFAULT_UI_PORT, serve_ui
 

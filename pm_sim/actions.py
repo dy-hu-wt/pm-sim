@@ -7,14 +7,15 @@ from typing import Any
 
 from .coworkers import CoworkerReply, replies_for_chat, replies_for_email
 from .db import connect, row_to_dict, rows_to_dicts
-from .effects import apply_effects
-from .conditions import all_conditions_match
+from .engine.effects import apply_effects
+from .engine.conditions import all_conditions_match
+from .engine.runtime_config import action_rules, actor_behaviors, response_delays, task_gate_rules
+from .engine.rules import match_rule, normalize_text
+from .engine.time import consume_action_time
 from .jsonutil import dumps, loads
 from .paths import DEFAULT_DB_PATH
-from .runtime_config import action_rules, actor_behaviors, response_delays, task_gate_rules
 from .semantic_match import semantic_match
 from .state import AGENT_ID, get_current_time, log_action
-from .time import consume_action_time
 
 COMPLETED_STATUSES = {"complete", "completed", "done", "resolved"}
 ACTION_TIME_COST_MINUTES = {
@@ -550,15 +551,27 @@ def _effects_for_action(
     action_type: str,
     context: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    normalized = _normalize(str(context.get("text", "")))
+    normalized = normalize_text(str(context.get("text", "")))
     effects: list[dict[str, Any]] = []
     for rule in _action_rules(conn):
         if rule.get("action_type") != action_type:
             continue
-        match_result = _action_rule_match_result(rule, context, normalized, conn)
-        if not match_result["matches"]:
+        match_result = match_rule(
+            rule,
+            normalized_text=normalized,
+            context=context,
+            context_keys=("person_id", "recipient_id", "doc_id"),
+            conn=conn,
+            semantic_matcher=lambda criteria, matched_rule: semantic_match(
+                conn,
+                text=str(context.get("text", "")),
+                criteria=criteria,
+                rule_id=str(matched_rule.get("id", "")),
+            ),
+        )
+        if not match_result.matches:
             continue
-        semantic_result = match_result.get("semantic")
+        semantic_result = match_result.semantic
         if semantic_result is not None:
             context.setdefault("semantic_matches", []).append(
                 {
@@ -574,47 +587,6 @@ def _effects_for_action(
             )
         effects.extend(dict(effect) for effect in rule.get("effects", []))
     return effects
-
-
-def _action_rule_match_result(
-    rule: dict[str, Any],
-    context: dict[str, Any],
-    normalized: str,
-    conn: sqlite3.Connection,
-) -> dict[str, Any]:
-    for key in ("person_id", "recipient_id", "doc_id"):
-        expected = rule.get(key)
-        if expected is not None and str(context.get(key, "")).lower() != str(expected).lower():
-            return {"matches": False}
-
-    terms_any = {_normalize(term) for term in rule.get("terms_any", [])}
-    if terms_any and not _mentions_any(normalized, terms_any):
-        return {"matches": False}
-
-    terms_all = {_normalize(term) for term in rule.get("terms_all", [])}
-    if terms_all and not all(term in normalized for term in terms_all):
-        return {"matches": False}
-
-    for group in rule.get("term_groups_all", []):
-        terms = {_normalize(term) for term in group}
-        if not terms or not _mentions_any(normalized, terms):
-            return {"matches": False}
-
-    if not all_conditions_match(conn, rule.get("when", [])):
-        return {"matches": False}
-
-    semantic_criteria = rule.get("semantic_match")
-    semantic_result = None
-    if semantic_criteria:
-        semantic_result = semantic_match(
-            conn,
-            text=str(context.get("text", "")),
-            criteria=semantic_criteria,
-            rule_id=str(rule.get("id", "")),
-        )
-        if not semantic_result.get("matches"):
-            return {"matches": False, "semantic": semantic_result}
-    return {"matches": True, "semantic": semantic_result}
 
 
 def _action_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
@@ -760,11 +732,3 @@ def _parse_time(value: str) -> datetime:
 
 def _format_time(value: datetime) -> str:
     return value.isoformat(timespec="seconds")
-
-
-def _normalize(value: str) -> str:
-    return " ".join(value.lower().split())
-
-
-def _mentions_any(value: str, terms: frozenset[str]) -> bool:
-    return any(term in value for term in terms)

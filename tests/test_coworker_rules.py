@@ -23,11 +23,11 @@ from pm_sim.actions import (
 from pm_sim.agents.llm import _instructions, llm_session_state, start_llm_session, step_llm_session, run_llm_agent
 from pm_sim.agents.scripted import run_scripted_agent
 from pm_sim.cli import main as cli_main
-from pm_sim.conditions import condition_matches
+from pm_sim.engine.conditions import condition_matches
 from pm_sim.coworkers import effects_for_event, replies_for_chat, replies_for_email
 from pm_sim.db import connect
 from pm_sim.evaluator import evaluate
-from pm_sim.effects import apply_effects
+from pm_sim.engine.effects import apply_effects
 from pm_sim.formatters import format_agent_progress_html, format_output, format_semantic_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
@@ -35,7 +35,7 @@ from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
 from pm_sim import semantic_match as semantic_match_module
 from pm_sim.state import action_log, event_log, observe, reset
-from pm_sim.time import advance_time
+from pm_sim.engine.time import advance_time
 from pm_sim.timeline import timeline
 from pm_sim.ui import _html, _run_next_ui_step, _scripted_demo_state, _state_payload
 

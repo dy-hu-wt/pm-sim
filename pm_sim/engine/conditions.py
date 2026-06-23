@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
-from .jsonutil import loads
+from ..jsonutil import loads
 
 
 UNRESOLVED_BLOCKER_STATUSES = {"open", "surfaced", "blocked"}

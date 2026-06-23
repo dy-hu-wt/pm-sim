@@ -8,7 +8,7 @@ from ..db import connect
 from ..jsonutil import loads
 from ..scenario import load_scenario
 from ..state import observe
-from ..time import advance_time
+from ..engine.time import advance_time
 
 
 ProgressFn = Callable[[str], None]

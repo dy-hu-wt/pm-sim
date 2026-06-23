@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .conditions import all_conditions_match, condition_time, failed_condition_descriptions
+from .engine.conditions import all_conditions_match, condition_time, failed_condition_descriptions
 from .db import connect, rows_to_dicts
 from .jsonutil import loads
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH

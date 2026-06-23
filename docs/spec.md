@@ -291,10 +291,12 @@ The defensible split is:
 
 ```text
 Reusable engine:
-  storage, tool actions, event delivery, timelines, effect application,
-  condition evaluation, actor behavior matching, action logs, task gates,
-  state-derived evidence, coworker state, autonomous actor policy delivery,
-  harm checks, background event rules, outcome rules, and evaluator scoring
+  `pm_sim/engine` owns event delivery, effect application, condition
+  evaluation, actor/action rule matching, runtime rule loading, autonomous
+  actor policy delivery, task gates, background event rules, and outcome rules.
+  Storage, tool actions, timelines, action logs, coworker state,
+  state-derived evidence, harm checks, and evaluator scoring stay reusable
+  but live in adjacent modules because they are public surfaces or storage.
 
 Scenario-specific v1 data:
   people, coworker state, facts, docs, tasks, blockers, events, actor behaviors,
