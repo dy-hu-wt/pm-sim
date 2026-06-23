@@ -53,6 +53,9 @@ cp .env.example .env
 python -m pip install -e ".[llm]"
 ```
 
+By default the LLM policy uses `OPENAI_MODEL` from `.env`; `.env.example` sets a demo-friendly
+default model. Override `OPENAI_MODEL` or pass `--model` when you want a different model.
+
 ## Start
 
 Reset the local SQLite state from the scenario:
@@ -287,7 +290,9 @@ Task updates are checked against the surrounding world state to resist reward ha
 
 After the Friday deadline event is delivered, `evaluate` also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
-The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, and `rules.json`. Most scenario semantics now live in data: task gates, coworker memory, chat/email/doc-derived evidence rules, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger terms, transcript lines, and effects. The `ui` command is an operator surface over the same SQLite state; its live playback advances time through the same backend event queue rather than replaying separate UI state.
+The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, and `rules.json`. Most scenario semantics now live in data: task gates, coworker memory, chat/email/doc-derived evidence rules, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger terms, transcript lines, and effects. Action-derived evidence uses scenario-authored claims plus causal `when` conditions, so saying the right words does not score unless the underlying fact or stakeholder request is already visible. The `ui` command is an operator surface over the same SQLite state; its live playback advances time through the same backend event queue rather than replaying separate UI state.
+
+Coworkers in v1 are deterministic stateful actors, not autonomous LLM NPCs. Their distinct roles come from authored personas, private facts, mutable `coworker_state`, response-delay/availability windows, proactive scheduled events, and prioritized reply rules. This keeps grading reproducible while still modeling PM-relevant behavior such as delayed answers, private owner knowledge, stakeholder pressure, and escalation.
 
 The backend is covered by:
 

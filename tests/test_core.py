@@ -1772,7 +1772,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertEqual(message["channel"], "email")
         self.assertEqual(message["recipient_id"], "daisy")
 
-    def test_substantive_daisy_email_records_stakeholder_evidence(self) -> None:
+    def test_substantive_daisy_email_before_discovery_does_not_score(self) -> None:
         result = send_email(
             self.db_path,
             "daisy",
@@ -1795,11 +1795,40 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
             conn.close()
 
         self.assertTrue(result["ok"])
-        self.assertEqual(result["applied_effects"][0]["type"], "add_evaluation_evidence")
+        self.assertEqual(result["applied_effects"], [])
+        self.assertIsNone(evidence)
+
+    def test_substantive_daisy_email_after_discovery_records_stakeholder_evidence(self) -> None:
+        self._drive_to_draft_approval()
+
+        result = send_email(
+            self.db_path,
+            "daisy",
+            "Nimbus Friday draft-mode status",
+            (
+                "Repo sync has stale-commit risk. I recommend reliable draft mode "
+                "for Friday with human approval."
+            ),
+        )
+        conn = connect(self.db_path)
+        try:
+            evidence = conn.execute(
+                """
+                SELECT evidence_key, note
+                FROM evaluation_evidence
+                WHERE evidence_key = 'stakeholder_alignment'
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(any(effect.get("key") == "stakeholder_alignment" for effect in result["applied_effects"]))
         self.assertEqual(evidence["evidence_key"], "stakeholder_alignment")
-        self.assertIn("Nimbus repo-sync risk and draft-mode", evidence["note"])
 
     def test_customer_message_ready_uses_scenario_authored_claims(self) -> None:
+        self._drive_to_draft_approval()
+
         result = send_email(
             self.db_path,
             "daisy",
@@ -1857,6 +1886,13 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
 
     def test_security_answer_email_records_security_question_evidence_after_daisy_asks(self) -> None:
         advance_time(self.db_path, "to:2026-06-24T14:00:00")
+        send_chat(
+            self.db_path,
+            "luigi",
+            "Nimbus asked if we store source code from private repos. Is there a security doc?",
+        )
+        advance_time(self.db_path, "2h")
+        read_doc(self.db_path, "doc_private_repo_security_baseline")
 
         result = send_email(
             self.db_path,
@@ -2375,6 +2411,20 @@ class EvaluatorTests(unittest.TestCase):
         self.assertIn("excessive direct outreach", harmful_component["note"])
 
     def test_substantive_daisy_email_can_satisfy_stakeholder_communication(self) -> None:
+        send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
+        advance_time(self.db_path, "until_next_event")
+        send_chat(
+            self.db_path,
+            "daisy",
+            "Repo sync has stale-code risk. Can we message reliable draft mode for Nimbus?",
+        )
+        advance_time(self.db_path, "45m")
+        send_chat(
+            self.db_path,
+            "toad",
+            "Repo sync can review stale commits. Approve draft mode for Friday?",
+        )
+        advance_time(self.db_path, "90m")
         send_email(
             self.db_path,
             "daisy",
@@ -2393,13 +2443,20 @@ class EvaluatorTests(unittest.TestCase):
         )
 
         self.assertEqual(stakeholder_component["earned"], 20)
-        self.assertEqual(stakeholder_component["evidence"][0]["source"], "action:msg_agent_email_3")
         self.assertEqual(
             {evidence["key"] for evidence in stakeholder_component["evidence"]},
             {"stakeholder_alignment", "customer_message_ready"},
         )
 
     def test_daisy_email_without_human_approval_is_not_customer_ready(self) -> None:
+        send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
+        advance_time(self.db_path, "until_next_event")
+        send_chat(
+            self.db_path,
+            "daisy",
+            "Repo sync has stale-code risk. Can we message reliable draft mode for Nimbus?",
+        )
+        advance_time(self.db_path, "45m")
         send_email(
             self.db_path,
             "daisy",

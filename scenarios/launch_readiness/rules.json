@@ -1513,6 +1513,14 @@
         "draft_mode",
         "nimbus_beta"
       ],
+      "when": [
+        {
+          "fact_discovered": "fact_repo_sync_stale"
+        },
+        {
+          "fact_discovered": "fact_nimbus_values_reliability"
+        }
+      ],
       "effects": [
         {
           "type": "add_evaluation_evidence",
@@ -1550,6 +1558,27 @@
         "nimbus_beta",
         "human_approval"
       ],
+      "when": [
+        {
+          "fact_discovered": "fact_repo_sync_stale"
+        },
+        {
+          "fact_discovered": "fact_nimbus_values_reliability"
+        },
+        {
+          "any": [
+            {
+              "fact_discovered": "fact_draft_mode_approved"
+            },
+            {
+              "project_decision": {
+                "project_id": "project_pr_review_agent",
+                "equals": "draft_mode_approved"
+              }
+            }
+          ]
+        }
+      ],
       "effects": [
         {
           "type": "add_evaluation_evidence",
@@ -1580,6 +1609,9 @@
               "private repo"
             ]
           }
+        },
+        {
+          "evidence_exists": "security_doc_found"
         }
       ],
       "effects": [
