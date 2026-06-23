@@ -14,11 +14,7 @@ Each scenario lives in its own directory.
 ```text
 scenario.yaml      manifest and include list
 world.yaml         people, projects, tasks, facts, blockers, docs, events
-events.yaml        scheduled interruptions and deadline events
-policies.yaml      proactive coworker behavior
-replies.yaml       direct chat and email replies
-meetings.yaml      meeting transcript and meeting-effect rules
-actions.yaml       action-triggered authored checks
+interactions.yaml  event, policy, reply, meeting, and action behavior rules
 evaluation.yaml    scoring, outcome rules, baseline, scripted path
 scenario.md        human-readable scenario guide
 ```

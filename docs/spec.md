@@ -155,11 +155,7 @@ Each scenario is split by concern:
 ```text
 scenario.yaml      manifest
 world.yaml         initial state
-events.yaml        scheduled interruption behavior
-policies.yaml      proactive coworker behavior
-replies.yaml       direct reply behavior
-meetings.yaml      meeting behavior
-actions.yaml       action-triggered authored checks
+interactions.yaml  event, policy, reply, meeting, and action behavior rules
 evaluation.yaml    scoring, outcomes, baseline, scripted path
 scenario.md        human-readable guide
 ```

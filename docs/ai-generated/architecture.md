@@ -23,11 +23,7 @@ scenario files
 ```text
 scenarios/launch_readiness/scenario.yaml
 scenarios/launch_readiness/world.yaml
-scenarios/launch_readiness/events.yaml
-scenarios/launch_readiness/policies.yaml
-scenarios/launch_readiness/replies.yaml
-scenarios/launch_readiness/meetings.yaml
-scenarios/launch_readiness/actions.yaml
+scenarios/launch_readiness/interactions.yaml
 scenarios/launch_readiness/evaluation.yaml
 ```
 

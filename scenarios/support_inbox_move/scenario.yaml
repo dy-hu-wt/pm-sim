@@ -6,9 +6,5 @@ timezone: America/New_York
 summary: Poppy is moving support from an old shared inbox to a new help desk during a Monday-Friday work week.
 include:
 - world.yaml
-- events.yaml
-- policies.yaml
-- replies.yaml
-- meetings.yaml
-- actions.yaml
+- interactions.yaml
 - evaluation.yaml

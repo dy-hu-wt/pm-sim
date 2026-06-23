@@ -1,0 +1,388 @@
+event_behaviors:
+- id: alice_saved_reply_reminder
+  event_type: alice_saved_reply_reminder
+  when:
+  - not:
+      coworker_state:
+        person_id: alice
+        key: saved_reply_risk_shared
+        equals: true
+  effects:
+  - type: create_message
+    channel: chat
+    sender_id: alice
+    recipient_id: agent
+    body: I checked the new help desk and the old saved replies are missing. We should move the top replies before Thursday and keep the old inbox read-only for backup.
+  - type: discover_fact
+    fact_id: saved_replies_missing
+    source: alice_saved_reply_reminder
+  - type: discover_fact
+    fact_id: top_saved_replies_can_move
+    source: alice_saved_reply_reminder
+  - type: reveal_doc
+    doc_id: old_inbox_notes
+  - type: update_blocker
+    blocker_id: saved_replies_missing
+    status: surfaced
+  - type: update_task
+    task_id: move_saved_replies
+    status: in_progress
+  - type: update_coworker_state
+    person_id: alice
+    key: saved_reply_risk_shared
+    value: true
+  - type: update_coworker_state
+    person_id: alice
+    key: saved_reply_plan_confirmed
+    value: true
+  - type: increase_pressure
+    pressure_id: saved_replies_pressure
+    by: 2
+    reason: Alice had to remind the PM that saved replies are missing.
+- id: bob_vip_routing_reminder
+  event_type: bob_vip_routing_reminder
+  when:
+  - not:
+      coworker_state:
+        person_id: bob
+        key: vip_routing_risk_shared
+        equals: true
+  effects:
+  - type: create_message
+    channel: email
+    sender_id: bob
+    recipient_id: agent
+    subject: VIP email routing gap
+    body: The default forwarding rule misses VIP aliases. We need to add the VIP allowlist, send a test email, and keep the old inbox open as backup for a week.
+  - type: discover_fact
+    fact_id: vip_email_routing_gap
+    source: bob_vip_routing_reminder
+  - type: discover_fact
+    fact_id: vip_forwarding_test_ok
+    source: bob_vip_routing_reminder
+  - type: reveal_doc
+    doc_id: vip_routing_note
+  - type: update_blocker
+    blocker_id: vip_email_routing_gap
+    status: surfaced
+  - type: update_task
+    task_id: test_vip_routing
+    status: in_progress
+  - type: update_coworker_state
+    person_id: bob
+    key: vip_routing_risk_shared
+    value: true
+  - type: update_coworker_state
+    person_id: bob
+    key: vip_routing_plan_confirmed
+    value: true
+  - type: increase_pressure
+    pressure_id: vip_email_pressure
+    by: 2
+    reason: Bob had to remind the PM that VIP routing is not tested.
+
+policy_behaviors:
+- id: alice_autonomous_saved_reply_nudge
+  person_id: alice
+  priority: 40
+  trigger:
+    at: '2026-06-25T09:30:00'
+  when:
+  - not:
+      coworker_state:
+        person_id: alice
+        key: support_update_ready
+        equals: true
+  effects:
+  - type: create_message
+    channel: chat
+    sender_id: alice
+    recipient_id: agent
+    body: 'I still need the support-team wording for Thursday: which saved replies moved, and whether the old inbox stays available as backup.'
+  - type: increase_pressure
+    pressure_id: saved_replies_pressure
+    by: 2
+    reason: Support still does not have written saved-reply instructions Thursday morning.
+- id: bob_autonomous_routing_nudge
+  person_id: bob
+  priority: 40
+  trigger:
+    at: '2026-06-25T10:00:00'
+  when:
+  - not:
+      coworker_state:
+        person_id: bob
+        key: routing_update_ready
+        equals: true
+  effects:
+  - type: create_message
+    channel: email
+    sender_id: bob
+    recipient_id: agent
+    subject: VIP routing still needs written plan
+    body: I still need the final routing note. The VIP forwarding allowlist should be tested before we call the new help desk ready.
+  - type: increase_pressure
+    pressure_id: vip_email_pressure
+    by: 2
+    reason: VIP routing still does not have written confirmation Thursday morning.
+
+reply_behaviors:
+  alice:
+  - id: alice_reveals_saved_reply_gap
+    channel: chat
+    priority: 100
+    match:
+      absent_facts:
+      - saved_replies_missing
+      intents:
+      - id: saved_reply_signal
+        description: The PM asks about saved replies, templates, support readiness, or the old inbox.
+        signals:
+        - saved replies
+        - saved reply
+        - template
+        - templates
+        - support
+        - old inbox
+        - help desk
+        - ready
+      require_all:
+      - saved_reply_signal
+      mode: deterministic
+    when:
+    - coworker_state:
+        person_id: alice
+        key: saved_reply_risk_shared
+        equals: false
+    reply:
+      delay_minutes: 45
+      body: The new help desk did not import our old saved replies. Move the top 12 saved replies before Thursday and keep the old inbox read-only for one week as backup.
+    effects:
+    - type: discover_fact
+      fact_id: saved_replies_missing
+      source: alice_chat_reply
+    - type: discover_fact
+      fact_id: top_saved_replies_can_move
+      source: alice_chat_reply
+    - type: reveal_doc
+      doc_id: old_inbox_notes
+    - type: update_blocker
+      blocker_id: saved_replies_missing
+      status: surfaced
+    - type: update_task
+      task_id: move_saved_replies
+      status: in_progress
+    - type: update_coworker_state
+      person_id: alice
+      key: saved_reply_risk_shared
+      value: true
+    - type: update_coworker_state
+      person_id: alice
+      key: saved_reply_plan_confirmed
+      value: true
+  - id: alice_default
+    channel: chat
+    priority: 0
+    match:
+      intents: []
+      mode: deterministic
+    when: []
+    reply:
+      delay_minutes: 45
+      body: I need the new help desk to be usable for the support team on Thursday. Ask me about saved replies or old inbox backup if you need the risky part.
+    effects: []
+  bob:
+  - id: bob_reveals_vip_routing_gap
+    channel: chat
+    priority: 100
+    match:
+      absent_facts:
+      - vip_email_routing_gap
+      intents:
+      - id: vip_routing_signal
+        description: The PM asks about VIP email routing, forwarding, aliases, or testing.
+        signals:
+        - vip
+        - email
+        - routing
+        - forwarding
+        - alias
+        - aliases
+        - test
+        - old inbox
+        - help desk
+      require_all:
+      - vip_routing_signal
+      mode: deterministic
+    when:
+    - coworker_state:
+        person_id: bob
+        key: vip_routing_risk_shared
+        equals: false
+    reply:
+      delay_minutes: 75
+      body: VIP customer aliases bypass the default forwarding rule. Add the VIP allowlist, send a test email to the new help desk, and keep the old inbox open as backup for a week.
+    effects:
+    - type: discover_fact
+      fact_id: vip_email_routing_gap
+      source: bob_chat_reply
+    - type: discover_fact
+      fact_id: vip_forwarding_test_ok
+      source: bob_chat_reply
+    - type: reveal_doc
+      doc_id: vip_routing_note
+    - type: update_blocker
+      blocker_id: vip_email_routing_gap
+      status: surfaced
+    - type: update_task
+      task_id: test_vip_routing
+      status: in_progress
+    - type: update_coworker_state
+      person_id: bob
+      key: vip_routing_risk_shared
+      value: true
+    - type: update_coworker_state
+      person_id: bob
+      key: vip_routing_plan_confirmed
+      value: true
+  - id: bob_default
+    channel: chat
+    priority: 0
+    match:
+      intents: []
+      mode: deterministic
+    when: []
+    reply:
+      delay_minutes: 75
+      body: I can help with routing. Ask me about VIP email forwarding or testing if you need the risky part.
+    effects: []
+
+meeting_behaviors:
+- id: inbox_move_checkin
+  required_attendees:
+  - alice
+  - bob
+  topic_match:
+    mode: deterministic
+    intents:
+    - id: inbox_move_signal
+      description: The meeting is about the support inbox move.
+      signals:
+      - inbox move
+      - help desk
+      - saved replies
+      - vip routing
+      - old inbox
+    require_all:
+    - inbox_move_signal
+  transcript_lines:
+  - Alice confirmed the top 12 saved replies must move before Thursday.
+  - Bob confirmed VIP aliases need a tested forwarding allowlist.
+  - The PM agreed to write the move plan and send both owners the final wording.
+  effects:
+  - type: discover_fact
+    fact_id: saved_replies_missing
+    source: inbox_move_meeting
+  - type: discover_fact
+    fact_id: top_saved_replies_can_move
+    source: inbox_move_meeting
+  - type: discover_fact
+    fact_id: vip_email_routing_gap
+    source: inbox_move_meeting
+  - type: discover_fact
+    fact_id: vip_forwarding_test_ok
+    source: inbox_move_meeting
+  - type: update_blocker
+    blocker_id: saved_replies_missing
+    status: surfaced
+  - type: update_blocker
+    blocker_id: vip_email_routing_gap
+    status: surfaced
+  - type: update_task
+    task_id: move_saved_replies
+    status: in_progress
+  - type: update_task
+    task_id: test_vip_routing
+    status: in_progress
+  - type: update_coworker_state
+    person_id: alice
+    key: saved_reply_risk_shared
+    value: true
+  - type: update_coworker_state
+    person_id: alice
+    key: saved_reply_plan_confirmed
+    value: true
+  - type: update_coworker_state
+    person_id: bob
+    key: vip_routing_risk_shared
+    value: true
+  - type: update_coworker_state
+    person_id: bob
+    key: vip_routing_plan_confirmed
+    value: true
+
+action_behaviors:
+- id: inbox_move_plan_written
+  action_type: update_doc
+  priority: 100
+  doc_id: inbox_move_plan
+  when:
+  - fact_discovered: saved_replies_missing
+  - fact_discovered: top_saved_replies_can_move
+  - fact_discovered: vip_email_routing_gap
+  - fact_discovered: vip_forwarding_test_ok
+  effects:
+  - type: discover_fact
+    fact_id: inbox_move_plan
+    source: inbox_move_plan_doc
+  - type: update_project
+    project_id: support_inbox_move
+    decision: saved_replies_and_vip_routing_ready
+  - type: update_blocker
+    blocker_id: move_plan_missing
+    status: resolved
+  - type: update_task
+    task_id: write_move_plan
+    status: complete
+  - type: update_coworker_state
+    person_id: alice
+    key: move_note_received
+    value: true
+  - type: update_coworker_state
+    person_id: bob
+    key: move_note_received
+    value: true
+  match:
+    mode: concept_match
+    required_concepts:
+    - id: saved_replies_moved
+      description: The plan says the top saved replies move to the new help desk.
+      exemplars:
+      - move the top 12 saved replies to the new help desk
+      - top saved replies are moved before Thursday
+      must_be_asserted: true
+    - id: vip_routing_tested
+      description: The plan says VIP forwarding or VIP routing is tested.
+      exemplars:
+      - VIP forwarding is tested
+      - test VIP email routing to the new help desk
+      must_be_asserted: true
+    - id: old_inbox_backup
+      description: The old inbox stays available as backup or read-only for one week.
+      exemplars:
+      - old inbox stays read-only for one week
+      - old inbox remains available as backup for one week
+      must_be_asserted: true
+    - id: alice_and_bob_named
+      description: Alice and Bob are both named as aligned owners.
+      exemplars:
+      - Alice and Bob are aligned
+      - Alice owns saved replies and Bob owns VIP routing
+      must_be_asserted: true
+    forbidden_concepts:
+    - id: old_inbox_closed_immediately
+      description: The plan closes the old inbox immediately on Thursday.
+      exemplars:
+      - close the old inbox immediately
+      - old inbox is shut off on Thursday
+      must_be_asserted: true

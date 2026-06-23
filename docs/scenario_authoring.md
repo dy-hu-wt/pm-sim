@@ -13,11 +13,7 @@ scenarios/<scenario_id>/
   scenario.md
   scenario.yaml
   world.yaml
-  events.yaml
-  policies.yaml
-  replies.yaml
-  meetings.yaml
-  actions.yaml
+  interactions.yaml
   evaluation.yaml
 ```
 
@@ -31,11 +27,7 @@ start_time: "2026-06-22T09:00:00"
 timezone: America/New_York
 include:
   - world.yaml
-  - events.yaml
-  - policies.yaml
-  - replies.yaml
-  - meetings.yaml
-  - actions.yaml
+  - interactions.yaml
   - evaluation.yaml
 ```
 
@@ -71,21 +63,19 @@ Use `coworker_state` for durable actor memory, not for every detail in the world
 
 Use `pressures` for mutable stakeholder pressure that should rise or fall during the week.
 
-## Behavior Files
+## Interaction Rules
 
-The authored behavior surface is split by purpose.
+`interactions.yaml` contains behavior rules that mutate or schedule simulated world state. Keep evaluation and scoring rules out of this file.
 
-`events.yaml` handles scheduled interruptions and deadline-time behavior. Use it for things like customer questions, leadership nudges, and project settlement events.
+Top-level groups:
 
-`policies.yaml` handles proactive coworker behavior. Use it when a coworker should reach out because time passed or a dependency is still missing.
+- `event_behaviors`: scheduled interruptions and deadline-time behavior, such as customer questions, leadership nudges, and project settlement events.
+- `policy_behaviors`: proactive coworker behavior when time passed or a dependency is still missing.
+- `reply_behaviors`: direct replies to agent chat and email. This is the main place where the PM learns information through conversation.
+- `meeting_behaviors`: useful meeting outcomes. A meeting should not be magical. It should work because the right people attended, the topic was relevant, and the prerequisites were satisfied.
+- `action_behaviors`: action-triggered authored checks that do not belong in reply or meeting logic, such as “the decision record was written with the required grounded content.”
 
-`replies.yaml` handles direct replies to agent chat and email. This is the main place where the PM learns information through conversation.
-
-`meetings.yaml` handles useful meeting outcomes. A meeting should not be magical. It should work because the right people attended, the topic was relevant, and the prerequisites were satisfied.
-
-`actions.yaml` handles action-triggered authored checks that do not belong in reply or meeting logic, such as “the decision record was written with the required grounded content.”
-
-Keep these files convergent. If chat, email, and meetings can all teach the same fact, they should all land on the same fact ID or state key.
+Keep these groups convergent. If chat, email, and meetings can all teach the same fact, they should all land on the same fact ID or state key.
 
 ## Matching
 
