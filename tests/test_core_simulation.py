@@ -49,16 +49,17 @@ class CoreSimulationTests(unittest.TestCase):
         self.tmpdir.cleanup()
 
     def test_reset_loads_scenario_state(self) -> None:
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         self.assertEqual(state["scenario_id"], "launch_readiness")
         self.assertEqual(state["current_time"], "2026-06-22T09:00:00")
         self.assertEqual(len(state["people"]), 5)
         self.assertEqual(len(state["projects"]), 2)
         self.assertGreaterEqual(len(state["tasks"]), 5)
+        self.assertNotIn("behavior_json", state["people"][0])
         people = {
             person["id"]: loads(person["behavior_json"])
-            for person in state["people"]
+            for person in state["people_internal"]
         }
         self.assertEqual(people["luigi"]["current_focus"], "repo sync hardening and private-repo security details")
         self.assertIn("recommended safer Friday scope", people["toad"]["needs_from_pm"])
@@ -96,6 +97,20 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertIn("Admin Audit Log Export deadline", obligations)
         self.assertIn("PR Review Agent Beta deadline", obligations)
 
+    def test_public_observe_hides_persona_internals(self) -> None:
+        state = observe(self.db_path)
+
+        self.assertEqual({person["id"] for person in state["people"]}, {"mario", "luigi", "peach", "daisy", "toad"})
+        self.assertNotIn("behavior_json", state["people"][0])
+        self.assertNotIn("people_internal", state)
+        self.assertNotIn("coworker_state", state)
+        self.assertNotIn("actor_goals", state)
+        self.assertNotIn("actor_workload", state)
+        self.assertNotIn("actor_commitments", state)
+        self.assertNotIn("pending_events", state)
+        self.assertNotIn("metadata_json", state["projects"][0])
+        self.assertNotIn("metadata", state["calendar_obligations"][0])
+
     def test_reset_seeds_open_launch_conflict(self) -> None:
         conflict = self._project_metadata()["launch_conflict"]
 
@@ -107,7 +122,7 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertFalse(conflict["inputs"]["implementation_scope_clear"])
 
     def test_hidden_blocker_and_hidden_fact_are_not_observed_initially(self) -> None:
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         blocker_ids = {blocker["id"] for blocker in state["known_blockers"]}
         fact_ids = {fact["id"] for fact in state["discovered_facts"]}
@@ -117,7 +132,7 @@ class CoreSimulationTests(unittest.TestCase):
 
     def test_advance_time_by_duration_does_not_deliver_future_events(self) -> None:
         result = advance_time(self.db_path, "2h")
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         self.assertEqual(result["from"], "2026-06-22T09:00:00")
         self.assertEqual(result["to"], "2026-06-22T11:00:00")
@@ -126,7 +141,7 @@ class CoreSimulationTests(unittest.TestCase):
 
     def test_advance_until_next_event_delivers_one_due_event(self) -> None:
         result = advance_time(self.db_path, "until_next_event")
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         self.assertEqual(result["to"], "2026-06-23T10:00:00")
         self.assertEqual(len(result["delivered_events"]), 1)
@@ -136,7 +151,7 @@ class CoreSimulationTests(unittest.TestCase):
 
     def test_background_event_applies_coworker_effects(self) -> None:
         advance_time(self.db_path, "to:2026-06-25T10:00:00")
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
         conflict = self._project_metadata()["launch_conflict"]
 
         blocker_ids = {blocker["id"] for blocker in state["known_blockers"]}
@@ -156,7 +171,7 @@ class CoreSimulationTests(unittest.TestCase):
 
     def test_autonomous_actor_behavior_applies_once_when_time_crosses_trigger(self) -> None:
         result = advance_time(self.db_path, "to:2026-06-24T15:00:00")
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         applied_policy_ids = {
             policy["id"] for policy in result["applied_actor_behaviors"]
@@ -177,7 +192,7 @@ class CoreSimulationTests(unittest.TestCase):
 
     def test_autonomous_daisy_policy_fires_only_without_customer_wording(self) -> None:
         result = advance_time(self.db_path, "to:2026-06-25T09:30:00")
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         applied_policy_ids = {
             policy["id"] for policy in result["applied_actor_behaviors"]
@@ -249,7 +264,7 @@ class CoreSimulationTests(unittest.TestCase):
             conn.close()
 
         result = advance_time(self.db_path, "to:2026-06-24T16:30:00")
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         applied_policy_ids = {
             policy["id"] for policy in result["applied_actor_behaviors"]
@@ -291,7 +306,7 @@ class CoreSimulationTests(unittest.TestCase):
             conn.close()
 
         result = advance_time(self.db_path, "to:2026-06-25T09:15:00")
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         applied_policy_ids = {
             policy["id"] for policy in result["applied_actor_behaviors"]
@@ -337,7 +352,7 @@ class CoreSimulationTests(unittest.TestCase):
             conn.close()
 
         result = advance_time(self.db_path, "to:2026-06-25T09:45:00")
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         applied_policy_ids = {
             policy["id"] for policy in result["applied_actor_behaviors"]
@@ -391,7 +406,7 @@ class CoreSimulationTests(unittest.TestCase):
             conn.close()
 
         result = advance_time(self.db_path, "to:2026-06-25T13:00:00")
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         applied_policy_ids = {
             policy["id"] for policy in result["applied_actor_behaviors"]
@@ -405,7 +420,7 @@ class CoreSimulationTests(unittest.TestCase):
 
     def test_interruption_creates_actor_commitment(self) -> None:
         advance_time(self.db_path, "to:2026-06-24T10:00:00")
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         commitments = {row["id"]: row for row in state["actor_commitments"]}
 
@@ -446,9 +461,9 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertTrue(conflict["inputs"]["implementation_scope_clear"])
 
     def test_customer_launch_mode_question_adds_pressure_event(self) -> None:
-        before = observe(self.db_path)
+        before = observe(self.db_path, include_private=True)
         result = advance_time(self.db_path, "to:2026-06-24T15:30:00")
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         event_types = {event["event_type"] for event in result["delivered_events"]}
         recent = state["recent_messages"][0]
@@ -466,7 +481,7 @@ class CoreSimulationTests(unittest.TestCase):
 
     def test_private_repo_security_question_arrives_as_background_event(self) -> None:
         result = advance_time(self.db_path, "to:2026-06-24T14:00:00")
-        state = observe(self.db_path)
+        state = observe(self.db_path, include_private=True)
 
         event_types = {event["event_type"] for event in result["delivered_events"]}
         recent = state["recent_messages"][0]

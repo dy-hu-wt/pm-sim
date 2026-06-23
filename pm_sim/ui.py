@@ -210,7 +210,7 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
                 if project.get("deadline")
             ],
         },
-        "observation": observe(db_path),
+        "observation": observe(db_path, include_private=True),
         "evaluation": evaluate(db_path, scenario_path),
         "tasks": list_tasks(db_path),
         "timeline": entries,

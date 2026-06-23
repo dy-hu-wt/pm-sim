@@ -52,6 +52,8 @@ The simulator exposes workplace tools rather than direct storage operations:
 
 These are different interfaces over the same state.
 
+The agent-facing `observe` surface is intentionally public. It shows visible projects, people/roles, discovered facts, known blockers, recent messages, visible docs, tasks, calendar obligations, and live pressures. It does not expose private persona fields, coworker voice hints, hidden event queue entries, rule triggers, or grading internals. Operator/UI code may request private observation for debugging, but that is not part of the agent's tool surface.
+
 ## State Ownership
 
 The scenario authors:
@@ -97,6 +99,8 @@ Each coworker can have:
 - proactive policy rules
 
 This gives the simulator realism without making grading depend on unconstrained model behavior.
+
+Private coworker voice/persona metadata is runtime authoring data. The PM agent learns coworker behavior through messages, delays, meetings, escalations, and durable state changes rather than by reading the hidden persona directly.
 
 ## Events
 

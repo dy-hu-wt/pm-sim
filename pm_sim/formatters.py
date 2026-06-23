@@ -316,6 +316,15 @@ def _format_observe(value: dict[str, Any]) -> str:
                     lines.append(f"  Missing:  {_short(', '.join(missing), 120)}")
 
     lines.append("")
+    lines.append("People")
+    people = value.get("people", [])
+    if people:
+        for person in people:
+            lines.append(f"  {person['id']}: {person['name']} ({person['role']})")
+    else:
+        lines.append("  None")
+
+    lines.append("")
     lines.append("Known Blockers")
     blockers = value.get("known_blockers", [])
     if blockers:
@@ -329,44 +338,47 @@ def _format_observe(value: dict[str, Any]) -> str:
     else:
         lines.append("  None")
 
-    lines.append("")
-    lines.append("Coworker State")
-    coworker_state = value.get("coworker_state", [])
-    if coworker_state:
-        for row in coworker_state:
-            lines.append(
-                f"  {row['person_id']}.{row['key']} = {_format_json_value(row.get('value_json'))}"
-            )
-    else:
-        lines.append("  None")
+    if "coworker_state" in value:
+        lines.append("")
+        lines.append("Coworker State")
+        coworker_state = value.get("coworker_state", [])
+        if coworker_state:
+            for row in coworker_state:
+                lines.append(
+                    f"  {row['person_id']}.{row['key']} = {_format_json_value(row.get('value_json'))}"
+                )
+        else:
+            lines.append("  None")
 
-    lines.append("")
-    lines.append("Actor Workload")
-    workloads = value.get("actor_workload", [])
-    if workloads:
-        for row in workloads:
-            lines.append(
-                f"  {row['person_id']}: {row.get('load_level', 'normal')} load"
-                f" · {row.get('capacity_minutes_remaining', 0)}m capacity"
-            )
-            if row.get("current_focus"):
-                lines.append(f"       Focus: {_short(row['current_focus'], 120)}")
-    else:
-        lines.append("  None")
+    if "actor_workload" in value:
+        lines.append("")
+        lines.append("Actor Workload")
+        workloads = value.get("actor_workload", [])
+        if workloads:
+            for row in workloads:
+                lines.append(
+                    f"  {row['person_id']}: {row.get('load_level', 'normal')} load"
+                    f" · {row.get('capacity_minutes_remaining', 0)}m capacity"
+                )
+                if row.get("current_focus"):
+                    lines.append(f"       Focus: {_short(row['current_focus'], 120)}")
+        else:
+            lines.append("  None")
 
-    lines.append("")
-    lines.append("Actor Commitments")
-    commitments = value.get("actor_commitments", [])
-    open_commitments = [row for row in commitments if row.get("status") != "done"]
-    if open_commitments:
-        for row in open_commitments[:8]:
-            due = f" due {_pretty_time(row.get('due_at'))}" if row.get("due_at") else ""
-            lines.append(
-                f"  {row['person_id']} [{row.get('status')}]{due}: "
-                f"{_short(row.get('description', ''), 120)}"
-            )
-    else:
-        lines.append("  None")
+    if "actor_commitments" in value:
+        lines.append("")
+        lines.append("Actor Commitments")
+        commitments = value.get("actor_commitments", [])
+        open_commitments = [row for row in commitments if row.get("status") != "done"]
+        if open_commitments:
+            for row in open_commitments[:8]:
+                due = f" due {_pretty_time(row.get('due_at'))}" if row.get("due_at") else ""
+                lines.append(
+                    f"  {row['person_id']} [{row.get('status')}]{due}: "
+                    f"{_short(row.get('description', ''), 120)}"
+                )
+        else:
+            lines.append("  None")
 
     lines.append("")
     lines.append("Recent Messages")
@@ -395,17 +407,18 @@ def _format_observe(value: dict[str, Any]) -> str:
     else:
         lines.append("  None")
 
-    lines.append("")
-    lines.append("Next Events")
-    events = value.get("pending_events", [])
-    if events:
-        for event in events[:5]:
-            lines.append(
-                f"  {_pretty_time(event['scheduled_at'])}  "
-                f"{event['event_type']}  ({event['id']})"
-            )
-    else:
-        lines.append("  None")
+    if "pending_events" in value:
+        lines.append("")
+        lines.append("Next Events")
+        events = value.get("pending_events", [])
+        if events:
+            for event in events[:5]:
+                lines.append(
+                    f"  {_pretty_time(event['scheduled_at'])}  "
+                    f"{event['event_type']}  ({event['id']})"
+                )
+        else:
+            lines.append("  None")
 
     return "\n".join(lines)
 

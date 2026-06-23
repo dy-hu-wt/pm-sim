@@ -33,19 +33,23 @@ def reset(
     }
 
 
-def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
-    from .calendar import visible_calendar_obligations
-
+def observe(
+    db_path: Path | str = DEFAULT_DB_PATH,
+    *,
+    include_private: bool = False,
+) -> dict[str, Any]:
     conn = connect(db_path)
     try:
-        return {
+        project_metadata = ", metadata_json" if include_private else ""
+        pressure_metadata = ", pr.metadata_json" if include_private else ""
+        result = {
             "current_time": get_current_time(conn),
             "scenario_id": get_state_value(conn, "scenario_id"),
             "projects": rows_to_dicts(
                 conn.execute(
-                    """
+                    f"""
                     SELECT id, name, description, status, risk_level,
-                           stakeholder_pressure, deadline, metadata_json
+                           stakeholder_pressure, deadline{project_metadata}
                     FROM projects
                     ORDER BY id
                     """
@@ -53,10 +57,10 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
             ),
             "pressures": rows_to_dicts(
                 conn.execute(
-                    """
+                    f"""
                     SELECT pr.id, pr.project_id, pr.owner_id, p.name AS owner_name,
                            pr.kind, pr.intensity, pr.min_intensity, pr.max_intensity,
-                           pr.reason, pr.due_at, pr.updated_at, pr.metadata_json
+                           pr.reason, pr.due_at, pr.updated_at{pressure_metadata}
                     FROM pressures pr
                     LEFT JOIN people p ON p.id = pr.owner_id
                     ORDER BY pr.intensity DESC, pr.due_at, pr.id
@@ -76,54 +80,9 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
             "people": rows_to_dicts(
                 conn.execute(
                     """
-                    SELECT id, name, role, behavior_json
+                    SELECT id, name, role
                     FROM people
                     ORDER BY id
-                    """
-                ).fetchall()
-            ),
-            "coworker_state": rows_to_dicts(
-                conn.execute(
-                    """
-                    SELECT cs.person_id, p.name, cs.key, cs.value_json, cs.updated_at
-                    FROM coworker_state cs
-                    JOIN people p ON p.id = cs.person_id
-                    ORDER BY cs.person_id, cs.key
-                    """
-                ).fetchall()
-            ),
-            "actor_goals": rows_to_dicts(
-                conn.execute(
-                    """
-                    SELECT ag.id, ag.person_id, p.name, ag.project_id, ag.description,
-                           ag.priority, ag.status, ag.metadata_json
-                    FROM actor_goals ag
-                    JOIN people p ON p.id = ag.person_id
-                    ORDER BY ag.person_id, ag.priority DESC, ag.id
-                    """
-                ).fetchall()
-            ),
-            "actor_workload": rows_to_dicts(
-                conn.execute(
-                    """
-                    SELECT aw.person_id, p.name, aw.current_focus,
-                           aw.capacity_minutes_remaining, aw.load_level,
-                           aw.updated_at, aw.metadata_json
-                    FROM actor_workload aw
-                    JOIN people p ON p.id = aw.person_id
-                    ORDER BY aw.person_id
-                    """
-                ).fetchall()
-            ),
-            "actor_commitments": rows_to_dicts(
-                conn.execute(
-                    """
-                    SELECT ac.id, ac.person_id, p.name, ac.project_id,
-                           ac.commitment_type, ac.description, ac.due_at,
-                           ac.status, ac.created_at, ac.updated_at, ac.metadata_json
-                    FROM actor_commitments ac
-                    JOIN people p ON p.id = ac.person_id
-                    ORDER BY ac.status, ac.due_at, ac.id
                     """
                 ).fetchall()
             ),
@@ -169,7 +128,10 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
                     """
                 ).fetchall()
             ),
-            "calendar_obligations": visible_calendar_obligations(db_path),
+            "calendar_obligations": _calendar_obligations(
+                db_path,
+                include_private=include_private,
+            ),
             "visible_docs": rows_to_dicts(
                 conn.execute(
                     """
@@ -180,7 +142,64 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
                     """
                 ).fetchall()
             ),
-            "pending_events": rows_to_dicts(
+        }
+
+        if include_private:
+            result["people_internal"] = rows_to_dicts(
+                conn.execute(
+                    """
+                    SELECT id, name, role, behavior_json
+                    FROM people
+                    ORDER BY id
+                    """
+                ).fetchall()
+            )
+            result["coworker_state"] = rows_to_dicts(
+                conn.execute(
+                    """
+                    SELECT cs.person_id, p.name, cs.key, cs.value_json, cs.updated_at
+                    FROM coworker_state cs
+                    JOIN people p ON p.id = cs.person_id
+                    ORDER BY cs.person_id, cs.key
+                    """
+                ).fetchall()
+            )
+            result["actor_goals"] = rows_to_dicts(
+                conn.execute(
+                    """
+                    SELECT ag.id, ag.person_id, p.name, ag.project_id, ag.description,
+                           ag.priority, ag.status, ag.metadata_json
+                    FROM actor_goals ag
+                    JOIN people p ON p.id = ag.person_id
+                    ORDER BY ag.person_id, ag.priority DESC, ag.id
+                    """
+                ).fetchall()
+            )
+            result["actor_workload"] = rows_to_dicts(
+                conn.execute(
+                    """
+                    SELECT aw.person_id, p.name, aw.current_focus,
+                           aw.capacity_minutes_remaining, aw.load_level,
+                           aw.updated_at, aw.metadata_json
+                    FROM actor_workload aw
+                    JOIN people p ON p.id = aw.person_id
+                    ORDER BY aw.person_id
+                    """
+                ).fetchall()
+            )
+            result["actor_commitments"] = rows_to_dicts(
+                conn.execute(
+                    """
+                    SELECT ac.id, ac.person_id, p.name, ac.project_id,
+                           ac.commitment_type, ac.description, ac.due_at,
+                           ac.status, ac.created_at, ac.updated_at, ac.metadata_json
+                    FROM actor_commitments ac
+                    JOIN people p ON p.id = ac.person_id
+                    ORDER BY ac.status, ac.due_at, ac.id
+                    """
+                ).fetchall()
+            )
+            result["pending_events"] = rows_to_dicts(
                 conn.execute(
                     """
                     SELECT id, event_type, scheduled_at, status, priority
@@ -190,10 +209,27 @@ def observe(db_path: Path | str = DEFAULT_DB_PATH) -> dict[str, Any]:
                     LIMIT 10
                     """
                 ).fetchall()
-            ),
-        }
+            )
+
+        return result
     finally:
         conn.close()
+
+
+def _calendar_obligations(
+    db_path: Path | str,
+    *,
+    include_private: bool,
+) -> list[dict[str, Any]]:
+    from .calendar import visible_calendar_obligations
+
+    obligations = visible_calendar_obligations(db_path)
+    if include_private:
+        return obligations
+    return [
+        {key: value for key, value in obligation.items() if key != "metadata"}
+        for obligation in obligations
+    ]
 
 
 def action_log(db_path: Path | str = DEFAULT_DB_PATH, limit: int = 20) -> list[dict[str, Any]]:

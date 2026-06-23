@@ -80,9 +80,9 @@ class PressureTests(unittest.TestCase):
             conn.close()
 
     def test_background_event_raises_pressure_without_project_delta_metadata(self) -> None:
-        before = observe(self.db_path)
+        before = observe(self.db_path, include_private=True)
         advance_time(self.db_path, "to:2026-06-24T15:30:00")
-        after = observe(self.db_path)
+        after = observe(self.db_path, include_private=True)
 
         before_pressures = {row["id"]: row for row in before["pressures"]}
         after_pressures = {row["id"]: row for row in after["pressures"]}
