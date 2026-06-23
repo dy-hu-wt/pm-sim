@@ -25,6 +25,76 @@ Supporting docs:
 - `docs/scenario_authoring.md`: how to write a new scenario
 - `docs/evaluator_semantics.md`: grading model and anti-cheat rules
 
+## Engine Structure
+
+```mermaid
+flowchart TD
+  subgraph Scenario["Scenario authoring"]
+    Manifest["scenario.yaml<br/>manifest + includes"]
+    World["world.yaml<br/>people, projects, tasks, docs, facts, blockers, events"]
+    Interactions["interactions.yaml<br/>reply, policy, event, meeting, action behaviors"]
+    Evaluation["evaluation.yaml<br/>agent brief, action checks, milestone rules, score components, outcomes"]
+  end
+
+  Loader["scenario loader<br/>validate refs + compile authoring rules"]
+  DB[("SQLite world state<br/>current time, messages, docs, tasks, blockers, facts,<br/>calendar, events, coworker state, logs")]
+
+  subgraph AgentSurface["Agent/operator surfaces"]
+    CLI["CLI tools"]
+    UI["operator UI"]
+    Agent["scripted or LLM agent"]
+  end
+
+  subgraph Tools["Workplace tools"]
+    Observe["observe / timeline"]
+    Docs["read_doc / update_doc"]
+    Comm["send_chat / send_email"]
+    Tasks["update_task"]
+    Calendar["schedule_meeting / advance_time / finish"]
+  end
+
+  subgraph Runtime["Simulation runtime"]
+    Actions["actions.py<br/>validate tool calls + apply action cost"]
+    Time["engine/time.py<br/>advance simulated time + deliver due events"]
+    Coworkers["coworkers.py<br/>deterministic candidate selection<br/>optional LLM prose rendering"]
+    Effects["engine/effects.py<br/>single mutation layer"]
+  end
+
+  subgraph Scoring["Outcome scoring"]
+    Checks["action_checks<br/>grounded action evidence"]
+    Milestones["milestone_rules<br/>derive scored state"]
+    Evaluator["evaluator.py<br/>score components + explanations"]
+    Outcome["deadline outcome rules<br/>final project result"]
+  end
+
+  Manifest --> Loader
+  World --> Loader
+  Interactions --> Loader
+  Evaluation --> Loader
+  Loader --> DB
+
+  Agent --> Tools
+  CLI --> Tools
+  UI --> Tools
+  Tools --> Actions
+  Calendar --> Time
+  Actions --> Coworkers
+  Time --> Coworkers
+  Coworkers --> Effects
+  Actions --> Effects
+  Time --> Effects
+  Effects --> DB
+  DB --> Observe
+
+  DB --> Checks
+  Checks --> Milestones
+  Milestones --> Evaluator
+  DB --> Outcome
+  Outcome --> Evaluator
+  Evaluator --> CLI
+  Evaluator --> UI
+```
+
 ## Setup
 
 Use Python 3.9+.
