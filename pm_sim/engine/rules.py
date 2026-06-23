@@ -101,37 +101,13 @@ def _match_concept_criteria(match: dict[str, Any]) -> dict[str, Any] | None:
     mode = str(match.get("mode", "deterministic")).lower()
     if mode != "concept_match":
         return None
-    criteria = _criteria_from_intents(match)
+    criteria = {
+        "required": _concept_items(match.get("required_concepts", [])),
+        "forbidden": _concept_items(match.get("forbidden_concepts", [])),
+    }
     criteria["mode"] = "concept_match"
     criteria["matcher"] = "llm"
     return criteria if criteria["required"] or criteria["forbidden"] else None
-
-
-def _criteria_from_intents(match: dict[str, Any]) -> dict[str, Any]:
-    if "required_concepts" in match or "forbidden_concepts" in match:
-        return {
-            "required": _concept_items(match.get("required_concepts", [])),
-            "forbidden": _concept_items(match.get("forbidden_concepts", [])),
-        }
-    intents = _intent_map(match)
-    required_ids = _required_intent_ids(match, intents)
-    forbidden_ids = _forbidden_intent_ids(match)
-    return {
-        "required": [
-            _concept_item_from_intent(intents[intent_id])
-            for intent_id in required_ids
-            if intent_id in intents
-        ],
-        "forbidden": [
-            _concept_item_from_intent(intents[intent_id])
-            for intent_id in forbidden_ids
-            if intent_id in intents
-        ],
-    }
-
-
-def _concept_item_from_intent(intent: dict[str, Any]) -> dict[str, Any]:
-    return dict(intent)
 
 
 def _concept_items(items: Any) -> list[dict[str, Any]]:

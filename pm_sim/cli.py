@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from .actions import (
-    list_tasks,
     read_doc,
     schedule_meeting,
     send_chat,
@@ -18,14 +17,12 @@ from .actions import (
 )
 from .agents.llm import LlmAgentError, run_llm_agent
 from .agents.scripted import run_scripted_agent
-from .calendar import validate_finish
 from .evaluator import evaluate
 from .formatters import format_agent_progress_console, format_output
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
-from .report import DEFAULT_UI_PATH, generate_report
 from .scenario import ScenarioError
-from .scenario_tools import lint_scenario, scenario_graph
-from .state import action_log, event_log, observe, reset
+from .scenario_tools import lint_scenario
+from .state import observe, reset
 from .engine.time import advance_time
 from .timeline import TIMELINE_KINDS, timeline
 from .ui import DEFAULT_UI_HOST, DEFAULT_UI_PORT, serve_ui
@@ -105,9 +102,6 @@ def _build_parser() -> argparse.ArgumentParser:
     observe_parser = subparsers.add_parser("observe", help="Print current observation.")
     observe_parser.set_defaults(func=lambda args: observe(args.db))
 
-    tasks_parser = subparsers.add_parser("list-tasks", help="List project tasks.")
-    tasks_parser.set_defaults(func=lambda args: list_tasks(args.db))
-
     read_doc_parser = subparsers.add_parser("read-doc", help="Read a visible document.")
     read_doc_parser.add_argument("doc_id")
     read_doc_parser.set_defaults(func=lambda args: read_doc(args.db, args.doc_id))
@@ -149,20 +143,6 @@ def _build_parser() -> argparse.ArgumentParser:
         )
     )
 
-    finish_parser = subparsers.add_parser(
-        "finish",
-        help="Validate that the agent can stop without visible pending obligations.",
-    )
-    finish_parser.set_defaults(func=lambda args: validate_finish(args.db))
-
-    log_parser = subparsers.add_parser("log", help="Debug direct action log.")
-    log_parser.add_argument("--limit", type=int, default=20)
-    log_parser.set_defaults(func=lambda args: action_log(args.db, args.limit))
-
-    events_parser = subparsers.add_parser("events", help="Debug scheduled/delivered event queue.")
-    events_parser.add_argument("--limit", type=int, default=20)
-    events_parser.set_defaults(func=lambda args: event_log(args.db, args.limit))
-
     timeline_parser = subparsers.add_parser("timeline", help="Show chronological simulation history.")
     timeline_parser.add_argument("--limit", type=int, default=0)
     timeline_parser.add_argument(
@@ -195,25 +175,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     lint_parser.set_defaults(func=lambda args: lint_scenario(args.scenario))
 
-    graph_parser = subparsers.add_parser(
-        "graph-scenario",
-        help="Print scenario graph nodes and causal links.",
-    )
-    graph_parser.add_argument(
-        "--scenario",
-        type=Path,
-        default=DEFAULT_SCENARIO_PATH,
-        help=f"Scenario YAML path. Default: {DEFAULT_SCENARIO_PATH}",
-    )
-    graph_parser.set_defaults(func=lambda args: scenario_graph(args.scenario))
-
     ui_parser = subparsers.add_parser("ui", help="Start the live operator UI.")
-    ui_parser.add_argument(
-        "--output",
-        type=Path,
-        default=DEFAULT_UI_PATH,
-        help=f"Static UI path for --static. Default: {DEFAULT_UI_PATH}",
-    )
     ui_parser.add_argument(
         "--timeline-limit",
         type=int,
@@ -225,11 +187,6 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_SCENARIO_PATH,
         help=f"Scenario YAML path. Default: {DEFAULT_SCENARIO_PATH}",
-    )
-    ui_parser.add_argument(
-        "--static",
-        action="store_true",
-        help="Write a static HTML snapshot instead of starting the live UI server.",
     )
     ui_parser.add_argument(
         "--host",
@@ -333,9 +290,6 @@ def _evaluate_command(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _ui_command(args: argparse.Namespace) -> dict[str, Any]:
-    if args.static:
-        _ensure_static_ui_state(args)
-        return generate_report(args.db, args.scenario, args.output, args.timeline_limit)
     return serve_ui(
         args.db,
         args.scenario,
@@ -349,39 +303,6 @@ def _ui_command(args: argparse.Namespace) -> dict[str, Any]:
         max_turns=args.max_turns,
         progress=None if args.as_json else _agent_progress,
     )
-
-
-def _ensure_static_ui_state(args: argparse.Namespace) -> None:
-    if _db_initialized(args.db):
-        return
-    if args.reset_first:
-        reset(args.db, args.scenario)
-        return
-    raise RuntimeError(
-        "Database is not initialized. Run pm-sim reset first or omit --resume "
-        "so pm-sim ui --static can initialize it."
-    )
-
-
-def _db_initialized(db_path: Path) -> bool:
-    import sqlite3
-
-    path = Path(db_path)
-    if not path.exists():
-        return False
-    conn = sqlite3.connect(path)
-    try:
-        row = conn.execute(
-            """
-            SELECT 1
-            FROM sqlite_master
-            WHERE type = 'table'
-              AND name = 'sim_state'
-            """
-        ).fetchone()
-        return row is not None
-    finally:
-        conn.close()
 
 
 def _run_agent_command(args: argparse.Namespace) -> dict[str, Any]:

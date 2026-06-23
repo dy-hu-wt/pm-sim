@@ -39,7 +39,6 @@ from pm_sim.engine.effects import apply_effects
 from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
-from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
 from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset
@@ -79,58 +78,6 @@ class ScriptedAgentTests(unittest.TestCase):
                 ("doc_friday_outcome",),
             ).fetchone()
         self.assertEqual(json.loads(row["metadata_json"])["final_outcome"], "draft_mode_beta_shipped")
-
-    def test_cli_ui_static_writes_html_summary(self) -> None:
-        run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
-        output_path = Path(self.tmpdir.name) / "ui.html"
-
-        output = self._run_cli("ui", "--static", "--output", str(output_path))
-        html = output_path.read_text(encoding="utf-8")
-
-        self.assertIn("UI written", output)
-        self.assertIn(str(output_path), output)
-        self.assertIn("Score:", output)
-        self.assertIn("PM Sim Operator UI", html)
-        self.assertIn("Evaluation", html)
-        self.assertIn("Playback", html)
-        self.assertIn("Timeline", html)
-        self.assertIn("Debug Logs", html)
-
-    def test_cli_ui_static_initializes_fresh_db(self) -> None:
-        output_path = Path(self.tmpdir.name) / "fresh_ui.html"
-
-        output = self._run_cli("ui", "--static", "--output", str(output_path))
-        html = output_path.read_text(encoding="utf-8")
-
-        self.assertIn("UI written", output)
-        self.assertIn("PM Sim Operator UI", html)
-        self.assertTrue(self.db_path.exists())
-        with connect(self.db_path) as conn:
-            row = conn.execute("SELECT value FROM sim_state WHERE key = 'scenario_id'").fetchone()
-        self.assertEqual(row["value"], "launch_readiness")
-
-    def test_cli_ui_static_resume_fresh_db_gives_clean_error(self) -> None:
-        output_path = Path(self.tmpdir.name) / "fresh_ui.html"
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = cli_main(
-                [
-                    "--db",
-                    str(self.db_path),
-                    "ui",
-                    "--static",
-                    "--resume",
-                    "--output",
-                    str(output_path),
-                ]
-            )
-
-        self.assertEqual(exit_code, 2)
-        self.assertFalse(output_path.exists())
-        self.assertIn("Database is not initialized", stderr.getvalue())
-        self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_scripted_agent_uses_public_tool_actions(self) -> None:
         run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)

@@ -53,6 +53,16 @@ Hidden or private until discovered:
 | Thu 16:00 | Koopa deadline settles. | Koopa outcome depends on scoped wording and no overcommitment. |
 | Fri 15:00 | Nimbus launch deadline settles. | Final project outcome is classified from world state. |
 
+## Pressure Model
+
+Pressure is the scenario's way of representing stakeholder heat that changes over time. It is not a score by itself. It tells the simulator which relationships are getting more tense, which questions are becoming urgent, and which outcomes should feel worse if the PM delays or communicates poorly.
+
+The week starts with two visible pressures: Daisy needs reliable Nimbus wording before her Thursday customer update, and Mario wants to keep the strongest launch scope if risk allows. More pressure appears as the week unfolds. Nimbus asks a private-repo security question, Daisy asks for a final go/no-go, and Koopa introduces a smaller customer interruption with its own Thursday deadline.
+
+Good PM work lowers pressure by turning uncertainty into grounded state. For example, emailing Daisy customer-ready draft-mode wording lowers Nimbus confidence pressure. Answering the security question from the source-of-truth doc lowers security-review pressure. Scoping Koopa to a one-time CSV keeps that customer request from stealing focus from the PR Review Agent launch.
+
+Bad or incomplete work leaves pressure high. If Daisy never gets forwardable wording, the final outcome can still ship technically but with customer pressure attached. If Koopa gets overpromised, portfolio tradeoff quality drops even if the main launch work is moving.
+
 ## Tasks And Blockers
 
 | Task | Initial state | Blocked by | Valid ways to solve |

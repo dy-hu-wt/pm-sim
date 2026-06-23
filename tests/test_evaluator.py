@@ -31,7 +31,6 @@ from pm_sim.engine.effects import apply_effects
 from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
-from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
 from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset

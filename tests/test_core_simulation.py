@@ -31,7 +31,6 @@ from pm_sim.engine.effects import apply_effects
 from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
-from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
 from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset
@@ -960,23 +959,6 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertTrue(all(entry["kind"].startswith("event_") for entry in events))
         self.assertEqual({entry["kind"] for entry in messages}, {"message"})
         self.assertEqual({entry["kind"] for entry in milestones}, {"milestone"})
-
-    def test_static_ui_writes_operator_html(self) -> None:
-        send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
-        advance_time(self.db_path, "until_next_event")
-        output_path = Path(self.tmpdir.name) / "operator_ui.html"
-
-        result = generate_report(self.db_path, DEFAULT_SCENARIO_PATH, output_path, timeline_limit=20)
-        html = output_path.read_text(encoding="utf-8")
-
-        self.assertTrue(result["ok"])
-        self.assertEqual(result["path"], str(output_path))
-        self.assertIn("PM Sim Operator UI", html)
-        self.assertIn("Playback", html)
-        self.assertIn("Evaluation", html)
-        self.assertIn("Timeline", html)
-        self.assertIn("Action Log", html)
-        self.assertIn("blocker_discovered", html)
 
     def test_live_ui_play_steps_run_scripted_pm_path(self) -> None:
         initial = _scripted_demo_state(self.db_path, DEFAULT_SCENARIO_PATH)

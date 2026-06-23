@@ -21,7 +21,7 @@ Scored milestones should be represented as state:
 
 - coworker state, such as `daisy.customer_update_received`
 - world/project state, such as `project.decision`
-- fact/blocker visibility, such as `fact_backfill_checksum_mismatch.visible_at`
+- fact/blocker visibility, such as `fact_repo_sync_stale.visible_at`
 - task/blocker status when it reflects a real gate
 
 The evaluator derives scored milestones from `milestone_rules`. Direct `record_milestone` effects are rejected for scored keys by scenario validation.
@@ -37,7 +37,7 @@ It does not decide whether the PM deserves credit by itself. Causal gates run fi
 - required customer interruptions must already be visible
 - required coworker state must already exist
 
-Concept matching is LLM-backed and requires `OPENAI_API_KEY` for full scoring. The matcher receives only the authored criteria and the candidate action text, returns per-concept booleans and rationales, and fails closed on missing credentials, invalid output, missing concept IDs, or contradictory top-level results. The evaluator still scores database state. The concept-match cache key includes model, criteria, text, and rule id, so model changes cannot reuse stale results.
+Concept matching is LLM-backed and requires `OPENAI_API_KEY` for full scoring. The matcher receives only the authored criteria and the candidate action text, returns per-concept booleans and rationales, and fails closed on missing credentials, invalid output, missing concept IDs, or contradictory top-level results. A match records `action_evidence`; separate deterministic promotion rules re-check causal gates before mutating coworker state or pressure. The evaluator still scores database state. The concept-match cache key includes model, criteria, text, and rule id, so model changes cannot reuse stale results.
 
 ## Anti-Cheat Matrix
 

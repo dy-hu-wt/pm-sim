@@ -4,6 +4,7 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Any
 
+from .concept_match import concept_match
 from .engine.conditions import all_conditions_match
 from .engine.runtime_config import event_rules
 from .engine.rules import match_rule, match_text_and_facts, normalize_text, priority_sorted
@@ -78,12 +79,14 @@ def replies_for_message(
 ) -> list[CoworkerReply]:
     person_id = person_id.lower()
     channel = channel.lower()
-    normalized = normalize_text(f"{subject or ''} {body}")
+    text = f"{subject or ''} {body}"
+    normalized = normalize_text(text)
     state = state or {}
     snapshot = _actor_snapshot(person_id, state, conn)
     candidates = _actor_decision_candidates(
         person_id,
         channel,
+        text,
         normalized,
         state,
         snapshot,
@@ -95,6 +98,7 @@ def replies_for_message(
 def _actor_decision_candidates(
     person_id: str,
     channel: str,
+    text: str,
     normalized: str,
     state: dict[str, Any],
     snapshot: ActorSnapshot,
@@ -102,17 +106,16 @@ def _actor_decision_candidates(
 ) -> list[ActorCandidate]:
     candidates = []
     candidates.extend(
-        _matching_behavior_candidates(person_id, channel, normalized, state, snapshot, conn)
+        _matching_behavior_candidates(person_id, channel, text, normalized, state, snapshot, conn)
     )
     candidates.extend(_commitment_candidates(person_id, channel, normalized, state, snapshot))
-    candidates.extend(_actor_goal_candidates(person_id, channel, normalized, state, snapshot))
-    candidates.extend(_contradiction_candidates(person_id, channel, normalized, state, snapshot))
     return sorted(candidates, key=lambda candidate: candidate.score, reverse=True)
 
 
 def _matching_behavior_candidates(
     person_id: str,
     channel: str,
+    text: str,
     normalized: str,
     state: dict[str, Any],
     snapshot: ActorSnapshot,
@@ -130,6 +133,16 @@ def _matching_behavior_candidates(
             normalized_text=normalized,
             conn=conn,
             state=state,
+            concept_matcher=(
+                None
+                if conn is None
+                else lambda criteria, matched_rule: concept_match(
+                    conn,
+                    text=text,
+                    criteria=criteria,
+                    rule_id=str(matched_rule.get("id", "")),
+                )
+            ),
         ).matches:
             continue
 
@@ -201,87 +214,6 @@ def _commitment_candidates(
                 urgency=20,
                 relevance=30,
                 candidate_id=f"agenda_commitment_{commitment['id']}",
-            )
-        )
-
-    return candidates
-
-
-def _actor_goal_candidates(
-    person_id: str,
-    channel: str,
-    normalized: str,
-    state: dict[str, Any],
-    snapshot: ActorSnapshot,
-) -> list[ActorCandidate]:
-    if not _message_is_ambiguous(normalized):
-        return []
-    needs = snapshot.behavior.get("needs_from_pm")
-    if not isinstance(needs, list) or not needs:
-        return []
-
-    body = _render_actor_utterance(
-        snapshot,
-        constraints=_string_list(snapshot.behavior.get("known_constraints", []))[:1],
-        asks=[str(needs[0])],
-    )
-    return [
-        _agenda_candidate(
-            person_id,
-            channel,
-            state,
-            body,
-            priority=20,
-            urgency=5,
-            relevance=10,
-            candidate_id="agenda_clarification",
-        )
-    ]
-
-
-def _contradiction_candidates(
-    person_id: str,
-    channel: str,
-    normalized: str,
-    state: dict[str, Any],
-    snapshot: ActorSnapshot,
-) -> list[ActorCandidate]:
-    candidates = []
-    if _pushes_auto_commenting(normalized) and _draft_mode_is_decided(snapshot):
-        body = _render_actor_utterance(
-            snapshot,
-            constraints=["that conflicts with the recorded draft-mode decision"],
-            asks=["keep auto-commenting as follow-up unless Toad reopens the decision"],
-        )
-        candidates.append(
-            _agenda_candidate(
-                person_id,
-                channel,
-                state,
-                body,
-                priority=95,
-                urgency=35,
-                relevance=35,
-                candidate_id="agenda_contradicts_draft_decision",
-            )
-        )
-
-    if _pushes_full_cutover(normalized) and _staged_mode_is_decided(snapshot):
-        body = _render_actor_utterance(
-            snapshot,
-            constraints=["that conflicts with the staged migration decision"],
-            asks=["keep full cutover as follow-up until the blocking risk is cleared"],
-        )
-        candidates.append(
-            _agenda_candidate(
-                person_id,
-                channel,
-                state,
-                body,
-                priority=95,
-                urgency=35,
-                relevance=35,
-                candidate_id="agenda_contradicts_staged_decision",
             )
         )
 
@@ -570,48 +502,6 @@ def _mentions_commitment_context(
         if any(word in normalized for word in words[:8]):
             return True
     return False
-
-
-def _message_is_ambiguous(normalized: str) -> bool:
-    vague_terms = ("status", "update", "thoughts", "how is", "checking in", "anything")
-    concrete_terms = (
-        "risk",
-        "approve",
-        "decision",
-        "draft",
-        "security",
-        "customer",
-        "scope",
-        "blocked",
-        "blocker",
-        "export",
-        "cutover",
-    )
-    return any(term in normalized for term in vague_terms) and not any(
-        term in normalized for term in concrete_terms
-    )
-
-
-def _pushes_auto_commenting(normalized: str) -> bool:
-    return any(term in normalized for term in ("auto-comment", "auto comment", "autopost", "auto-post"))
-
-
-def _pushes_full_cutover(normalized: str) -> bool:
-    return "full cutover" in normalized or "cut over fully" in normalized
-
-
-def _draft_mode_is_decided(snapshot: ActorSnapshot) -> bool:
-    return (
-        "draft_mode_approved" in snapshot.discovered_facts
-        or "fact_draft_mode_approved" in snapshot.discovered_facts
-        or "draft_mode_approved" in snapshot.project_decisions.values()
-        or snapshot.coworker_state.get((snapshot.person_id, "approval_recorded")) is True
-        or any(value == "draft_mode_approved" for value in snapshot.project_decisions.values())
-    )
-
-
-def _staged_mode_is_decided(snapshot: ActorSnapshot) -> bool:
-    return any(value == "staged_shadow_mode" for value in snapshot.project_decisions.values())
 
 
 def _render_actor_utterance(

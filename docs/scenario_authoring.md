@@ -157,35 +157,34 @@ Use `visible_at: null` for docs, facts, and blockers that exist in the world but
 
 `interactions.yaml` is where the week moves. The engine advances time, delivers events, records actions, and applies effects. The scenario decides which facts are revealed and which state changes happen.
 
-Coworker behavior lives in `actor_behaviors`. A `reply` behavior handles chat or email from the agent. A `policy` behavior is proactive: the coworker reaches out because time passed or some state was missing.
+Coworker behavior is split by authoring purpose. `reply_behaviors` are direct replies to chat or email from the agent. `policy_behaviors` are proactive: a coworker reaches out because time passed or some state was missing. `event_behaviors` say what happens when a scheduled event is delivered. `meeting_behaviors` define transcript/effect rules for useful meetings. `action_behaviors` define action-derived effects that are not grading templates.
 
 ```yaml
-actor_behaviors:
-  - id: luigi_repo_sync_reply
-    kind: reply
-    person_id: luigi
-    channels: [chat, email]
-    match:
-      mode: deterministic
-      intents:
-        - id: asks_repo_sync_risk
-          description: The agent asks whether repo sync is safe for Friday launch.
-          signals:
-            - repo sync risk
-            - stale commit
-            - latest commit reliability
-      require_all: [asks_repo_sync_risk]
-    reply:
-      body: Repo sync can still review a stale commit if webhooks arrive out of order. I recommend draft mode for Friday.
-      delay_minutes: 70
-    effects:
-      - type: discover_fact
-        fact_id: fact_repo_sync_stale
-        source: luigi_reply
-      - type: update_coworker_state
-        person_id: luigi
-        key: repo_sync_risk_shared
-        value: true
+reply_behaviors:
+  luigi:
+    - id: luigi_repo_sync_reply
+      channels: [chat, email]
+      match:
+        mode: deterministic
+        intents:
+          - id: asks_repo_sync_risk
+            description: The agent asks whether repo sync is safe for Friday launch.
+            signals:
+              - repo sync risk
+              - stale commit
+              - latest commit reliability
+        require_all: [asks_repo_sync_risk]
+      reply:
+        body: Repo sync can still review a stale commit if webhooks arrive out of order. I recommend draft mode for Friday.
+        delay_minutes: 70
+      effects:
+        - type: discover_fact
+          fact_id: fact_repo_sync_stale
+          source: luigi_reply
+        - type: update_coworker_state
+          person_id: luigi
+          key: repo_sync_risk_shared
+          value: true
 ```
 
 The important part is the effect, not the exact sentence. If the same information can be learned by chat, email, or meeting, make all paths converge on the same fact and coworker state.
@@ -193,9 +192,8 @@ The important part is the effect, not the exact sentence. If the same informatio
 Proactive behavior makes coworkers feel stateful. Daisy should not wait forever if she needs customer wording.
 
 ```yaml
-actor_behaviors:
+policy_behaviors:
   - id: daisy_customer_wording_nudge
-    kind: policy
     person_id: daisy
     trigger:
       at: "2026-06-25T09:30:00"
@@ -226,10 +224,10 @@ events:
       project_id: project_pr_review_agent
 ```
 
-`event_rules` say what happens when an event is delivered.
+`event_behaviors` say what happens when an event is delivered.
 
 ```yaml
-event_rules:
+event_behaviors:
   - id: daisy_security_question_arrives
     event_type: daisy_private_repo_security_question
     effects:
@@ -416,13 +414,12 @@ Before calling a scenario done, run these commands:
 ```bash
 pm-sim reset --scenario scenarios/<scenario_id>
 pm-sim lint-scenario --scenario scenarios/<scenario_id>
-pm-sim graph-scenario --scenario scenarios/<scenario_id>
 pm-sim advance-time to:2026-06-26T15:00:00
 pm-sim evaluate --scenario scenarios/<scenario_id> --explain
 pm-sim run-agent --policy scripted --reset --scenario scenarios/<scenario_id>
 python -m unittest discover -s tests
 ```
 
-`lint-scenario` gives counts, warnings, actor behavior primitive counts, and score links. `graph-scenario` prints the project/task/blocker/dependency/grading graph so you can see whether a milestone is actually connected to the state it claims to measure.
+`lint-scenario` gives counts, warnings, actor behavior primitive counts, and score links so you can see whether milestones are connected to the state they claim to measure.
 
 Then inspect the no-op score and the scripted score. The no-op path should be clearly worse. The scripted path should pass. If both paths score well, the evaluator is too loose. If the scripted path only works by following one exact sequence, add alternate chat, email, or meeting paths that produce the same state.

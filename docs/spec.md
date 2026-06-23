@@ -56,7 +56,7 @@ Example actions:
 ```text
 send_chat(person_id, body)
 send_email(to, subject, body)
-list_tasks()
+observe()
 update_task(task_id, status, priority)
 read_doc(doc_id)
 update_doc(doc_id, body)
@@ -324,7 +324,7 @@ pm-sim read-doc doc_project_brief
 pm-sim update-doc doc_launch_decision_record "Friday launch decision: ..."
 pm-sim send-chat luigi "Any repo sync blockers for launch?"
 pm-sim advance-time until_next_event
-pm-sim log
+pm-sim timeline --kind action
 pm-sim evaluate
 pm-sim run-agent --policy scripted --reset
 pm-sim run-agent --policy llm --reset --max-turns 40

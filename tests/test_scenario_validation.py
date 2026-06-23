@@ -32,8 +32,7 @@ from pm_sim.engine.effects import apply_effects
 from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
-from pm_sim.report import generate_report
-from pm_sim.scenario import ScenarioError, load_scenario
+from pm_sim.scenario import ScenarioError, _load_scenario_data, load_scenario
 from pm_sim.scenario_tools import lint_scenario, scenario_graph
 from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset
@@ -44,27 +43,28 @@ from pm_sim.ui import _html, _run_next_ui_step, _scripted_demo_state, _state_pay
 class ScenarioValidationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.base = load_scenario(DEFAULT_SCENARIO_PATH)
+        self.author_base = _load_scenario_data(Path(DEFAULT_SCENARIO_PATH))
         self.tmpdir = tempfile.TemporaryDirectory()
 
     def tearDown(self) -> None:
         self.tmpdir.cleanup()
 
     def test_invalid_task_owner_raises_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
+        scenario = copy.deepcopy(self.author_base)
         scenario["tasks"][0]["owner_id"] = "unknown_person"
 
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
     def test_missing_person_response_delay_raises_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
+        scenario = copy.deepcopy(self.author_base)
         del scenario["people"][0]["response_delay_minutes"]
 
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
     def test_invalid_dependency_task_raises_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
+        scenario = copy.deepcopy(self.author_base)
         scenario["dependencies"][0]["upstream_task_id"] = "missing_task"
 
         with self.assertRaises(ScenarioError):
@@ -87,29 +87,29 @@ class ScenarioValidationTests(unittest.TestCase):
         self.assertIn("complete", gate["statuses"])
 
     def test_invalid_event_project_payload_raises_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
+        scenario = copy.deepcopy(self.author_base)
         scenario["events"][0]["payload"]["project_id"] = "missing_project"
 
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
     def test_duplicate_ids_raise_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
+        scenario = copy.deepcopy(self.author_base)
         scenario["events"][1]["id"] = scenario["events"][0]["id"]
 
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
     def test_invalid_event_rule_effect_raises_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
-        scenario["event_rules"][0]["effects"][1]["project_id"] = "missing_project"
+        scenario = copy.deepcopy(self.author_base)
+        scenario["event_behaviors"][0]["effects"][1]["project_id"] = "missing_project"
 
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
     def test_invalid_coworker_state_effect_raises_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
-        scenario["event_rules"][0]["effects"].append(
+        scenario = copy.deepcopy(self.author_base)
+        scenario["event_behaviors"][0]["effects"].append(
             {
                 "type": "update_coworker_state",
                 "person_id": "missing_person",
@@ -122,28 +122,22 @@ class ScenarioValidationTests(unittest.TestCase):
             load_scenario(self._write_scenario(scenario))
 
     def test_invalid_actor_policy_person_raises_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
-        next(behavior for behavior in scenario["actor_behaviors"] if behavior["kind"] == "policy")["person_id"] = "unknown_person"
+        scenario = copy.deepcopy(self.author_base)
+        scenario["policy_behaviors"][0]["person_id"] = "unknown_person"
 
         with self.assertRaises(ScenarioError):
             load_scenario(self._write_scenario(scenario))
 
-    def test_invalid_actor_behavior_kind_raises_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
-        scenario["actor_behaviors"].append(
-            {
-                "id": "invalid_actor_behavior",
-                "kind": "wander",
-                "person_id": "daisy",
-            }
-        )
+    def test_legacy_behavior_key_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.author_base)
+        scenario["behaviors"] = [{"id": "invalid_actor_behavior", "kind": "wander"}]
 
-        with self.assertRaisesRegex(ScenarioError, "unsupported kind"):
+        with self.assertRaisesRegex(ScenarioError, "legacy behavior key"):
             load_scenario(self._write_scenario(scenario))
 
     def test_invalid_actor_workload_effect_raises_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
-        scenario["actor_behaviors"][0]["effects"].append(
+        scenario = copy.deepcopy(self.author_base)
+        scenario["policy_behaviors"][0]["effects"].append(
             {
                 "type": "update_actor_workload",
                 "person_id": "unknown_person",
@@ -155,19 +149,49 @@ class ScenarioValidationTests(unittest.TestCase):
             load_scenario(self._write_scenario(scenario))
 
     def test_invalid_action_match_intent_raises_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
+        scenario = copy.deepcopy(self.author_base)
         scenario["grading_rules"][0]["action"]["match"] = {
             "mode": "concept_match",
             "intents": [{"id": "missing_description"}],
             "require_all": ["missing_description"],
         }
 
+        with self.assertRaisesRegex(ScenarioError, "cannot use deterministic intent keys"):
+            load_scenario(self._write_scenario(scenario))
+
+    def test_empty_concept_match_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.author_base)
+        scenario["grading_rules"][0]["action"]["match"] = {"mode": "concept_match"}
+
+        with self.assertRaisesRegex(ScenarioError, "requires required_concepts or forbidden_concepts"):
+            load_scenario(self._write_scenario(scenario))
+
+    def test_duplicate_concept_id_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.author_base)
+        concepts = scenario["grading_rules"][0]["action"]["match"]["required_concepts"]
+        concepts[1]["id"] = concepts[0]["id"]
+
+        with self.assertRaisesRegex(ScenarioError, "duplicate concept id"):
+            load_scenario(self._write_scenario(scenario))
+
+    def test_overlapping_required_and_forbidden_concept_id_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.author_base)
+        match = scenario["grading_rules"][0]["action"]["match"]
+        match["forbidden_concepts"][0]["id"] = match["required_concepts"][0]["id"]
+
+        with self.assertRaisesRegex(ScenarioError, "cannot appear in both required and forbidden"):
+            load_scenario(self._write_scenario(scenario))
+
+    def test_concept_without_description_raises_scenario_error(self) -> None:
+        scenario = copy.deepcopy(self.author_base)
+        del scenario["grading_rules"][0]["action"]["match"]["required_concepts"][0]["description"]
+
         with self.assertRaisesRegex(ScenarioError, "must include description"):
             load_scenario(self._write_scenario(scenario))
 
     def test_direct_scored_milestone_effect_raises_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
-        scenario["event_rules"][0]["effects"].append(
+        scenario = copy.deepcopy(self.author_base)
+        scenario["event_behaviors"][0]["effects"].append(
             {
                 "type": "record_milestone",
                 "key": "blocker_discovered",
@@ -179,7 +203,7 @@ class ScenarioValidationTests(unittest.TestCase):
             load_scenario(self._write_scenario(scenario))
 
     def test_manifest_scenario_includes_files(self) -> None:
-        scenario = copy.deepcopy(self.base)
+        scenario = copy.deepcopy(self.author_base)
         manifest = {
             key: scenario.pop(key)
             for key in ("id", "name", "company", "start_time", "timezone", "summary")
@@ -257,7 +281,7 @@ class ScenarioValidationTests(unittest.TestCase):
             load_scenario(path)
 
     def test_event_before_start_time_raises_scenario_error(self) -> None:
-        scenario = copy.deepcopy(self.base)
+        scenario = copy.deepcopy(self.author_base)
         scenario["events"][0]["scheduled_at"] = "2026-06-22T08:59:00"
 
         with self.assertRaises(ScenarioError):

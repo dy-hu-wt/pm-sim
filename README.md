@@ -70,7 +70,7 @@ This creates `data/current.db`, which is ignored by git.
 
 ## Baseline Comparison
 
-This is the no-op path. It lets the scheduled coworker events run to Friday without agent intervention, then scores the settled state and opens the generated outcome report.
+This is the no-op path. It lets the scheduled coworker events run to Friday without agent intervention, then scores the settled state and reads the in-scenario Friday outcome document.
 
 ```bash
 pm-sim reset
@@ -197,10 +197,9 @@ pm-sim observe
 pm-sim --json observe
 ```
 
-Read tasks and docs:
+Read docs:
 
 ```bash
-pm-sim list-tasks
 pm-sim read-doc doc_project_brief
 pm-sim read-doc doc_beta_rollout_template
 pm-sim read-doc doc_launch_decision_record
@@ -216,10 +215,7 @@ pm-sim send-email daisy "Nimbus Friday draft-mode status" "Repo sync has stale-c
 pm-sim update-doc doc_launch_decision_record "Friday launch decision: Toad approved draft mode for Nimbus. Draft suggestions require human approval before posting. Auto-commenting is out of Friday scope and remains follow-up work. Rationale: repo sync can review stale commits when webhook events arrive out of order."
 pm-sim update-task task_launch_decision --status in_progress
 pm-sim schedule-meeting "Draft-mode decision" 2026-06-24T10:00:00 2026-06-24T10:30:00 mario luigi daisy toad
-pm-sim finish
 ```
-
-`finish` refuses to stop while visible future calendar obligations or project deadlines remain. Advance time through the remaining visible obligations before calling it again.
 
 Inspect the chronological simulation history:
 
@@ -247,7 +243,7 @@ Open the operator UI:
 pm-sim ui
 ```
 
-This resets the scenario, starts a local UI, and opens it in your browser. The Play button runs the scripted PM demo one workplace action at a time, using the same backend tools and event queue as the CLI. Concept-scored communication still uses the configured LLM matcher. Use `pm-sim ui --resume` only when you intentionally want to inspect the current DB instead of starting fresh. To write a static HTML snapshot of the current DB, use `pm-sim ui --static --output tmp/demo_ui.html`; that file is a report-style snapshot, not a live run.
+This resets the scenario, starts a local UI, and opens it in your browser. The Play button runs the scripted PM demo one workplace action at a time, using the same backend tools and event queue as the CLI. Concept-scored communication still uses the configured LLM matcher. Use `pm-sim ui --resume` only when you intentionally want to inspect the current DB instead of starting fresh.
 
 To watch the model-driven agent in the same UI, install the LLM extra, set `OPENAI_API_KEY`, and run:
 
@@ -269,8 +265,7 @@ Workplace actions also consume deterministic simulated effort: chat costs 5 minu
 Debug lower-level internals when needed:
 
 ```bash
-pm-sim events
-pm-sim log
+pm-sim timeline --kind action
 ```
 
 Run the scripted agent:
@@ -286,7 +281,7 @@ Run the optional LLM agent:
 pm-sim run-agent --policy llm --reset --max-turns 40
 ```
 
-The LLM policy uses the OpenAI API to choose workplace tool calls, then the simulator executes those calls locally. The model does not get the evaluator as a tool during the episode. Visible calendar obligations are part of the simulation state; `finish` is rejected while known commitments or project deadlines remain. After the agent reaches the end of those visible obligations and stops, the runner finalizes any remaining deadline settlement and grades that state.
+The LLM policy uses the OpenAI API to choose workplace tool calls, then the simulator executes those calls locally. The model does not get the evaluator as a tool during the episode. Visible calendar obligations are part of the simulation state; the agent runner rejects its internal finish tool while known commitments or project deadlines remain. After the agent reaches the end of those visible obligations and stops, the runner finalizes any remaining deadline settlement and grades that state.
 
 An LLM turn means one model decision round: the runner sends the current conversation/tool results to the model, waits for tool calls, runs those tools, and feeds the tool outputs back. A single model turn may contain more than one tool call. LLM runs print concise colorized progress lines with simulated time, action labels, logical time cost, and short results, such as `[agent] [Wed 2026-06-24 14:00] CHAT to luigi: ... — scheduled 1 reply event(s) (+5m)`. Add `--quiet` to suppress those logs. The LLM instructions ask for targeted coordination rather than broad check-ins. The agent action loop can stop when `finish` succeeds, the run exhausts turns, or the model stops producing tool calls. The final summary prints both why the agent loop stopped and which deadline events/outcome were delivered; long runs show step counts plus recent steps instead of every action.
 
@@ -308,9 +303,9 @@ Task updates are checked against the surrounding world state to resist reward ha
 
 After the Friday deadline event is delivered, `evaluate` also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
-The scenario is split across `scenarios/launch_readiness/scenario.yaml`, `world.yaml`, `interactions.yaml`, and `evaluation.yaml`. Most scenario semantics now live in data: task gates, coworker memory, actor behaviors, chat/email/doc-derived effects, pressure rows, state-derived evidence, harmful-action rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger intents, transcript lines, concept criteria, pressure kinds, and effects. Static `stakeholder_pressure` text is only project context; mutable pressure uses `pressures` rows with `1-10` intensity plus `increase_pressure`, `lower_pressure`, `pressure_at_least`, and `pressure_at_most`. `actor_behaviors` is the single behavior authoring and runtime surface: `kind: "reply"` handles chat/email replies, and `kind: "policy"` handles proactive timed/state-driven nudges. Matching uses one `match` object: deterministic actor routing uses `mode: "deterministic"` with authored intents/signals, while action-derived scoring uses `mode: "concept_match"` after causal `when` conditions pass. Concept communication checks are LLM-backed, cached, and fail closed. The LLM receives only the action text and authored concept criteria; it never decides facts, task state, outcome state, or points. The concept-match cache key includes model, criteria, text, and rule id. The `ui` command is an operator surface over the same SQLite state; its live playback advances time through the same backend event queue rather than replaying separate UI state.
+The scenario is split across `scenarios/launch_readiness/scenario.yaml`, `world.yaml`, `interactions.yaml`, and `evaluation.yaml`. Most scenario semantics now live in data: task gates, coworker memory, grouped interaction behaviors, pressure rows, state-derived evidence, harmful-action rules, meetings, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger intents, transcript lines, concept criteria, pressure kinds, and effects. Static `stakeholder_pressure` text is only project context; mutable pressure uses `pressures` rows with `1-10` intensity plus `increase_pressure`, `lower_pressure`, `pressure_at_least`, and `pressure_at_most`. `interactions.yaml` uses purpose-specific sections: `event_behaviors`, `policy_behaviors`, `reply_behaviors`, `meeting_behaviors`, and `action_behaviors`. The loader compiles those sections into runtime rule lists before writing SQLite state. Matching uses one `match` object: deterministic actor routing uses `mode: "deterministic"` with authored intents/signals, while action-derived scoring uses `mode: "concept_match"` after causal `when` conditions pass. Concept communication checks are LLM-backed, cached, and fail closed; successful matches record `action_evidence`, then deterministic promotion rules mutate coworker state or pressure. The LLM receives only the action text and authored concept criteria; it never decides facts, task state, outcome state, or points. The concept-match cache key includes model, criteria, text, and rule id. The `ui` command is an operator surface over the same SQLite state; its live playback advances time through the same backend event queue rather than replaying separate UI state.
 
-Coworkers are deterministic autonomous actors, not freeform LLM NPCs. Their distinct roles come from authored personas, agenda fields (`current_focus`, `needs_from_pm`, `known_constraints`), private facts, mutable `coworker_state`, schema-backed actor goals/workload/commitments, response-delay/availability windows, proactive scheduled events, and prioritized actor behaviors. Direct chat/email goes through an actor decision step: the simulator gathers matched behavior candidates, actor workload constraints, open commitments, agenda/clarification needs, and contradictions with recorded decisions, ranks them, then composes one delayed reply. Actor behaviors use the shared condition language through `when`, so behavior can depend on actor memory, project decisions, blocker status, milestones, or time. Meetings also check attendee availability and existing calendar conflicts before scheduling. This keeps grading reproducible while still modeling PM-relevant behavior such as delayed answers, private owner knowledge, stakeholder pressure, escalation, workload changes, explicit commitments, and different responses after someone has already answered or approved something.
+Coworkers are deterministic autonomous actors, not freeform LLM NPCs. Their distinct roles come from authored personas, private facts, mutable `coworker_state`, schema-backed actor goals/workload/commitments, response-delay/availability windows, proactive scheduled events, and prioritized actor behaviors. Direct chat/email goes through an actor decision step: the simulator gathers matched behavior candidates, actor workload constraints, and open commitments, ranks them, then composes one delayed reply. Actor behaviors use the shared condition language through `when`, so behavior can depend on actor memory, project decisions, blocker status, milestones, or time. Meetings also check attendee availability and existing calendar conflicts before scheduling. This keeps grading reproducible while still modeling PM-relevant behavior such as delayed answers, private owner knowledge, stakeholder pressure, escalation, workload changes, explicit commitments, and different responses after someone has already answered or approved something.
 
 The backend is covered by:
 

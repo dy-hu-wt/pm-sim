@@ -48,7 +48,23 @@ def _load_scenario_data(path: Path) -> dict[str, Any]:
                     f"{include_path} defines duplicate scenario key already present in {path}: {key}"
                 )
             merged[key] = value
+    _reject_legacy_behavior_keys(merged, path)
     return merged
+
+
+def _reject_legacy_behavior_keys(data: dict[str, Any], path: Path) -> None:
+    legacy_keys = {
+        "behaviors": "event_behaviors, policy_behaviors, reply_behaviors, meeting_behaviors, or action_behaviors",
+        "actor_behaviors": "policy_behaviors or reply_behaviors",
+        "event_rules": "event_behaviors",
+        "meeting_rules": "meeting_behaviors",
+        "action_rules": "action_behaviors or grading_rules",
+    }
+    for key, replacement in legacy_keys.items():
+        if key in data:
+            raise ScenarioError(
+                f"{path} uses legacy behavior key {key}; use {replacement} instead."
+            )
 
 
 def _load_yaml_object(path: Path) -> dict[str, Any]:
@@ -89,11 +105,7 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
         for rule in grading_rules
         if isinstance(rule, dict)
     }
-    action_rules = [
-        rule
-        for rule in compiled.get("action_rules", [])
-        if rule.get("id") not in generated_action_ids
-    ]
+    action_rules = []
     milestone_rules = [
         rule
         for rule in compiled.get("milestone_rules", [])
@@ -206,49 +218,78 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _compile_behaviors(data: dict[str, Any]) -> dict[str, Any]:
-    behaviors = data.get("behaviors", [])
-    if not behaviors:
-        return data
-    if not isinstance(behaviors, list):
-        raise ScenarioError("behaviors must be a list.")
-
     compiled = copy_object(data)
-    actor_behaviors = list(compiled.get("actor_behaviors", []))
-    event_rules = list(compiled.get("event_rules", []))
-    meeting_rules = list(compiled.get("meeting_rules", []))
-    action_rules = list(compiled.get("action_rules", []))
+    actor_behaviors: list[dict[str, Any]] = []
+    event_rules = _behavior_group(compiled, "event_behaviors")
+    meeting_rules = _behavior_group(compiled, "meeting_behaviors")
+    action_rules = [
+        *compiled.get("action_rules", []),
+        *_behavior_group(compiled, "action_behaviors"),
+    ]
     seen = set()
 
-    for behavior in behaviors:
-        if not isinstance(behavior, dict):
-            raise ScenarioError("behaviors entries must be objects.")
-        behavior_id = behavior.get("id")
-        if not isinstance(behavior_id, str) or not behavior_id:
-            raise ScenarioError("Behavior must have a string id.")
-        if behavior_id in seen:
-            raise ScenarioError(f"Behaviors have duplicate id: {behavior_id}")
-        seen.add(behavior_id)
+    for behavior in _behavior_group(compiled, "policy_behaviors"):
+        row = dict(behavior)
+        row["kind"] = "policy"
+        actor_behaviors.append(row)
 
-        kind = behavior.get("kind")
-        row = {key: value for key, value in behavior.items() if key != "kind"}
-        if kind in {"reply", "policy"}:
-            row["kind"] = kind
+    reply_behaviors = compiled.get("reply_behaviors", {})
+    if reply_behaviors is None:
+        reply_behaviors = {}
+    if not isinstance(reply_behaviors, dict):
+        raise ScenarioError("reply_behaviors must be an object keyed by person id.")
+    for person_id, behaviors in reply_behaviors.items():
+        if not isinstance(person_id, str) or not person_id:
+            raise ScenarioError("reply_behaviors keys must be non-empty person ids.")
+        if not isinstance(behaviors, list):
+            raise ScenarioError(f"reply_behaviors.{person_id} must be a list.")
+        for behavior in behaviors:
+            if not isinstance(behavior, dict):
+                raise ScenarioError(f"reply_behaviors.{person_id} entries must be objects.")
+            row = dict(behavior)
+            row["kind"] = "reply"
+            row["person_id"] = person_id
             actor_behaviors.append(row)
-        elif kind == "event":
-            event_rules.append(row)
-        elif kind == "meeting":
-            meeting_rules.append(row)
-        elif kind == "action":
-            action_rules.append(row)
-        else:
-            raise ScenarioError(f"Behavior {behavior_id} has unsupported kind: {kind}")
 
-    compiled.pop("behaviors", None)
+    for group_name, group in (
+        ("event_behaviors", event_rules),
+        ("policy_behaviors", actor_behaviors),
+        ("meeting_behaviors", meeting_rules),
+        ("action_behaviors", action_rules),
+    ):
+        for behavior in group:
+            behavior_id = behavior.get("id")
+            if not isinstance(behavior_id, str) or not behavior_id:
+                raise ScenarioError(f"{group_name} entries must include string id.")
+            if behavior_id in seen:
+                raise ScenarioError(f"Behavior groups have duplicate id: {behavior_id}")
+            seen.add(behavior_id)
+
+    for key in (
+        "event_behaviors",
+        "policy_behaviors",
+        "reply_behaviors",
+        "meeting_behaviors",
+        "action_behaviors",
+    ):
+        compiled.pop(key, None)
     compiled["actor_behaviors"] = actor_behaviors
     compiled["event_rules"] = event_rules
     compiled["meeting_rules"] = meeting_rules
     compiled["action_rules"] = action_rules
     return compiled
+
+
+def _behavior_group(data: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    behaviors = data.get(key, [])
+    if behaviors is None:
+        return []
+    if not isinstance(behaviors, list):
+        raise ScenarioError(f"{key} must be a list.")
+    for behavior in behaviors:
+        if not isinstance(behavior, dict):
+            raise ScenarioError(f"{key} entries must be objects.")
+    return [dict(behavior) for behavior in behaviors]
 
 
 def _normalize_author_references(data: dict[str, Any]) -> dict[str, Any]:

@@ -31,7 +31,6 @@ from pm_sim.engine.effects import apply_effects
 from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
-from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
 from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset
@@ -284,19 +283,36 @@ class ActorBehaviorTests(unittest.TestCase):
         )
 
     def test_actor_planner_challenges_message_that_contradicts_recorded_decision(self) -> None:
-        replies = replies_for_chat(
-            "toad",
-            "Let's switch back to auto-commenting for Friday.",
-            {
-                "actor_behaviors": [],
-                "response_delays": {"toad": 90},
-                "project_decisions": {"project_pr_review_agent": "draft_mode_approved"},
-            },
-        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            reset(db_path, DEFAULT_SCENARIO_PATH)
+            conn = connect(db_path)
+            try:
+                apply_effects(
+                    conn,
+                    [
+                        {
+                            "type": "update_project",
+                            "project_id": "project_pr_review_agent",
+                            "decision": "draft_mode_approved",
+                        }
+                    ],
+                    now="2026-06-22T12:00:00",
+                    source="test",
+                )
+                conn.commit()
+            finally:
+                conn.close()
 
-        self.assertEqual(len(replies), 1)
-        self.assertIn("conflicts with the recorded draft-mode decision", replies[0].body)
-        self.assertIn("agenda_contradicts_draft_decision", replies[0].matched_rule_ids)
+            result = send_chat(db_path, "toad", "Let's switch back to auto-commenting for Friday.")
+            advance_time(db_path, "until_next_event")
+            messages = [
+                message for message in observe(db_path)["recent_messages"]
+                if message["sender_id"] == "toad"
+            ]
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(any("conflicts with the recorded draft-mode decision" in message["body"] for message in messages))
 
     def test_luigi_repeat_risk_reply_does_not_duplicate_discovery_effects(self) -> None:
         replies = replies_for_chat(

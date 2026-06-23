@@ -24,6 +24,7 @@ from pm_sim.actions import (
 )
 from pm_sim.agents.llm import _instructions, llm_session_state, start_llm_session, step_llm_session, run_llm_agent
 from pm_sim.agents.scripted import run_scripted_agent
+from pm_sim.calendar import validate_finish
 from pm_sim.cli import main as cli_main
 from pm_sim.engine.conditions import condition_matches
 from pm_sim.coworkers import effects_for_event, replies_for_chat, replies_for_email
@@ -33,7 +34,7 @@ from pm_sim.engine.effects import apply_effects
 from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
-from pm_sim.scenario import ScenarioError, load_scenario
+from pm_sim.scenario import ScenarioError, _load_scenario_data, load_scenario
 from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset
 from pm_sim.engine.time import advance_time
@@ -275,8 +276,9 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertTrue(loads(state["value_json"]))
 
     def test_private_repo_security_reply_is_actor_behavior_driven(self) -> None:
-        scenario = load_scenario(DEFAULT_SCENARIO_PATH)
-        scenario["actor_behaviors"] = []
+        scenario = _load_scenario_data(Path(DEFAULT_SCENARIO_PATH))
+        scenario["reply_behaviors"] = {}
+        scenario["policy_behaviors"] = []
         scenario_path = Path(self.tmpdir.name) / "no_actor_behaviors.yaml"
         scenario_path.write_text(yaml.safe_dump(scenario, sort_keys=False))
         reset(self.db_path, scenario_path)
@@ -978,14 +980,14 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
         self.assertIn("Toad approval", result["error"])
         self.assertEqual(self._task_state("task_launch_decision"), before)
 
-    def test_finish_cli_rejects_and_then_accepts_after_visible_obligations(self) -> None:
-        rejected = self._run_cli("finish")
+    def test_finish_validator_rejects_and_then_accepts_after_visible_obligations(self) -> None:
+        rejected = validate_finish(self.db_path)
         advance_time(self.db_path, "to:2026-06-26T15:00:00")
-        accepted = self._run_cli("finish")
+        accepted = validate_finish(self.db_path)
 
-        self.assertIn("Finish rejected", rejected)
-        self.assertIn("Visible calendar obligations remain", rejected)
-        self.assertIn("Finish accepted", accepted)
+        self.assertFalse(rejected["ok"])
+        self.assertIn("Visible calendar obligations remain", rejected["error"])
+        self.assertTrue(accepted["ok"])
 
     def _drive_to_draft_approval(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
