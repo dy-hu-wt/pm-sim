@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from html import escape
+from html import escape, unescape
 from pathlib import Path
 from typing import Any
 
@@ -10,20 +10,22 @@ from .db import connect, rows_to_dicts
 from .evaluator import evaluate
 from .jsonutil import loads
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
+from .scenario import load_scenario
 from .state import action_log, event_log, observe
 from .timeline import timeline
 
 
-DEFAULT_REPORT_PATH = Path("tmp/operator_report.html")
+DEFAULT_UI_PATH = Path("tmp/operator_ui.html")
 
 
 def generate_report(
     db_path: Path | str = DEFAULT_DB_PATH,
     scenario_path: Path | str = DEFAULT_SCENARIO_PATH,
-    output_path: Path | str = DEFAULT_REPORT_PATH,
+    output_path: Path | str = DEFAULT_UI_PATH,
     timeline_limit: int = 80,
 ) -> dict[str, Any]:
     output = Path(output_path)
+    scenario = load_scenario(scenario_path)
     observation = observe(db_path)
     evaluation = evaluate(db_path, scenario_path)
     timeline_entries = timeline(db_path, limit=0)
@@ -31,6 +33,7 @@ def generate_report(
         timeline_entries = timeline_entries[-timeline_limit:]
 
     data = {
+        "scenario": _scenario_summary(scenario),
         "observation": observation,
         "evaluation": evaluation,
         "tasks": list_tasks(db_path),
@@ -73,7 +76,24 @@ def _visible_docs(db_path: Path | str) -> list[dict[str, Any]]:
         conn.close()
 
 
+def _scenario_summary(scenario: dict[str, Any]) -> dict[str, Any]:
+    project_deadlines = [
+        project.get("deadline")
+        for project in scenario.get("projects", [])
+        if project.get("deadline")
+    ]
+    return {
+        "id": scenario.get("id"),
+        "name": scenario.get("name") or scenario.get("id"),
+        "company": scenario.get("company", ""),
+        "start_time": scenario.get("start_time"),
+        "timezone": scenario.get("timezone"),
+        "project_deadlines": project_deadlines,
+    }
+
+
 def _render_html(data: dict[str, Any]) -> str:
+    scenario = data["scenario"]
     observation = data["observation"]
     evaluation = data["evaluation"]
     final_outcome = evaluation.get("final_outcome") or {}
@@ -86,7 +106,7 @@ def _render_html(data: dict[str, Any]) -> str:
             "<head>",
             '<meta charset="utf-8">',
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
-            "<title>PM Sim Operator Report</title>",
+            f"<title>{_h(scenario.get('name') or 'PM Sim Operator UI')}</title>",
             "<style>",
             _css(),
             "</style>",
@@ -97,13 +117,15 @@ def _render_html(data: dict[str, Any]) -> str:
             _top_nav(),
             '<header class="hero">',
             '<div class="hero-copy">',
-            '<p class="eyebrow">PM Sim Operator Report</p>',
-            f"<h1>{_h(observation.get('scenario_id', 'scenario'))}</h1>",
+            '<p class="eyebrow">PM Sim Operator UI</p>',
+            f"<h1>{_h(scenario.get('name') or observation.get('scenario_id', 'scenario'))}</h1>",
+            f"<p>{_h(scenario.get('company', ''))}</p>",
             f"<p>Simulated time: <strong>{_h(observation.get('current_time'))}</strong></p>",
             "</div>",
             f'<div class="hero-score">{_h(score)}<span>score</span></div>',
             "</header>",
             _summary_cards(evaluation, final_outcome),
+            _section("Playback", _playback(data.get("timeline", []))),
             '<div id="overview" class="dashboard-grid">',
             _section("Projects", _projects(observation.get("projects", []))),
             _section("Calendar Obligations", _obligations(observation.get("calendar_obligations", []))),
@@ -112,11 +134,14 @@ def _render_html(data: dict[str, Any]) -> str:
             _section("Known Blockers", _blockers(observation.get("known_blockers", []))),
             _section("Evaluation", _evaluation(evaluation)),
             "</div>",
-            _section("Week Timeline", _week_calendar(data.get("timeline", []))),
+            _section("Timeline", _week_calendar(data.get("timeline", []), scenario)),
             _section("Tasks", _tasks(data.get("tasks", []))),
             _section("Recent Messages", _messages(observation.get("recent_messages", []))),
             _section("Visible Docs", _docs(data.get("docs", []))),
             _section("Debug Logs", _debug_logs(data)),
+            "<script>",
+            _script(data.get("timeline", [])),
+            "</script>",
             "</main>",
             "</div>",
             "</body>",
@@ -259,6 +284,39 @@ p { margin: 0 0 8px; }
 .calendar-time { color: var(--muted); font-size: 11px; font-weight: 800; }
 .calendar-title { font-weight: 800; margin-top: 2px; }
 .calendar-detail { color: var(--muted); margin-top: 3px; font-size: 12px; }
+.playback-panel { padding: 16px; display: grid; gap: 14px; }
+.playback-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.playback-button {
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 8px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.playback-button.primary { background: var(--blue); border-color: var(--blue); color: #ffffff; }
+.playback-meter { color: var(--muted); font-size: 13px; font-weight: 700; }
+.playback-track {
+  display: grid;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 6px;
+}
+.playback-item {
+  display: none;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+.playback-item.visible { display: block; }
+.playback-item.event { border-left-color: var(--purple); }
+.playback-item .meta { color: var(--muted); font-size: 12px; font-weight: 800; }
+.playback-item .title { font-weight: 850; margin-top: 2px; }
+.playback-item .detail { color: var(--muted); margin-top: 3px; }
 .debug-stack { padding: 14px; display: grid; gap: 10px; }
 details {
   border: 1px solid var(--line);
@@ -339,7 +397,8 @@ def _top_nav() -> str:
     links = [
         ("overview", "Overview"),
         ("evaluation", "Evaluation"),
-        ("week-timeline", "Week Timeline"),
+        ("playback", "Playback"),
+        ("timeline", "Timeline"),
         ("tasks", "Tasks"),
         ("recent-messages", "Messages"),
         ("visible-docs", "Docs"),
@@ -348,7 +407,7 @@ def _top_nav() -> str:
     nav = "".join(f'<a href="#{section_id}">{_h(label)}</a>' for section_id, label in links)
     return (
         '<nav class="top-nav">'
-        '<div class="brand"><strong>PM Sim</strong><span>operator report</span></div>'
+        '<div class="brand"><strong>PM Sim</strong><span>operator ui</span></div>'
         f'<div class="nav-links">{nav}</div>'
         "</nav>"
     )
@@ -361,7 +420,7 @@ def _summary_cards(evaluation: dict[str, Any], final_outcome: dict[str, Any]) ->
         '<div class="stat-grid">'
         + _card("Score", f"{evaluation.get('score')} / {evaluation.get('max_score')}", "good" if status == "passed" else "warn")
         + _card("Evidence Found", str(evaluation.get("evidence_count", 0)))
-        + _card("Friday Result", outcome_title)
+        + _card("Outcome", outcome_title)
         + _card("Status", status, "good" if status == "passed" else "warn")
         + "</div>"
     )
@@ -456,9 +515,37 @@ def _evaluation(evaluation: dict[str, Any]) -> str:
     return _table(["Component", "Score", "Status", "Note"], rows, raw_columns={2})
 
 
-def _week_calendar(entries: list[dict[str, Any]]) -> str:
-    days = ["2026-06-22", "2026-06-23", "2026-06-24", "2026-06-25", "2026-06-26"]
-    labels = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+def _playback(entries: list[dict[str, Any]]) -> str:
+    playback_entries = _playback_entries(entries)
+    if not playback_entries:
+        return '<p class="empty">No visible activity</p>'
+
+    items = []
+    for index, entry in enumerate(playback_entries):
+        items.append(
+            f'<div class="playback-item {_h(entry["kind"])}" data-step="{index}">'
+            f'<div class="meta">{_h(entry["time_label"])}</div>'
+            f'<div class="title">{_h(entry["title"])}</div>'
+            f'<div class="detail">{_h(entry["detail"])}</div>'
+            "</div>"
+        )
+    return (
+        '<div class="playback-panel">'
+        '<div class="playback-controls">'
+        '<button class="playback-button primary" type="button" data-playback="play">Play</button>'
+        '<button class="playback-button" type="button" data-playback="pause">Pause</button>'
+        '<button class="playback-button" type="button" data-playback="reset">Reset</button>'
+        f'<span class="playback-meter" id="playback-meter">0 / {len(playback_entries)}</span>'
+        "</div>"
+        '<div class="playback-track" id="playback-track">'
+        + "".join(items)
+        + "</div>"
+        "</div>"
+    )
+
+
+def _week_calendar(entries: list[dict[str, Any]], scenario: dict[str, Any]) -> str:
+    days = _timeline_days(entries, scenario)
     grouped = {day: [] for day in days}
     for entry in entries:
         card = _calendar_card(entry)
@@ -469,7 +556,8 @@ def _week_calendar(entries: list[dict[str, Any]]) -> str:
             grouped[day].append(card)
 
     columns = []
-    for day, label in zip(days, labels):
+    for day in days:
+        label = _day_label(day)
         cards = "".join(grouped[day]) or '<p class="empty">No visible activity</p>'
         columns.append(
             '<div class="day-column">'
@@ -480,7 +568,68 @@ def _week_calendar(entries: list[dict[str, Any]]) -> str:
     return '<div class="week-grid">' + "".join(columns) + "</div>"
 
 
+def _timeline_days(entries: list[dict[str, Any]], scenario: dict[str, Any]) -> list[str]:
+    values = [
+        scenario.get("start_time"),
+        *scenario.get("project_deadlines", []),
+        *(entry.get("time") for entry in entries),
+    ]
+    parsed = [_parse_date(value) for value in values if value]
+    if not parsed:
+        return []
+    start = min(parsed)
+    end = max(parsed)
+    day_count = (end - start).days + 1
+    return [(start + _day_delta(offset)).isoformat() for offset in range(day_count)]
+
+
+def _day_delta(days: int):
+    from datetime import timedelta
+
+    return timedelta(days=days)
+
+
+def _parse_date(value: Any):
+    return datetime.fromisoformat(str(value)[:19]).date()
+
+
+def _day_label(day: str) -> str:
+    try:
+        return datetime.fromisoformat(day).strftime("%a")
+    except ValueError:
+        return day
+
+
 def _calendar_card(entry: dict[str, Any]) -> str | None:
+    display = _display_timeline_entry(entry)
+    if display is None:
+        return None
+
+    return (
+        f'<div class="calendar-card {_h(display["kind"])}">'
+        f'<div class="calendar-time">{_h(_time_only(entry.get("time")))}</div>'
+        f'<div class="calendar-title">{_h(display["title"])}</div>'
+        f'<div class="calendar-detail">{_h(display["detail"])}</div>'
+        "</div>"
+    )
+
+
+def _playback_entries(entries: list[dict[str, Any]]) -> list[dict[str, str]]:
+    rows = []
+    for entry in entries:
+        display = _display_timeline_entry(entry)
+        if display is None:
+            continue
+        rows.append(
+            {
+                **display,
+                "time_label": f"{str(entry.get('time', ''))[:10]} {_time_only(entry.get('time'))}".strip(),
+            }
+        )
+    return rows
+
+
+def _display_timeline_entry(entry: dict[str, Any]) -> dict[str, str] | None:
     kind = entry.get("kind")
     if kind not in {"action", "event_delivered"}:
         return None
@@ -490,18 +639,14 @@ def _calendar_card(entry: dict[str, Any]) -> str | None:
         return None
 
     title = _calendar_title(entry)
-    detail = _calendar_detail(entry)
     if not title:
         return None
-
     card_kind = "event" if kind == "event_delivered" else str(kind or "action")
-    return (
-        f'<div class="calendar-card {_h(card_kind)}">'
-        f'<div class="calendar-time">{_h(_time_only(entry.get("time")))}</div>'
-        f'<div class="calendar-title">{title}</div>'
-        f'<div class="calendar-detail">{detail}</div>'
-        "</div>"
-    )
+    return {
+        "kind": card_kind,
+        "title": unescape(title),
+        "detail": unescape(_calendar_detail(entry)),
+    }
 
 
 def _calendar_title(entry: dict[str, Any]) -> str:
@@ -628,6 +773,55 @@ def _debug_logs(data: dict[str, Any]) -> str:
     )
 
 
+def _script(entries: list[dict[str, Any]]) -> str:
+    if not _playback_entries(entries):
+        return ""
+    return """
+(() => {
+  const items = Array.from(document.querySelectorAll(".playback-item"));
+  const meter = document.getElementById("playback-meter");
+  let index = 0;
+  let timer = null;
+
+  function render() {
+    items.forEach((item, itemIndex) => {
+      item.classList.toggle("visible", itemIndex < index);
+    });
+    if (meter) meter.textContent = `${index} / ${items.length}`;
+    const latest = items[Math.max(0, index - 1)];
+    if (latest) latest.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  function pause() {
+    if (timer) window.clearInterval(timer);
+    timer = null;
+  }
+
+  function play() {
+    pause();
+    timer = window.setInterval(() => {
+      if (index >= items.length) {
+        pause();
+        return;
+      }
+      index += 1;
+      render();
+    }, 650);
+  }
+
+  document.querySelector('[data-playback="play"]')?.addEventListener("click", play);
+  document.querySelector('[data-playback="pause"]')?.addEventListener("click", pause);
+  document.querySelector('[data-playback="reset"]')?.addEventListener("click", () => {
+    pause();
+    index = 0;
+    render();
+  });
+
+  render();
+})();
+""".strip()
+
+
 def _actions(actions: list[dict[str, Any]]) -> str:
     rows = [
         [item.get("created_at"), item.get("actor"), _badge(item.get("action_type"), "blue"), item.get("id")]
@@ -693,16 +887,7 @@ def _section_id(title: str) -> str:
 
 def _human_outcome(final_outcome: dict[str, Any]) -> str:
     outcome = final_outcome.get("outcome")
-    mapping = {
-        "draft_mode_beta_shipped": "Draft-mode beta shipped",
-        "late_draft_mode": "Draft mode landed late",
-        "risky_auto_commenting": "Risky auto-commenting shipped",
-        "missed_due_to_blockers": "Launch blocked",
-        "no_approved_friday_plan": "No approved Friday plan",
-        "koopa_audit_update_ready": "Koopa update ready",
-        "koopa_audit_scope_unresolved": "Koopa scope unresolved",
-    }
-    return mapping.get(str(outcome), _human_label(outcome or "Pending"))
+    return _human_label(outcome or "Pending")
 
 
 def _human_project_state(metadata: dict[str, Any]) -> str:
@@ -719,14 +904,6 @@ def _human_event(event_type: Any) -> str:
         "coworker_reply": "Coworker replied",
         "meeting_occurs": "Meeting ended",
         "project_deadline": "Project deadline",
-        "mario_auto_comment_push": "Mario pushed auto-commenting",
-        "peach_design_blocked_escalation": "Peach escalated blocker",
-        "daisy_confidence_check": "Daisy asked for confidence update",
-        "daisy_private_repo_security_question": "Daisy asked security question",
-        "nimbus_launch_mode_question": "Nimbus asked launch-mode question",
-        "luigi_proactive_repo_risk": "Luigi resurfaced repo risk",
-        "koopa_audit_export_request": "Koopa audit request arrived",
-        "thursday_final_readiness_check": "Thursday readiness check",
     }
     return mapping.get(str(event_type), _human_label(event_type))
 
@@ -736,14 +913,6 @@ def _human_event_detail(entry: dict[str, Any]) -> str:
         "coworker_reply": "A coworker response became visible.",
         "meeting_occurs": "The meeting ended and a transcript was created.",
         "project_deadline": "Deadline settled",
-        "mario_auto_comment_push": "Scope pressure",
-        "peach_design_blocked_escalation": "Onboarding risk",
-        "daisy_confidence_check": "Customer confidence check",
-        "daisy_private_repo_security_question": "Security question",
-        "nimbus_launch_mode_question": "Launch wording question",
-        "luigi_proactive_repo_risk": "Repo-sync reminder",
-        "koopa_audit_export_request": "New competing request",
-        "thursday_final_readiness_check": "Final go/no-go",
     }
     event_type = str(entry.get("event_type") or "")
     if event_type in descriptions:
@@ -764,48 +933,23 @@ def _human_label(value: Any) -> str:
     text = str(value or "")
     if not text:
         return ""
+    for prefix in ("doc_", "task_", "fact_", "blocker_", "project_", "event_"):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+            break
     return text.replace("_", " ").replace("-", " ").strip().capitalize()
 
 
 def _doc_name(value: Any) -> str:
-    names = {
-        "doc_project_brief": "PR Review Agent beta brief",
-        "doc_monday_standup": "Monday standup notes",
-        "doc_launch_decision_record": "Friday launch decision record",
-        "doc_beta_rollout_template": "Nimbus rollout template",
-        "doc_private_repo_security_baseline": "Private repo security baseline",
-        "doc_koopa_audit_export_note": "Koopa audit export note",
-        "doc_friday_outcome": "Friday outcome",
-        "doc_koopa_audit_export_outcome": "Koopa audit export outcome",
-    }
-    return names.get(str(value), _human_label(value or "document"))
+    return _human_label(value or "document")
 
 
 def _task_name(value: Any) -> str:
-    names = {
-        "task_launch_decision": "Launch-mode decision",
-        "task_draft_mode_docs": "Draft-mode onboarding",
-        "task_customer_talk_track": "Customer talk track",
-        "task_beta_rollout_notes": "Beta rollout notes",
-        "task_repo_sync": "Repo sync",
-        "task_review_context_pipeline": "Review context pipeline",
-        "task_audit_export_feasibility": "Audit export feasibility",
-        "task_audit_export_scope": "Audit export scope",
-        "task_koopa_status_update": "Koopa status update",
-    }
-    return names.get(str(value), _human_label(value or "task"))
+    return _human_label(value or "task")
 
 
 def _person_name(value: Any) -> str:
-    names = {
-        "agent": "Agent",
-        "mario": "Mario",
-        "luigi": "Luigi",
-        "peach": "Peach",
-        "daisy": "Daisy",
-        "toad": "Toad",
-    }
-    return names.get(str(value), _human_label(value))
+    return _human_label(value)
 
 
 def _time_only(value: Any) -> str:

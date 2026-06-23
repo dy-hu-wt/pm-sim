@@ -229,7 +229,7 @@ The first implementation should focus on the backend simulator:
 - evaluator
 - CLI/operator commands
 
-UI and APIs can come after the simulation semantics work. Richer observability is useful when it stays read-only: the generated operator report should summarize SQLite state, evaluation, timeline, and logs without owning separate state or changing the simulation.
+The operator UI is intentionally thin. It reads from the same SQLite state as the CLI, shows current projects, calendar obligations, evaluation, timeline, and logs, and can advance simulated time by calling the same backend event-queue code as `advance-time`. It does not own separate scenario state.
 
 ### Storage
 

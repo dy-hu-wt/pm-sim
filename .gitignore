@@ -2,6 +2,7 @@ tmp/
 data/
 __pycache__/
 *.pyc
+*.db
 *.egg-info/
 .venv/
 .env

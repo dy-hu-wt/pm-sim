@@ -1,0 +1,393 @@
+from __future__ import annotations
+
+import json
+import threading
+import webbrowser
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
+
+from .actions import list_tasks
+from .evaluator import evaluate
+from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
+from .scenario import load_scenario
+from .state import observe, reset
+from .time import advance_time
+from .timeline import timeline
+
+
+DEFAULT_UI_HOST = "127.0.0.1"
+DEFAULT_UI_PORT = 8765
+
+
+def serve_ui(
+    db_path: Path | str = DEFAULT_DB_PATH,
+    scenario_path: Path | str = DEFAULT_SCENARIO_PATH,
+    *,
+    host: str = DEFAULT_UI_HOST,
+    port: int = DEFAULT_UI_PORT,
+    open_browser: bool = True,
+    reset_first: bool = False,
+    timeline_limit: int = 120,
+) -> dict[str, Any]:
+    if reset_first:
+        reset(db_path, scenario_path)
+
+    server = _UiServer(
+        (host, port),
+        _Handler,
+        db_path=Path(db_path),
+        scenario_path=Path(scenario_path),
+        timeline_limit=timeline_limit,
+    )
+    url = f"http://{host}:{server.server_address[1]}/"
+
+    if open_browser:
+        threading.Timer(0.2, lambda: webbrowser.open(url)).start()
+
+    try:
+        print(f"UI running at {url}")
+        print("Press Ctrl-C to stop.")
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+
+    return {"ok": True, "url": url, "stopped": True}
+
+
+class _UiServer(ThreadingHTTPServer):
+    def __init__(
+        self,
+        server_address,
+        RequestHandlerClass,
+        *,
+        db_path: Path,
+        scenario_path: Path,
+        timeline_limit: int,
+    ):
+        super().__init__(server_address, RequestHandlerClass)
+        self.db_path = db_path
+        self.scenario_path = scenario_path
+        self.timeline_limit = timeline_limit
+
+
+class _Handler(BaseHTTPRequestHandler):
+    server: _UiServer
+
+    def do_GET(self) -> None:
+        path = urlparse(self.path).path
+        if path == "/":
+            self._send_html(_html())
+            return
+        if path == "/api/state":
+            self._send_json(_state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit))
+            return
+        self.send_error(404)
+
+    def do_POST(self) -> None:
+        path = urlparse(self.path).path
+        if path == "/api/reset":
+            reset(self.server.db_path, self.server.scenario_path)
+            self._send_json(_state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit))
+            return
+        if path == "/api/advance-next":
+            before = observe(self.server.db_path).get("current_time")
+            advanced = advance_time(self.server.db_path, "until_next_event")
+            payload = _state_payload(self.server.db_path, self.server.scenario_path, self.server.timeline_limit)
+            payload["advance"] = advanced
+            payload["done"] = before == advanced.get("to") and not advanced.get("delivered_events")
+            self._send_json(payload)
+            return
+        self.send_error(404)
+
+    def log_message(self, format: str, *args) -> None:
+        return
+
+    def _send_html(self, body: str) -> None:
+        encoded = body.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def _send_json(self, payload: dict[str, Any]) -> None:
+        encoded = json.dumps(payload).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+
+def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> dict[str, Any]:
+    scenario = load_scenario(scenario_path)
+    entries = timeline(db_path, limit=0)
+    if timeline_limit > 0:
+        entries = entries[-timeline_limit:]
+    return {
+        "scenario": {
+            "id": scenario.get("id"),
+            "name": scenario.get("name") or scenario.get("id"),
+            "company": scenario.get("company", ""),
+            "start_time": scenario.get("start_time"),
+        },
+        "observation": observe(db_path),
+        "evaluation": evaluate(db_path, scenario_path),
+        "tasks": list_tasks(db_path),
+        "timeline": entries,
+        "display_timeline": [_display_entry(entry) for entry in entries if _display_entry(entry)],
+    }
+
+
+def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
+    kind = entry.get("kind")
+    if kind not in {"action", "event_delivered"}:
+        return None
+    if kind == "action" and entry.get("action_type") in {"advance_time", "reset", "finalize_to_deadline"}:
+        return None
+    if kind == "event_delivered" and entry.get("event_type") == "coworker_reply":
+        return None
+
+    if kind == "event_delivered":
+        title = _label(entry.get("event_type"))
+        detail = "Event delivered"
+        card_kind = "event"
+    else:
+        action_type = str(entry.get("action_type") or "")
+        payload = entry.get("payload") or {}
+        title = _action_title(action_type, payload)
+        detail = _action_detail(action_type, payload)
+        card_kind = "action"
+
+    return {
+        "time": str(entry.get("time") or ""),
+        "kind": card_kind,
+        "title": title,
+        "detail": detail,
+    }
+
+
+def _action_title(action_type: str, payload: dict[str, Any]) -> str:
+    if action_type == "send_chat":
+        return f"Chat to {_label(payload.get('person_id'))}"
+    if action_type == "send_email":
+        return f"Email to {_label(payload.get('person_id'))}"
+    if action_type == "read_doc":
+        return "Read document"
+    if action_type == "update_doc":
+        return "Updated document"
+    if action_type == "update_task":
+        return "Updated task"
+    if action_type == "schedule_meeting":
+        return "Scheduled meeting"
+    return _label(action_type)
+
+
+def _action_detail(action_type: str, payload: dict[str, Any]) -> str:
+    if action_type in {"send_chat", "send_email"}:
+        return str(payload.get("subject") or "Message sent")
+    if action_type in {"read_doc", "update_doc"}:
+        return _label(payload.get("doc_id"))
+    if action_type == "update_task":
+        return _label(payload.get("task_id"))
+    if action_type == "schedule_meeting":
+        return str(payload.get("title") or "Meeting")
+    return _label(action_type)
+
+
+def _label(value: Any) -> str:
+    text = str(value or "")
+    for prefix in ("doc_", "task_", "fact_", "blocker_", "project_", "event_"):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+            break
+    return text.replace("_", " ").replace("-", " ").strip().capitalize()
+
+
+def _html() -> str:
+    return """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PM Sim UI</title>
+<style>
+:root { --bg:#f4f6f8; --panel:#fff; --ink:#17202a; --muted:#637083; --line:#d9dee7; --blue:#255c99; --purple:#6f4bb2; --good:#0f7b4f; --warn:#9a5b00; --bad:#aa2f2f; --shadow:0 16px 40px rgba(24,35,52,.08); }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+main { max-width:1280px; margin:0 auto; padding:24px; }
+.top { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; gap:16px; align-items:center; margin-bottom:16px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.95); box-shadow:var(--shadow); }
+.brand strong { display:block; font-size:16px; }
+.brand span { color:var(--muted); font-size:12px; }
+.controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+button { border:1px solid var(--line); border-radius:8px; padding:8px 12px; background:#fff; color:var(--ink); font-weight:800; cursor:pointer; }
+button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
+.meter { color:var(--muted); font-weight:800; }
+.hero, section, .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); }
+.hero { display:flex; justify-content:space-between; gap:16px; align-items:flex-end; padding:22px; margin-bottom:14px; }
+.eyebrow { color:var(--blue); text-transform:uppercase; font-size:12px; font-weight:800; letter-spacing:.08em; margin:0 0 4px; }
+h1 { margin:0 0 6px; font-size:30px; letter-spacing:0; }
+h2 { margin:0; font-size:17px; }
+p { margin:0 0 8px; }
+.score { font-size:30px; font-weight:850; text-align:right; }
+.score span { display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }
+.grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); margin-bottom:14px; }
+.card { padding:14px; border-left:4px solid var(--blue); }
+.label { color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; }
+.value { font-size:20px; font-weight:850; margin-top:4px; }
+section { margin:14px 0; overflow:hidden; }
+.section-head { padding:13px 15px; border-bottom:1px solid var(--line); background:#fbfcfe; }
+.playback { padding:14px; display:grid; gap:8px; max-height:420px; overflow:auto; }
+.item { border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:8px; background:#fff; padding:10px; }
+.item.event { border-left-color:var(--purple); }
+.item .time { color:var(--muted); font-size:12px; font-weight:850; }
+.item .title { font-weight:850; margin-top:2px; }
+.item .detail { color:var(--muted); margin-top:2px; }
+.columns { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px; }
+.list { padding:14px; display:grid; gap:8px; }
+.row { border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }
+.badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:800; background:#eef2f7; }
+.good { color:var(--good); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+.empty { color:var(--muted); font-style:italic; padding:14px; }
+@media (max-width:800px) { .top,.hero { display:block; } .controls { margin-top:10px; } .score { text-align:left; margin-top:12px; } }
+</style>
+</head>
+<body>
+<main>
+  <nav class="top">
+    <div class="brand"><strong>PM Sim</strong><span>live operator UI</span></div>
+    <div class="controls">
+      <button class="primary" id="play">Play</button>
+      <button id="step">Step</button>
+      <button id="pause">Pause</button>
+      <button id="reset">Reset</button>
+      <span class="meter" id="meter">loading</span>
+    </div>
+  </nav>
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Simulation</p>
+      <h1 id="title">PM Sim</h1>
+      <p id="subtitle"></p>
+      <p>Simulated time: <strong id="sim-time"></strong></p>
+    </div>
+    <div class="score"><span id="score">-</span><span>score</span></div>
+  </header>
+  <section id="playback-section">
+    <div class="section-head"><h2>Live Playback</h2></div>
+    <div class="playback" id="playback"></div>
+  </section>
+  <div class="grid" id="summary"></div>
+  <div class="columns">
+    <section><div class="section-head"><h2>Projects</h2></div><div class="list" id="projects"></div></section>
+    <section><div class="section-head"><h2>Calendar</h2></div><div class="list" id="calendar"></div></section>
+  </div>
+  <div class="columns">
+    <section><div class="section-head"><h2>Evaluation</h2></div><div class="list" id="evaluation"></div></section>
+    <section><div class="section-head"><h2>Tasks</h2></div><div class="list" id="tasks"></div></section>
+  </div>
+</main>
+<script>
+let timer = null;
+let stepping = false;
+
+const $ = (id) => document.getElementById(id);
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const pretty = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString([], { weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+};
+const statusClass = (value) => {
+  const text = String(value ?? "").toLowerCase();
+  if (["passed","done","complete","completed","resolved","low","delivered","shipped"].includes(text)) return "good";
+  if (["partial","medium","scheduled","pending","ready","in_progress","active"].includes(text)) return "warn";
+  if (["missing","failed","blocked","open","high","critical","at_risk"].includes(text)) return "bad";
+  return "";
+};
+const label = (value) => String(value ?? "").replace(/^(doc|task|fact|blocker|project|event)_/, "").replaceAll("_", " ").replaceAll("-", " ").replace(/^./, c => c.toUpperCase());
+
+async function api(path, options = {}) {
+  const response = await fetch(path, options);
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+
+function card(labelText, value) {
+  return `<div class="card"><div class="label">${esc(labelText)}</div><div class="value">${esc(value)}</div></div>`;
+}
+
+function row(title, detail, meta = "") {
+  return `<div class="row"><strong>${esc(title)}</strong>${meta ? ` <span class="badge ${statusClass(meta)}">${esc(label(meta))}</span>` : ""}<div>${esc(detail)}</div></div>`;
+}
+
+function render(state) {
+  const scenario = state.scenario || {};
+  const obs = state.observation || {};
+  const evaluation = state.evaluation || {};
+  $("title").textContent = scenario.name || obs.scenario_id || "PM Sim";
+  $("subtitle").textContent = scenario.company || "";
+  $("sim-time").textContent = pretty(obs.current_time);
+  $("score").textContent = `${evaluation.score ?? "-"} / ${evaluation.max_score ?? "-"}`;
+  $("meter").textContent = `${state.display_timeline.length} visible item(s)`;
+
+  $("summary").innerHTML = [
+    card("Evidence found", evaluation.evidence_count ?? 0),
+    card("Outcome", label((evaluation.final_outcome || {}).outcome || "pending")),
+    card("Status", evaluation.score === evaluation.max_score ? "passed" : "incomplete")
+  ].join("");
+
+  $("playback").innerHTML = state.display_timeline.length
+    ? state.display_timeline.map(item => `<div class="item ${esc(item.kind)}"><div class="time">${esc(pretty(item.time))}</div><div class="title">${esc(item.title)}</div><div class="detail">${esc(item.detail)}</div></div>`).join("")
+    : `<div class="empty">No visible activity yet.</div>`;
+  $("playback").lastElementChild?.scrollIntoView({ block: "nearest" });
+
+  $("projects").innerHTML = (obs.projects || []).map(project => row(project.name, `${project.stakeholder_pressure || ""} Deadline: ${pretty(project.deadline)}`, project.status)).join("") || `<div class="empty">No projects.</div>`;
+  $("calendar").innerHTML = (obs.calendar_obligations || []).map(item => row(item.title, pretty(item.start_at), item.kind)).join("") || `<div class="empty">No visible obligations.</div>`;
+  $("evaluation").innerHTML = (evaluation.components || []).map(component => row(label(component.key), component.note || "", `${component.earned} / ${component.points}`)).join("") || `<div class="empty">No evaluation yet.</div>`;
+  $("tasks").innerHTML = (state.tasks || []).slice(0, 12).map(task => row(task.title, `Owner: ${task.owner_id || "unowned"} · Due: ${pretty(task.due_at)}`, task.status)).join("") || `<div class="empty">No tasks.</div>`;
+}
+
+async function refresh() {
+  render(await api("/api/state"));
+}
+
+async function step() {
+  if (stepping) return;
+  stepping = true;
+  try {
+    const state = await api("/api/advance-next", { method: "POST" });
+    render(state);
+    if (state.done) pause();
+  } finally {
+    stepping = false;
+  }
+}
+
+function play() {
+  pause();
+  const loop = async () => {
+    await step();
+    if (timer) timer = setTimeout(loop, 900);
+  };
+  timer = setTimeout(loop, 0);
+}
+
+function pause() {
+  if (timer) clearTimeout(timer);
+  timer = null;
+}
+
+$("play").addEventListener("click", play);
+$("step").addEventListener("click", step);
+$("pause").addEventListener("click", pause);
+$("reset").addEventListener("click", async () => { pause(); render(await api("/api/reset", { method: "POST" })); });
+refresh();
+</script>
+</body>
+</html>"""

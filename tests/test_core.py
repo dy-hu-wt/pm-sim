@@ -788,17 +788,18 @@ class CoreSimulationTests(unittest.TestCase):
         self.assertEqual({entry["kind"] for entry in messages}, {"message"})
         self.assertEqual({entry["kind"] for entry in evidence}, {"evidence"})
 
-    def test_report_writes_operator_html(self) -> None:
+    def test_static_ui_writes_operator_html(self) -> None:
         send_chat(self.db_path, "luigi", "Any repo sync blockers for launch?")
         advance_time(self.db_path, "until_next_event")
-        output_path = Path(self.tmpdir.name) / "operator_report.html"
+        output_path = Path(self.tmpdir.name) / "operator_ui.html"
 
         result = generate_report(self.db_path, DEFAULT_SCENARIO_PATH, output_path, timeline_limit=20)
         html = output_path.read_text(encoding="utf-8")
 
         self.assertTrue(result["ok"])
         self.assertEqual(result["path"], str(output_path))
-        self.assertIn("PM Sim Operator Report", html)
+        self.assertIn("PM Sim Operator UI", html)
+        self.assertIn("Playback", html)
         self.assertIn("Evaluation", html)
         self.assertIn("Timeline", html)
         self.assertIn("Action Log", html)
@@ -2574,19 +2575,20 @@ class ScriptedAgentTests(unittest.TestCase):
             ).fetchone()
         self.assertEqual(json.loads(row["metadata_json"])["final_outcome"], "draft_mode_beta_shipped")
 
-    def test_cli_report_writes_html_summary(self) -> None:
+    def test_cli_ui_static_writes_html_summary(self) -> None:
         run_scripted_agent(self.db_path, DEFAULT_SCENARIO_PATH, reset_first=True)
-        output_path = Path(self.tmpdir.name) / "report.html"
+        output_path = Path(self.tmpdir.name) / "ui.html"
 
-        output = self._run_cli("report", "--output", str(output_path))
+        output = self._run_cli("ui", "--static", "--output", str(output_path))
         html = output_path.read_text(encoding="utf-8")
 
-        self.assertIn("Report written", output)
+        self.assertIn("UI written", output)
         self.assertIn(str(output_path), output)
         self.assertIn("Score:    120 / 120", output)
-        self.assertIn("PM Sim Operator Report", html)
-        self.assertIn("Draft-mode beta shipped", html)
-        self.assertIn("Week Timeline", html)
+        self.assertIn("PM Sim Operator UI", html)
+        self.assertIn("Draft mode beta shipped", html)
+        self.assertIn("Playback", html)
+        self.assertIn("Timeline", html)
         self.assertIn("Debug Logs", html)
 
     def test_scripted_agent_uses_public_tool_actions(self) -> None:

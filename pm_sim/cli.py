@@ -22,11 +22,12 @@ from .agents.scripted import run_scripted_agent
 from .evaluator import evaluate
 from .formatters import format_output
 from .paths import DEFAULT_DB_PATH, DEFAULT_SCENARIO_PATH
-from .report import DEFAULT_REPORT_PATH, generate_report
+from .report import DEFAULT_UI_PATH, generate_report
 from .scenario import ScenarioError
 from .state import action_log, event_log, observe, reset
 from .time import advance_time
 from .timeline import TIMELINE_KINDS, timeline
+from .ui import DEFAULT_UI_HOST, DEFAULT_UI_PORT, serve_ui
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -155,26 +156,53 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     evaluate_parser.set_defaults(func=_evaluate_command)
 
-    report_parser = subparsers.add_parser("report", help="Write an HTML operator report.")
-    report_parser.add_argument(
+    ui_parser = subparsers.add_parser("ui", help="Start the live operator UI.")
+    ui_parser.add_argument(
         "--output",
         type=Path,
-        default=DEFAULT_REPORT_PATH,
-        help=f"Report path. Default: {DEFAULT_REPORT_PATH}",
+        default=DEFAULT_UI_PATH,
+        help=f"Static UI path for --static. Default: {DEFAULT_UI_PATH}",
     )
-    report_parser.add_argument(
+    ui_parser.add_argument(
         "--timeline-limit",
         type=int,
         default=80,
         help="Number of recent timeline rows to include. Default: 80.",
     )
-    report_parser.add_argument(
+    ui_parser.add_argument(
         "--scenario",
         type=Path,
         default=DEFAULT_SCENARIO_PATH,
         help=f"Scenario JSON path. Default: {DEFAULT_SCENARIO_PATH}",
     )
-    report_parser.set_defaults(func=_report_command)
+    ui_parser.add_argument(
+        "--static",
+        action="store_true",
+        help="Write a static HTML snapshot instead of starting the live UI server.",
+    )
+    ui_parser.add_argument(
+        "--host",
+        default=DEFAULT_UI_HOST,
+        help=f"Host for the live UI server. Default: {DEFAULT_UI_HOST}.",
+    )
+    ui_parser.add_argument(
+        "--port",
+        type=int,
+        default=DEFAULT_UI_PORT,
+        help=f"Port for the live UI server. Default: {DEFAULT_UI_PORT}. Use 0 for any free port.",
+    )
+    ui_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="Do not open the browser automatically.",
+    )
+    ui_parser.add_argument(
+        "--reset",
+        action="store_true",
+        dest="reset_first",
+        help="Reset the DB before starting the UI.",
+    )
+    ui_parser.set_defaults(func=_ui_command)
 
     advance_parser = subparsers.add_parser("advance-time", help="Advance simulated time.")
     advance_parser.add_argument(
@@ -233,8 +261,18 @@ def _evaluate_command(args: argparse.Namespace) -> dict[str, Any]:
     return result
 
 
-def _report_command(args: argparse.Namespace) -> dict[str, Any]:
-    return generate_report(args.db, args.scenario, args.output, args.timeline_limit)
+def _ui_command(args: argparse.Namespace) -> dict[str, Any]:
+    if args.static:
+        return generate_report(args.db, args.scenario, args.output, args.timeline_limit)
+    return serve_ui(
+        args.db,
+        args.scenario,
+        host=args.host,
+        port=args.port,
+        open_browser=not args.no_open,
+        reset_first=args.reset_first,
+        timeline_limit=args.timeline_limit,
+    )
 
 
 def _run_agent_command(args: argparse.Namespace) -> dict[str, Any]:

@@ -220,12 +220,13 @@ pm-sim timeline --kind event
 pm-sim timeline --kind evidence
 ```
 
-Write a single-file operator report with current projects, calendar obligations, evidence, timeline, and logs:
+Open the operator UI:
 
 ```bash
-pm-sim report
-pm-sim report --output tmp/demo_report.html
+pm-sim ui
 ```
+
+This starts a local UI and opens it in your browser. The Play button advances simulated time through the backend, so events are delivered into SQLite as the UI runs. To write a static HTML snapshot instead, use `pm-sim ui --static --output tmp/demo_ui.html`.
 
 Advance simulated time without using wall-clock time:
 
@@ -278,7 +279,7 @@ Task updates are checked against the surrounding world state to resist reward ha
 
 After the Friday deadline event is delivered, `evaluate` also reports the classified final outcome, such as `draft_mode_beta_shipped`, `late_draft_mode`, `risky_auto_commenting`, `missed_due_to_blockers`, or `no_approved_friday_plan`.
 
-The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, and `rules.json`. Most scenario semantics now live in data: task gates, coworker memory, chat/email/doc-derived evidence rules, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger terms, transcript lines, and effects. The `report` command is a read-only operator surface over that same state, not a separate application state store.
+The scenario is split across `scenarios/launch_readiness/scenario.json`, `world.json`, and `rules.json`. Most scenario semantics now live in data: task gates, coworker memory, chat/email/doc-derived evidence rules, state-derived evidence, harmful-action rules, coworker chat rules, background event rules, meeting rules, and outcome rules are evaluated by reusable engine code. Python owns the deterministic interpreters and mutation layer; the authored scenario owns the people, facts, trigger terms, transcript lines, and effects. The `ui` command is an operator surface over the same SQLite state; its live playback advances time through the same backend event queue rather than replaying separate UI state.
 
 The backend is covered by:
 

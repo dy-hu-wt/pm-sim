@@ -28,8 +28,8 @@ def format_output(command: str | None, value: Any) -> str:
         return _format_timeline(value)
     if command == "run-agent":
         return _format_run_agent(value)
-    if command == "report":
-        return _format_report(value)
+    if command == "ui":
+        return _format_ui(value)
     return str(value)
 
 
@@ -346,12 +346,19 @@ def _format_timeline(entries: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _format_report(value: dict[str, Any]) -> str:
+def _format_ui(value: dict[str, Any]) -> str:
     if not value.get("ok"):
         return f"Error: {value.get('error')}"
+    if value.get("url"):
+        return "\n".join(
+            [
+                "UI stopped",
+                f"  URL: {value.get('url')}",
+            ]
+        )
     return "\n".join(
         [
-            "Report written",
+            "UI written",
             f"  Path:     {value.get('path')}",
             f"  Time:     {_pretty_time(value.get('current_time'))}",
             f"  Score:    {value.get('score')} / {value.get('max_score')}",
