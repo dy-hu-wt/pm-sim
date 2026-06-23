@@ -139,6 +139,11 @@ def _state_payload(db_path: Path, scenario_path: Path, timeline_limit: int) -> d
             "name": scenario.get("name") or scenario.get("id"),
             "company": scenario.get("company", ""),
             "start_time": scenario.get("start_time"),
+            "project_deadlines": [
+                project.get("deadline")
+                for project in scenario.get("projects", [])
+                if project.get("deadline")
+            ],
         },
         "observation": observe(db_path),
         "evaluation": evaluate(db_path, scenario_path),
@@ -248,7 +253,7 @@ section { margin:14px 0; overflow:hidden; }
 .section-head { padding:13px 15px; border-bottom:1px solid var(--line); background:#fbfcfe; }
 .playback-controls { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:8px; padding:14px 14px 0; }
 .replay { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(320px,.9fr); gap:12px; padding:14px; align-items:start; }
-.calendar-board { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; }
+.calendar-board { display:grid; grid-auto-flow:column; gap:10px; overflow-x:auto; padding-bottom:4px; }
 .day { min-height:180px; border:1px solid var(--line); border-radius:10px; background:#f8fafc; overflow:hidden; }
 .day-head { padding:9px 10px; border-bottom:1px solid var(--line); background:#fff; }
 .day-head strong { display:block; }
@@ -345,6 +350,12 @@ const dayLabel = (value) => {
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleDateString([], { weekday:"short" });
 };
+const addDays = (date, days) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+const isoDay = (date) => date.toISOString().slice(0, 10);
 
 async function api(path, options = {}) {
   const response = await fetch(path, options);
@@ -360,14 +371,34 @@ function row(title, detail, meta = "") {
   return `<div class="row"><strong>${esc(title)}</strong>${meta ? ` <span class="badge ${statusClass(meta)}">${esc(label(meta))}</span>` : ""}<div>${esc(detail)}</div></div>`;
 }
 
-function renderReplay(items) {
+function scenarioDays(scenario, items) {
+  const values = [
+    scenario.start_time,
+    ...(scenario.project_deadlines || []),
+    ...items.map(item => item.time)
+  ].filter(Boolean);
+  const parsed = values
+    .map(value => new Date(String(value).slice(0, 10) + "T12:00:00"))
+    .filter(date => !Number.isNaN(date.getTime()));
+  if (!parsed.length) return [];
+  const start = new Date(Math.min(...parsed));
+  const end = new Date(Math.max(...parsed));
+  const days = [];
+  for (let day = start; day <= end; day = addDays(day, 1)) days.push(isoDay(day));
+  return days;
+}
+
+function renderReplay(items, scenario) {
   const latest = items.length - 1;
   $("playback").innerHTML = items.length
     ? items.map((item, index) => `<div class="item ${esc(item.kind)} ${index === latest ? "current" : ""}"><div class="time">${esc(pretty(item.time))}</div><div class="title">${esc(item.title)}</div><div class="detail">${esc(item.detail)}</div></div>`).join("")
     : `<div class="empty">No visible activity yet.</div>`;
   $("playback").lastElementChild?.scrollIntoView({ block: "nearest" });
 
-  const days = [...new Set(items.map(item => dateKey(item.time)).filter(Boolean))];
+  const days = scenarioDays(scenario || {}, items);
+  $("calendar-board").style.gridTemplateColumns = days.length
+    ? `repeat(${days.length}, minmax(170px, 1fr))`
+    : "";
   $("calendar-board").innerHTML = days.length
     ? days.map(day => {
         const cards = items
@@ -396,7 +427,7 @@ function render(state) {
     card("Status", evaluation.score === evaluation.max_score ? "passed" : "incomplete")
   ].join("");
 
-  renderReplay(state.display_timeline || []);
+  renderReplay(state.display_timeline || [], scenario);
 
   $("projects").innerHTML = (obs.projects || []).map(project => row(project.name, `${project.stakeholder_pressure || ""} Deadline: ${pretty(project.deadline)}`, project.status)).join("") || `<div class="empty">No projects.</div>`;
   $("calendar").innerHTML = (obs.calendar_obligations || []).map(item => row(item.title, pretty(item.start_at), item.kind)).join("") || `<div class="empty">No visible obligations.</div>`;

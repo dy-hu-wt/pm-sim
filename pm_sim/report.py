@@ -257,9 +257,9 @@ p { margin: 0 0 8px; }
 }
 .week-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   overflow-x: auto;
+  padding-bottom: 4px;
 }
 .day-column {
   min-height: 180px;
@@ -593,7 +593,8 @@ def _week_calendar(entries: list[dict[str, Any]], scenario: dict[str, Any]) -> s
             f"{cards}"
             "</div>"
         )
-    return '<div class="week-grid">' + "".join(columns) + "</div>"
+    style = f' style="grid-template-columns: repeat({len(days)}, minmax(180px, 1fr));"'
+    return f'<div class="week-grid"{style}>' + "".join(columns) + "</div>"
 
 
 def _timeline_days(entries: list[dict[str, Any]], scenario: dict[str, Any]) -> list[str]:
