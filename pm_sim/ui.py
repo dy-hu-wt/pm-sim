@@ -323,23 +323,31 @@ def _display_entry(entry: dict[str, Any]) -> dict[str, str] | None:
         channel = str(entry.get("channel") or "").lower()
         sender = _label(entry.get("sender_id"))
         recipient = _label(entry.get("recipient_id") or "all")
-        title = f"{channel.capitalize()} {sender} -> {recipient}".strip()
-        detail = str(entry.get("subject") or entry.get("body") or "Message")
+        title = str(entry.get("subject") or f"{channel.capitalize()} update")
+        detail = str(entry.get("body") or "")
         card_kind = "message"
+        badge = channel.upper()
+        route = f"{sender} -> {recipient}".strip()
     elif kind == "event_delivered":
         title = _label(entry.get("event_type"))
         detail = "Event delivered"
         card_kind = "event"
+        badge = "EVENT"
+        route = ""
     else:
         action_type = str(entry.get("action_type") or "")
         payload = entry.get("payload") or {}
         title = _action_title(action_type, payload)
         detail = _action_detail(action_type, payload)
         card_kind = "action"
+        badge = _action_badge(action_type)
+        route = _action_route(action_type, payload)
 
     return {
         "time": str(entry.get("time") or ""),
         "kind": card_kind,
+        "badge": badge,
+        "route": route,
         "title": title,
         "detail": detail,
     }
@@ -380,17 +388,17 @@ def _log_lines(entries: list[dict[str, Any]], llm_state: dict[str, Any]) -> list
 
 def _action_title(action_type: str, payload: dict[str, Any]) -> str:
     if action_type == "send_chat":
-        return f"Chat to {_label(payload.get('person_id'))}"
+        return str(payload.get("subject") or "Message sent")
     if action_type == "send_email":
-        return f"Email to {_label(payload.get('person_id'))}"
+        return str(payload.get("subject") or "Email sent")
     if action_type == "read_doc":
-        return "Read document"
+        return _label(payload.get("doc_id"))
     if action_type == "update_doc":
-        return "Updated document"
+        return _label(payload.get("doc_id"))
     if action_type == "update_task":
-        return "Updated task"
+        return _label(payload.get("task_id"))
     if action_type == "schedule_meeting":
-        return "Scheduled meeting"
+        return str(payload.get("title") or "Meeting")
     if action_type == "advance_time":
         return "Waited"
     return _label(action_type)
@@ -398,16 +406,52 @@ def _action_title(action_type: str, payload: dict[str, Any]) -> str:
 
 def _action_detail(action_type: str, payload: dict[str, Any]) -> str:
     if action_type in {"send_chat", "send_email"}:
-        return str(payload.get("subject") or "Message sent")
+        return str(payload.get("body") or payload.get("message") or "Message sent")
     if action_type in {"read_doc", "update_doc"}:
-        return _label(payload.get("doc_id"))
+        return "Document"
     if action_type == "update_task":
-        return _label(payload.get("task_id"))
+        parts = []
+        if payload.get("status"):
+            parts.append(f"Status {payload.get('status')}")
+        if payload.get("priority"):
+            parts.append(f"Priority {payload.get('priority')}")
+        return " · ".join(parts) or "Task updated"
     if action_type == "schedule_meeting":
-        return str(payload.get("title") or "Meeting")
+        attendees = payload.get("attendees") or []
+        people = ", ".join(_label(person) for person in attendees) if attendees else "No attendees"
+        starts_at = payload.get("starts_at") or ""
+        return f"{people} · {starts_at}".strip(" ·")
     if action_type == "advance_time":
         return str(payload.get("target") or "Advanced simulated time")
     return _label(action_type)
+
+
+def _action_badge(action_type: str) -> str:
+    if action_type == "send_chat":
+        return "CHAT"
+    if action_type == "send_email":
+        return "EMAIL"
+    if action_type == "read_doc":
+        return "READ DOC"
+    if action_type == "update_doc":
+        return "WRITE DOC"
+    if action_type == "update_task":
+        return "TASK"
+    if action_type == "schedule_meeting":
+        return "MEETING"
+    return _label(action_type).upper()
+
+
+def _action_route(action_type: str, payload: dict[str, Any]) -> str:
+    if action_type in {"send_chat", "send_email"}:
+        return f"Agent -> {_label(payload.get('person_id'))}"
+    if action_type == "schedule_meeting":
+        attendees = payload.get("attendees") or []
+        if attendees:
+            preview = ", ".join(_label(person) for person in attendees[:4])
+            suffix = "..." if len(attendees) > 4 else ""
+            return f"With {preview}{suffix}"
+    return ""
 
 
 def _label(value: Any) -> str:
@@ -475,10 +519,19 @@ section { margin:14px 0; overflow:hidden; }
 .day-head { padding:9px 10px; border-bottom:1px solid var(--line); background:#fff; }
 .day-head strong { display:block; }
 .day-head span { color:var(--muted); font-size:12px; }
-.calendar-event { margin:8px; padding:8px; border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:8px; background:#fff; }
+.calendar-event { margin:8px; padding:10px; border:1px solid var(--line); border-left:4px solid var(--blue); border-radius:10px; background:#fff; display:grid; gap:6px; }
 .calendar-event.event { border-left-color:var(--purple); }
 .calendar-event.message { border-left-color:#1a8f6a; }
 .calendar-event.current { outline:2px solid rgba(37,92,153,.24); background:#f2f7ff; }
+.calendar-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.calendar-meta { display:flex; align-items:center; gap:8px; min-width:0; }
+.tool-badge { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; letter-spacing:.04em; background:#eaf1fb; color:var(--blue); }
+.calendar-event.message .tool-badge { background:#e7f6f0; color:#136c50; }
+.calendar-event.event .tool-badge { background:#f2ebff; color:var(--purple); }
+.calendar-route { font-size:12px; font-weight:700; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.calendar-time { font-size:12px; font-weight:800; color:var(--muted); flex:0 0 auto; }
+.calendar-title { font-size:14px; font-weight:800; color:var(--ink); }
+.calendar-detail { font-size:12px; color:var(--muted); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 .log-console { max-height:360px; overflow:auto; padding:14px; border:1px solid var(--line); border-radius:10px; background:#101722; color:#d9e7ff; font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
 .log-line { white-space:pre-wrap; border-bottom:1px solid rgba(255,255,255,.06); padding:6px 0; }
 .log-line:last-child { border-bottom:none; }
@@ -487,10 +540,19 @@ section { margin:14px 0; overflow:hidden; }
 .list { padding:14px; display:grid; gap:8px; }
 .row { border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }
 .row.scheduled { border-left:4px solid var(--purple); }
+.project-card { border:1px solid var(--line); border-radius:10px; padding:12px; background:#fff; display:grid; gap:8px; }
+.project-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.project-title { font-size:15px; font-weight:800; }
+.project-flags { display:flex; flex-wrap:wrap; gap:6px; }
+.meta-chip { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; background:#f1f4f8; color:var(--muted); }
+.project-copy { font-size:13px; color:var(--muted); }
+.project-footer { display:flex; flex-wrap:wrap; gap:6px; }
 .table-wrap { padding:14px; overflow:auto; }
 table { width:100%; border-collapse:collapse; font-size:13px; }
 th, td { padding:10px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
 th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+.task-title { font-weight:800; }
+.task-subtle { color:var(--muted); font-size:12px; margin-top:2px; }
 details.operator { margin:14px 0; border:1px solid var(--line); border-radius:12px; background:#fff; box-shadow:var(--shadow); overflow:hidden; }
 details.operator summary { cursor:pointer; padding:13px 15px; font-weight:850; background:#fbfcfe; border-bottom:1px solid var(--line); }
 details.operator[open] summary { border-bottom:1px solid var(--line); }
@@ -608,6 +670,28 @@ function row(title, detail, meta = "") {
   return `<div class="row"><strong>${esc(title)}</strong>${meta ? ` <span class="badge ${statusClass(meta)}">${esc(label(meta))}</span>` : ""}<div>${esc(detail)}</div></div>`;
 }
 
+function projectCard(project) {
+  const status = project.status || "";
+  const risk = project.risk_level || project.risk || "";
+  const outcome = project.final_outcome || project.decision || project.outcome_summary || "";
+  return `
+    <div class="project-card">
+      <div class="project-head">
+        <div class="project-title">${esc(project.name || "Project")}</div>
+        <div class="project-flags">
+          ${status ? `<span class="badge ${statusClass(status)}">${esc(label(status))}</span>` : ""}
+          ${risk ? `<span class="badge ${statusClass(risk)}">${esc(label(risk))} risk</span>` : ""}
+        </div>
+      </div>
+      ${project.stakeholder_pressure ? `<div class="project-copy">${esc(project.stakeholder_pressure)}</div>` : ""}
+      <div class="project-footer">
+        ${project.deadline ? `<span class="meta-chip">Deadline ${esc(pretty(project.deadline))}</span>` : ""}
+        ${outcome ? `<span class="meta-chip">${esc(label(outcome))}</span>` : ""}
+      </div>
+    </div>
+  `;
+}
+
 function scenarioDays(scenario, items) {
   const values = [
     scenario.start_time,
@@ -636,7 +720,17 @@ function renderReplay(items, scenario) {
         const cards = items
           .map((item, index) => ({ item, index }))
           .filter(row => dateKey(row.item.time) === day)
-          .map(row => `<div class="calendar-event ${esc(row.item.kind)} ${row.index === latest ? "current" : ""}"><div class="time">${esc(timeOnly(row.item.time))}</div><div class="title">${esc(row.item.title)}</div><div class="detail">${esc(row.item.detail)}</div></div>`)
+          .map(row => `<div class="calendar-event ${esc(row.item.kind)} ${row.index === latest ? "current" : ""}">
+            <div class="calendar-top">
+              <div class="calendar-meta">
+                <span class="tool-badge">${esc(row.item.badge || row.item.kind)}</span>
+                ${row.item.route ? `<span class="calendar-route">${esc(row.item.route)}</span>` : ""}
+              </div>
+              <div class="calendar-time">${esc(timeOnly(row.item.time))}</div>
+            </div>
+            <div class="calendar-title">${esc(row.item.title)}</div>
+            ${row.item.detail ? `<div class="calendar-detail">${esc(row.item.detail)}</div>` : ""}
+          </div>`)
           .join("");
         return `<div class="day"><div class="day-head"><strong>${esc(dayLabel(day))}</strong><span>${esc(day)}</span></div>${cards || `<div class="empty">No visible activity.</div>`}</div>`;
       }).join("")
@@ -673,7 +767,7 @@ function render(state) {
     logEl.scrollTop = logEl.scrollHeight;
   }
 
-  $("projects").innerHTML = (obs.projects || []).map(project => row(project.name, `${project.stakeholder_pressure || ""} Deadline: ${pretty(project.deadline)}`, project.status)).join("") || `<div class="empty">No projects.</div>`;
+  $("projects").innerHTML = (obs.projects || []).map(projectCard).join("") || `<div class="empty">No projects.</div>`;
   $("blockers").innerHTML = (obs.known_blockers || []).map(blocker => row(blocker.title, blocker.description || "", blocker.status)).join("") || `<div class="empty">No visible blockers.</div>`;
   $("schedule").innerHTML = (state.authored_schedule || []).map(item => `<div class="row scheduled"><strong>${esc(item.title)}</strong> <span class="badge">${esc(timeOnly(item.time))}</span><div>${esc(pretty(item.time))}</div><div>${esc(item.detail)}</div></div>`).join("") || `<div class="empty">No authored events.</div>`;
   $("evaluation").innerHTML = (evaluation.components || []).map(component => row(label(component.key), component.note || "", `${component.earned} / ${component.points}`)).join("") || `<div class="empty">No evaluation yet.</div>`;
@@ -682,7 +776,19 @@ function render(state) {
     <table>
       <thead><tr><th>Task</th><th>Status</th><th>Owner</th><th>Priority</th><th>Due</th></tr></thead>
       <tbody>
-        ${tasks.map(task => `<tr><td>${esc(task.title)}</td><td><span class="badge ${statusClass(task.status)}">${esc(label(task.status))}</span></td><td>${esc(task.owner_id || "unowned")}</td><td>${esc(label(task.priority || ""))}</td><td>${esc(pretty(task.due_at))}</td></tr>`).join("")}
+        ${tasks.map(task => `<tr>
+          <td>
+            <div class="task-title">${esc(task.title)}</div>
+            ${task.blocked_by ? `<div class="task-subtle">Blocked by ${esc(label(task.blocked_by))}</div>` : ""}
+          </td>
+          <td><span class="badge ${statusClass(task.status)}">${esc(label(task.status))}</span></td>
+          <td><span class="meta-chip">${esc(label(task.owner_id || "unowned"))}</span></td>
+          <td><span class="badge ${statusClass(task.priority)}">${esc(label(task.priority || ""))}</span></td>
+          <td>
+            <div>${esc(pretty(task.due_at))}</div>
+            ${task.due_at ? `<div class="task-subtle">Deadline</div>` : ""}
+          </td>
+        </tr>`).join("")}
       </tbody>
     </table>
   ` : `<div class="empty">No tasks.</div>`;
