@@ -1605,6 +1605,13 @@ class ToolActionTests(unittest.TestCase):
         self.assertIn("task_repo_sync", task_ids)
         self.assertIn("task_launch_decision", task_ids)
 
+    def test_list_tasks_includes_business_timing_orientation(self) -> None:
+        tasks = {task["id"]: task for task in list_tasks(self.db_path)}
+
+        self.assertIn("Thursday morning", tasks["task_customer_talk_track"]["description"])
+        self.assertIn("the Thursday security review", tasks["task_koopa_status_update"]["description"])
+        self.assertIn("Thursday final-readiness check", tasks["task_beta_rollout_notes"]["description"])
+
     def test_read_doc_returns_visible_doc_body(self) -> None:
         result = read_doc(self.db_path, "doc_project_brief")
 
