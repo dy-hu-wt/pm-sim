@@ -297,7 +297,7 @@ grading_rules:
       note: Daisy received grounded customer-ready launch wording.
 ```
 
-This rule is causal. The agent must discover the risk and get the decision before the email can update Daisy's state. The concept matcher only checks narrow authored concepts in the action text; the evaluator later scores `customer_message_ready` from Daisy's state, not from the raw email body. Prefer `required_concepts` and `forbidden_concepts` with a few exemplars over long keyword lists for grading rules.
+This rule is causal. The agent must discover the risk and get the decision before the email can update Daisy's state. The concept matcher only checks narrow authored concepts in the action text and records `action_evidence`; deterministic promotion rules then update Daisy's state. The evaluator later scores `customer_message_ready` from Daisy's state, not from the raw email body. Prefer `required_concepts` and `forbidden_concepts` with a few exemplars over long keyword lists for grading rules.
 
 `mode: concept_match` makes this text check explicit. Concept matching is LLM-backed and requires `OPENAI_API_KEY` for full scoring. It receives only the authored criteria and message text, caches by model/criteria/text/rule id, and rejects responses that do not return every authored concept id with a rationale. The LLM never decides facts, task state, outcome state, or points.
 

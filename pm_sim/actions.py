@@ -10,7 +10,13 @@ from .db import connect, row_to_dict, rows_to_dicts
 from .dependencies import apply_task_dependency_updates
 from .engine.effects import apply_effects
 from .engine.conditions import all_conditions_match
-from .engine.runtime_config import action_rules, actor_behaviors, response_delays, task_gate_rules
+from .engine.runtime_config import (
+    action_rules,
+    actor_behaviors,
+    evidence_promotion_rules,
+    response_delays,
+    task_gate_rules,
+)
 from .engine.rules import match_rule, normalize_text
 from .engine.time import consume_action_time
 from .jsonutil import dumps, loads
@@ -137,6 +143,7 @@ def update_doc(db_path: Path | str, doc_id: str, body: str) -> dict[str, Any]:
             now=current_time,
             source=f"action:{action_id}",
         )
+        applied_effects.extend(_apply_evidence_promotions(conn, current_time, action_id))
         time_cost = consume_action_time(
             conn,
             current_time=current_time,
@@ -216,6 +223,7 @@ def send_chat(db_path: Path | str, person_id: str, body: str) -> dict[str, Any]:
             now=current_time,
             source=f"action:{action_id}",
         )
+        applied_effects.extend(_apply_evidence_promotions(conn, current_time, action_id))
         time_cost = consume_action_time(
             conn,
             current_time=current_time,
@@ -304,6 +312,7 @@ def send_email(
             now=current_time,
             source=f"action:{action_id}",
         )
+        applied_effects.extend(_apply_evidence_promotions(conn, current_time, action_id))
         time_cost = consume_action_time(
             conn,
             current_time=current_time,
@@ -606,8 +615,33 @@ def _effects_for_action(
     return effects
 
 
+def _apply_evidence_promotions(
+    conn: sqlite3.Connection,
+    current_time: str,
+    action_id: str,
+) -> list[dict[str, Any]]:
+    applied_effects: list[dict[str, Any]] = []
+    for rule in _evidence_promotion_rules(conn):
+        if not all_conditions_match(conn, rule.get("when", [])):
+            continue
+        effects = [dict(effect) for effect in rule.get("effects", [])]
+        applied_effects.extend(
+            apply_effects(
+                conn,
+                effects,
+                now=current_time,
+                source=f"evidence_promotion:{action_id}:{rule.get('id')}",
+            )
+        )
+    return applied_effects
+
+
 def _action_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return action_rules(conn)
+
+
+def _evidence_promotion_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    return evidence_promotion_rules(conn)
 
 
 def _schedule_meeting_occurs(

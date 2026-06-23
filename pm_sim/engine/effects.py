@@ -53,6 +53,12 @@ def apply_effects(
             result = _apply_record_milestone(
                 conn, effect, now=now, source=source, index=index
             )
+        elif effect_type == "record_action_evidence":
+            result = _apply_record_action_evidence(
+                conn, effect, now=now, source=source, index=index
+            )
+        elif effect_type == "mark_action_evidence_promoted":
+            result = _apply_mark_action_evidence_promoted(conn, effect, now=now)
         else:
             raise ValueError(f"Unknown effect type: {effect_type!r}")
 
@@ -626,6 +632,65 @@ def _apply_record_milestone(
         ),
     )
     return {"id": milestone_record_id, "key": milestone_id, "deduped": False}
+
+
+def _apply_record_action_evidence(
+    conn: sqlite3.Connection,
+    effect: dict[str, Any],
+    *,
+    now: str,
+    source: str,
+    index: int,
+) -> dict[str, Any]:
+    evidence_key = _required(effect, "key")
+    evidence_id = effect.get("id") or _generated_id(
+        conn,
+        "action_evidence",
+        f"evidence_{_source_slug(source)}",
+        index,
+    )
+    status = effect.get("status", "pending")
+    metadata = {
+        key: value
+        for key, value in effect.items()
+        if key not in {"type", "id", "key", "action_type", "status"}
+    }
+    conn.execute(
+        """
+        INSERT INTO action_evidence
+          (id, key, action_type, created_at, source, status, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            evidence_id,
+            evidence_key,
+            effect.get("action_type", ""),
+            now,
+            source,
+            status,
+            dumps(metadata),
+        ),
+    )
+    return {"id": evidence_id, "key": evidence_key, "status": status}
+
+
+def _apply_mark_action_evidence_promoted(
+    conn: sqlite3.Connection,
+    effect: dict[str, Any],
+    *,
+    now: str,
+) -> dict[str, Any]:
+    evidence_key = _required(effect, "key")
+    cursor = conn.execute(
+        """
+        UPDATE action_evidence
+        SET status = 'promoted'
+        WHERE key = ?
+          AND status = 'pending'
+        """,
+        (evidence_key,),
+    )
+    return {"key": evidence_key, "promoted_count": cursor.rowcount}
 
 
 def _required(effect: dict[str, Any], key: str) -> Any:

@@ -40,6 +40,11 @@ def action_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return priority_sorted(rules)
 
 
+def evidence_promotion_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    rules = state_json(conn, "evidence_promotion_rules_json", [])
+    return priority_sorted(rules) if isinstance(rules, list) else []
+
+
 def event_rules(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     rules = state_json(conn, "event_rules_json", [])
     return priority_sorted(rules) if isinstance(rules, list) else []

@@ -47,6 +47,8 @@ def condition_matches(
         return _pressure_matches(conn, condition["pressure_at_most"], comparator="at_most")
     if "coworker_state" in condition:
         return _coworker_state_matches(conn, condition["coworker_state"])
+    if "action_evidence" in condition:
+        return _action_evidence_matches(conn, condition["action_evidence"])
     if "message_exists" in condition:
         return _message_exists(conn, condition["message_exists"])
     if "first_time_at_or_after" in condition:
@@ -137,6 +139,11 @@ def condition_description(conn: sqlite3.Connection, condition: dict[str, Any]) -
         )
         expected = spec.get("equals", "truthy" if spec.get("truthy") else "configured condition")
         return f"{person_id}.{key} == {expected!r} (current={value})"
+    if "action_evidence" in condition:
+        spec = condition["action_evidence"]
+        count = _action_evidence_count(conn, spec)
+        status = spec.get("status", "any")
+        return f"action evidence {spec.get('key')} status {status!r} exists (current count={count})"
     if "project_decision" in condition:
         spec = condition["project_decision"]
         project_id = spec.get("project_id")
@@ -207,6 +214,8 @@ def condition_time(conn: sqlite3.Connection, source: dict[str, Any]) -> str | No
     if "coworker_state" in source:
         spec = source["coworker_state"]
         return coworker_state_updated_at(conn, spec["person_id"], spec["key"])
+    if "action_evidence" in source:
+        return action_evidence_created_at(conn, source["action_evidence"])
     if "first_fact_or_milestone" in source:
         spec = source["first_fact_or_milestone"]
         return first_fact_or_milestone_time(
@@ -272,6 +281,9 @@ def _first_condition_time(conn: sqlite3.Connection, spec: dict[str, Any]) -> str
             condition_time(conn, {"coworker_state": spec["coworker_state"]})
             if "coworker_state" in spec
             else None,
+            action_evidence_created_at(conn, spec["action_evidence"])
+            if "action_evidence" in spec
+            else None,
         )
         if value is not None
     ]
@@ -331,6 +343,26 @@ def coworker_state_updated_at(conn: sqlite3.Connection, person_id: str, key: str
         (person_id, key),
     ).fetchone()
     return None if row is None else row["updated_at"]
+
+
+def action_evidence_created_at(conn: sqlite3.Connection, spec: dict[str, Any]) -> str | None:
+    values: list[Any] = [spec["key"]]
+    status_clause = ""
+    if spec.get("status"):
+        status_clause = "AND status = ?"
+        values.append(spec["status"])
+    row = conn.execute(
+        f"""
+        SELECT created_at
+        FROM action_evidence
+        WHERE key = ?
+          {status_clause}
+        ORDER BY created_at, id
+        LIMIT 1
+        """,
+        values,
+    ).fetchone()
+    return None if row is None else row["created_at"]
 
 
 def _blocker_status_matches(conn: sqlite3.Connection, spec: dict[str, Any]) -> bool:
@@ -414,6 +446,28 @@ def _coworker_state_matches(conn: sqlite3.Connection, spec: dict[str, Any]) -> b
     if "not_in" in spec:
         return value not in spec["not_in"]
     raise ValueError(f"Unsupported coworker_state condition: {spec}")
+
+
+def _action_evidence_matches(conn: sqlite3.Connection, spec: dict[str, Any]) -> bool:
+    return _action_evidence_count(conn, spec) > 0
+
+
+def _action_evidence_count(conn: sqlite3.Connection, spec: dict[str, Any]) -> int:
+    values: list[Any] = [spec["key"]]
+    status_clause = ""
+    if spec.get("status"):
+        status_clause = "AND status = ?"
+        values.append(spec["status"])
+    row = conn.execute(
+        f"""
+        SELECT COUNT(*) AS count
+        FROM action_evidence
+        WHERE key = ?
+          {status_clause}
+        """,
+        values,
+    ).fetchone()
+    return int(row["count"]) if row is not None else 0
 
 
 def _message_exists(conn: sqlite3.Connection, spec: dict[str, Any]) -> bool:

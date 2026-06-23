@@ -75,6 +75,11 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
         for rule in grading_rules
         if isinstance(rule, dict)
     }
+    generated_promotion_ids = {
+        f"grading_{_required_string(rule, 'id', 'grading rule')}_promotion"
+        for rule in grading_rules
+        if isinstance(rule, dict)
+    }
     generated_milestone_keys = {
         _required_string(
             _required_object(rule, "milestone", f"grading rule {rule.get('id')}"),
@@ -93,6 +98,11 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
         rule
         for rule in compiled.get("milestone_rules", [])
         if rule.get("id") not in generated_milestone_keys
+    ]
+    evidence_promotion_rules = [
+        rule
+        for rule in compiled.get("evidence_promotion_rules", [])
+        if rule.get("id") not in generated_promotion_ids
     ]
     for rule in grading_rules:
         if not isinstance(rule, dict):
@@ -117,15 +127,41 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
             raise ScenarioError(f"grading rule {rule_id} state must include value.")
         milestone_key = _required_string(milestone, "key", f"grading rule {rule_id} milestone")
         note = _required_string(milestone, "note", f"grading rule {rule_id} milestone")
+        evidence_key = f"grading_{rule_id}"
 
         action_rules.append(
             {
-                "id": f"grading_{rule_id}_action",
+                "id": f"{evidence_key}_action",
                 "action_type": action_type,
                 "priority": int(rule.get("priority", 60)),
                 "recipient_id": recipient_id,
                 "match": _match_for_grading_action(action),
                 "when": rule.get("requires", []),
+                "effects": [
+                    {
+                        "type": "record_action_evidence",
+                        "key": evidence_key,
+                        "action_type": action_type,
+                        "person_id": person_id,
+                        "state_key": key,
+                        "state_value": state["value"],
+                    },
+                ],
+            }
+        )
+        evidence_promotion_rules.append(
+            {
+                "id": f"{evidence_key}_promotion",
+                "priority": int(rule.get("priority", 60)),
+                "when": [
+                    *rule.get("requires", []),
+                    {
+                        "action_evidence": {
+                            "key": evidence_key,
+                            "status": "pending",
+                        }
+                    },
+                ],
                 "effects": [
                     {
                         "type": "update_coworker_state",
@@ -134,6 +170,10 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
                         "value": state["value"],
                     },
                     *rule.get("effects", []),
+                    {
+                        "type": "mark_action_evidence_promoted",
+                        "key": evidence_key,
+                    },
                 ],
             }
         )
@@ -160,6 +200,7 @@ def _compile_grading_rules(data: dict[str, Any]) -> dict[str, Any]:
         )
 
     compiled["action_rules"] = action_rules
+    compiled["evidence_promotion_rules"] = evidence_promotion_rules
     compiled["milestone_rules"] = milestone_rules
     return compiled
 
@@ -573,6 +614,16 @@ def _validate_scenario(data: dict[str, Any], path: Path) -> None:
         pressures,
         valid_actors,
     )
+    _validate_evidence_promotion_rules(
+        data.get("evidence_promotion_rules", []),
+        docs,
+        facts,
+        projects,
+        blockers,
+        tasks,
+        pressures,
+        valid_actors,
+    )
     _validate_condition_rule_sets(data, facts, pressures, valid_actors)
     _validate_scored_milestones_are_state_derived(data)
     _validate_scripted_policy(data.get("scripted_policy", []), people, docs, tasks)
@@ -976,6 +1027,49 @@ def _validate_action_rules(
         )
 
 
+def _validate_evidence_promotion_rules(
+    rules: list[dict[str, Any]],
+    docs: set[str],
+    facts: set[str],
+    projects: set[str],
+    blockers: set[str],
+    tasks: set[str],
+    pressures: set[str],
+    valid_actors: set[str],
+) -> None:
+    seen = set()
+    for rule in rules:
+        rule_id = rule.get("id")
+        if not isinstance(rule_id, str) or not rule_id:
+            raise ScenarioError("Evidence promotion rule must have a string id.")
+        if rule_id in seen:
+            raise ScenarioError(f"Evidence promotion rules have duplicate id: {rule_id}")
+        seen.add(rule_id)
+
+        _validate_conditions(
+            rule.get("when", []),
+            label=f"Evidence promotion rule {rule_id}",
+            facts=facts,
+            pressures=pressures,
+            valid_actors=valid_actors,
+        )
+
+        effects = rule.get("effects", [])
+        if not isinstance(effects, list):
+            raise ScenarioError(f"Evidence promotion rule {rule_id} effects must be a list.")
+        _validate_effects(
+            effects,
+            label=f"Evidence promotion rule {rule_id}",
+            docs=docs,
+            facts=facts,
+            projects=projects,
+            blockers=blockers,
+            tasks=tasks,
+            pressures=pressures,
+            valid_actors=valid_actors,
+        )
+
+
 def _validate_match_spec(spec: dict[str, Any], label: str, *, facts: set[str]) -> None:
     mode = spec.get("mode", "deterministic")
     if mode not in {"deterministic", "concept_match"}:
@@ -990,6 +1084,10 @@ def _validate_match_spec(spec: dict[str, Any], label: str, *, facts: set[str]) -
         for fact_id in spec.get(key, []):
             if fact_id not in facts:
                 raise ScenarioError(f"{label} references unknown {key} fact: {fact_id}")
+
+    if mode == "concept_match":
+        _validate_concept_match_spec(spec, label)
+        return
 
     intents = spec.get("intents", [])
     if intents is None:
@@ -1018,28 +1116,67 @@ def _validate_match_spec(spec: dict[str, Any], label: str, *, facts: set[str]) -
                 raise ScenarioError(f"{label} match.{key} references unknown intent: {intent_id}")
 
     for key in ("required_concepts", "forbidden_concepts"):
-        concepts = spec.get(key, [])
-        if concepts is None:
-            concepts = []
-        if not isinstance(concepts, list):
-            raise ScenarioError(f"{label} match.{key} must be a list.")
-        concept_ids = set()
-        for index, concept in enumerate(concepts, start=1):
-            concept_label = f"{label} match {key} concept {index}"
-            if not isinstance(concept, dict):
-                raise ScenarioError(f"{concept_label} must be an object.")
-            concept_id = concept.get("id")
-            if not isinstance(concept_id, str) or not concept_id:
-                raise ScenarioError(f"{concept_label} must include string id.")
-            if concept_id in concept_ids:
-                raise ScenarioError(f"{label} match.{key} has duplicate concept id: {concept_id}")
-            concept_ids.add(concept_id)
-            if not isinstance(concept.get("description"), str) or not concept.get("description"):
-                raise ScenarioError(f"{concept_label} must include description.")
-            exemplars = concept.get("exemplars", [])
-            if not isinstance(exemplars, list) or not exemplars:
-                raise ScenarioError(f"{concept_label} must include non-empty exemplars.")
-            _validate_string_list(exemplars, f"{concept_label} exemplars")
+        if key in spec:
+            raise ScenarioError(f"{label} match.{key} is only valid with mode: concept_match.")
+
+
+def _validate_concept_match_spec(spec: dict[str, Any], label: str) -> None:
+    legacy_keys = sorted(
+        key
+        for key in ("intents", "require_all", "require_any", "forbid", "forbidden")
+        if key in spec
+    )
+    if legacy_keys:
+        raise ScenarioError(
+            f"{label} match.mode concept_match cannot use deterministic intent keys: "
+            + ", ".join(legacy_keys)
+        )
+
+    required_ids = _validate_concept_list(
+        spec.get("required_concepts", []),
+        f"{label} match.required_concepts",
+    )
+    forbidden_ids = _validate_concept_list(
+        spec.get("forbidden_concepts", []),
+        f"{label} match.forbidden_concepts",
+    )
+    if not required_ids and not forbidden_ids:
+        raise ScenarioError(
+            f"{label} match.mode concept_match requires required_concepts or forbidden_concepts."
+        )
+    overlap = sorted(set(required_ids).intersection(forbidden_ids))
+    if overlap:
+        raise ScenarioError(
+            f"{label} match concept ids cannot appear in both required and forbidden: "
+            + ", ".join(overlap)
+        )
+
+
+def _validate_concept_list(concepts: Any, label: str) -> list[str]:
+    if concepts is None:
+        concepts = []
+    if not isinstance(concepts, list):
+        raise ScenarioError(f"{label} must be a list.")
+    concept_ids = []
+    seen = set()
+    for index, concept in enumerate(concepts, start=1):
+        concept_label = f"{label} concept {index}"
+        if not isinstance(concept, dict):
+            raise ScenarioError(f"{concept_label} must be an object.")
+        concept_id = concept.get("id")
+        if not isinstance(concept_id, str) or not concept_id:
+            raise ScenarioError(f"{concept_label} must include string id.")
+        if concept_id in seen:
+            raise ScenarioError(f"{label} has duplicate concept id: {concept_id}")
+        seen.add(concept_id)
+        concept_ids.append(concept_id)
+        if not isinstance(concept.get("description"), str) or not concept.get("description"):
+            raise ScenarioError(f"{concept_label} must include description.")
+        exemplars = concept.get("exemplars", [])
+        if not isinstance(exemplars, list) or not exemplars:
+            raise ScenarioError(f"{concept_label} must include non-empty exemplars.")
+        _validate_string_list(exemplars, f"{concept_label} exemplars")
+    return concept_ids
 
 
 def _validate_condition_rule_sets(
@@ -1050,6 +1187,7 @@ def _validate_condition_rule_sets(
 ) -> None:
     for section, key in (
         ("milestone_rules", "when"),
+        ("evidence_promotion_rules", "when"),
         ("task_gate_rules", "requires"),
         ("outcome_rules", "when"),
     ):
@@ -1105,6 +1243,7 @@ def _validate_scored_milestones_are_state_derived(data: dict[str, Any]) -> None:
         "event_rules",
         "meeting_rules",
         "action_rules",
+        "evidence_promotion_rules",
         "task_gate_rules",
         "harmful_action_rules",
     ):
@@ -1236,6 +1375,14 @@ def _validate_condition(
             if not isinstance(match, dict):
                 raise ScenarioError(f"{label} message_exists match must be an object.")
             _validate_match_spec(match, f"{label} message_exists", facts=facts)
+    if "action_evidence" in condition:
+        spec = condition["action_evidence"]
+        if not isinstance(spec, dict):
+            raise ScenarioError(f"{label} action_evidence condition must be an object.")
+        if not isinstance(spec.get("key"), str) or not spec["key"]:
+            raise ScenarioError(f"{label} action_evidence.key must be a non-empty string.")
+        if "status" in spec and spec["status"] not in {"pending", "promoted"}:
+            raise ScenarioError(f"{label} action_evidence.status must be pending or promoted.")
     for key in ("pressure_at_least", "pressure_at_most"):
         if key not in condition:
             continue
@@ -1288,6 +1435,12 @@ def _validate_effects(
                     raise ScenarioError(f"{label} has invalid update_coworker_state key.")
             elif not isinstance(values, dict) or not values:
                 raise ScenarioError(f"{label} has invalid update_coworker_state values.")
+        if effect_type in {"record_action_evidence", "mark_action_evidence_promoted"}:
+            if not isinstance(effect.get("key"), str) or not effect["key"]:
+                raise ScenarioError(f"{label} has invalid {effect_type} key.")
+            if effect_type == "record_action_evidence" and "status" in effect:
+                if effect["status"] not in {"pending", "promoted"}:
+                    raise ScenarioError(f"{label} record_action_evidence.status must be pending or promoted.")
         if effect_type == "update_actor_workload":
             person_id = effect.get("person_id")
             if person_id not in valid_actors or person_id == "agent":

@@ -33,7 +33,6 @@ from pm_sim.engine.effects import apply_effects
 from pm_sim.formatters import format_agent_progress_html, format_output, format_concept_progress
 from pm_sim.jsonutil import loads
 from pm_sim.paths import DEFAULT_SCENARIO_PATH
-from pm_sim.report import generate_report
 from pm_sim.scenario import ScenarioError, load_scenario
 from pm_sim import concept_match as concept_match_module
 from pm_sim.state import action_log, event_log, observe, reset
@@ -490,6 +489,13 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
                   AND key = 'customer_message_ready'
                 """
             ).fetchone()
+            action_evidence = conn.execute(
+                """
+                SELECT key, status
+                FROM action_evidence
+                WHERE key = 'grading_customer_message_ready'
+                """
+            ).fetchone()
         finally:
             conn.close()
         evaluation = evaluate(self.db_path, DEFAULT_SCENARIO_PATH)
@@ -513,6 +519,7 @@ Repo-sync stale-commit rationale: Luigi confirmed the review context pipeline is
             "grading_customer_message_ready_action",
             {match["rule_id"] for match in result["concept_matches"]},
         )
+        self.assertEqual(action_evidence["status"], "promoted")
         self.assertTrue(loads(row["value_json"]))
         self.assertIn(
             "customer_message_ready",
