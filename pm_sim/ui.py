@@ -618,6 +618,14 @@ section { margin:14px 0; overflow:hidden; }
 .meta-chip { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; font-size:11px; font-weight:800; background:#f1f4f8; color:var(--muted); }
 .project-copy { font-size:13px; color:var(--muted); }
 .project-footer { display:flex; flex-wrap:wrap; gap:6px; }
+.blocker-groups { padding:14px; display:grid; gap:12px; }
+.blocker-group { display:grid; gap:8px; }
+.blocker-group-title { color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+.blocker-card { border:1px solid var(--line); border-radius:10px; padding:12px; background:#fff; display:grid; gap:6px; }
+.blocker-card.resolved { opacity:.72; background:#fbfcfd; }
+.blocker-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.blocker-title { font-weight:800; }
+.blocker-copy { color:var(--muted); font-size:13px; }
 .table-wrap { padding:14px; overflow:auto; }
 table { width:100%; border-collapse:collapse; font-size:13px; }
 th, td { padding:10px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
@@ -837,6 +845,36 @@ function taskCard(task) {
   `;
 }
 
+function blockerCard(blocker) {
+  const status = blocker.status || "";
+  const statusText = status === "surfaced" ? "Known risk" : label(status);
+  return `
+    <div class="blocker-card ${status === "resolved" ? "resolved" : ""}">
+      <div class="blocker-head">
+        <div class="blocker-title">${esc(blocker.title || "Blocker")}</div>
+        <span class="badge ${statusClass(status)}">${esc(statusText)}</span>
+      </div>
+      <div class="blocker-copy">${esc(blocker.description || "")}</div>
+      ${blocker.severity ? `<div><span class="meta-chip">${esc(label(blocker.severity))} severity</span></div>` : ""}
+    </div>
+  `;
+}
+
+function blockerGroups(blockers) {
+  if (!blockers.length) return `<div class="empty">No visible blockers.</div>`;
+  const active = blockers.filter(blocker => blocker.status !== "resolved");
+  const resolved = blockers.filter(blocker => blocker.status === "resolved");
+  return `
+    <div class="blocker-groups">
+      <div class="blocker-group">
+        <div class="blocker-group-title">Active / Known Risks</div>
+        ${active.length ? active.map(blockerCard).join("") : `<div class="empty">No active visible blockers.</div>`}
+      </div>
+      ${resolved.length ? `<div class="blocker-group"><div class="blocker-group-title">Resolved</div>${resolved.map(blockerCard).join("")}</div>` : ""}
+    </div>
+  `;
+}
+
 function evaluationCard(component) {
   const missing = component.missing_evidence || [];
   return `
@@ -958,7 +996,7 @@ function render(state) {
   }
 
   $("projects").innerHTML = (obs.projects || []).map(projectCard).join("") || `<div class="empty">No projects.</div>`;
-  $("blockers").innerHTML = (obs.known_blockers || []).map(blocker => row(blocker.title, blocker.description || "", blocker.status)).join("") || `<div class="empty">No visible blockers.</div>`;
+  $("blockers").innerHTML = blockerGroups(obs.known_blockers || []);
   $("schedule").innerHTML = (state.authored_schedule || []).map(scheduleCard).join("") || `<div class="empty">No authored events.</div>`;
   $("evaluation").innerHTML = (evaluation.components || []).map(evaluationCard).join("") || `<div class="empty">No evaluation yet.</div>`;
   const tasks = (state.tasks || []).slice(0, 12);

@@ -235,6 +235,11 @@
           "source": "koopa_audit_export_request"
         },
         {
+          "type": "update_blocker",
+          "blocker_id": "blocker_audit_export_scope_unclear",
+          "status": "surfaced"
+        },
+        {
           "type": "reveal_doc",
           "doc_id": "doc_koopa_audit_export_note"
         },
@@ -285,6 +290,9 @@
       "channel": "chat",
       "priority": 130,
       "match": {
+        "required_facts": [
+          "fact_koopa_needs_audit_csv"
+        ],
         "terms_any": [
           "koopa",
           "audit",
@@ -329,6 +337,7 @@
       "priority": 110,
       "match": {
         "required_facts": [
+          "fact_koopa_needs_audit_csv",
           "fact_audit_log_one_time_export_feasible"
         ],
         "terms_any": [

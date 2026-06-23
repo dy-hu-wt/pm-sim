@@ -654,8 +654,7 @@
       "status": "open",
       "severity": "medium",
       "owner_id": "toad",
-      "visibility_scope": "public",
-      "visible_at": "2026-06-22T09:00:00",
+      "visibility_scope": "hidden",
       "description": "Koopa Bank needs an answer for Thursday, but the team has not confirmed whether this is a one-time CSV export or a full self-serve feature."
     }
   ],
